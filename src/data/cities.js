@@ -1,19 +1,18 @@
 // Cities the citizen can switch between from the Home screen.
 //
+// Sourced from the full India location dataset (data/indiaLocations.js —
+// all 28 states + 8 UTs, 598 districts, 528 cities/towns with population
+// > 100,000 and real coordinates). See that file for data sources and
+// the CitySelector component for the searchable state -> district -> city
+// picker built on top of it.
+//
 // DATA ACCURACY NOTE: the demo bin/toilet dataset (data/bins.js,
 // data/toilets.js) only covers Lucknow. Choosing another city recentres
 // the map and filters the counts to facilities actually near that city,
 // so it honestly shows "none mapped yet" rather than pretending.
-export const CITIES = [
-  { id: "lucknow", name: "Lucknow", state: "Uttar Pradesh", latitude: 26.8467, longitude: 80.9462 },
-  { id: "kanpur", name: "Kanpur", state: "Uttar Pradesh", latitude: 26.4499, longitude: 80.3319 },
-  { id: "varanasi", name: "Varanasi", state: "Uttar Pradesh", latitude: 25.3176, longitude: 82.9739 },
-  { id: "prayagraj", name: "Prayagraj", state: "Uttar Pradesh", latitude: 25.4358, longitude: 81.8463 },
-  { id: "agra", name: "Agra", state: "Uttar Pradesh", latitude: 27.1767, longitude: 78.0081 },
-  { id: "meerut", name: "Meerut", state: "Uttar Pradesh", latitude: 28.9845, longitude: 77.7064 },
-];
+export { CITIES } from "./indiaLocations";
 
-export const DEFAULT_CITY_ID = "lucknow";
+export const DEFAULT_CITY_ID = "lucknow-up";
 
 // Facilities within this many km of a city's centre count as "in" it.
 export const CITY_RADIUS_KM = 40;

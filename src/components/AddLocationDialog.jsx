@@ -13,9 +13,9 @@ import { validateCustomCity } from "../services/cityService";
 // the map preview underneath is the confirmation step — same
 // pick-then-preview pattern as GovAddFacility and ReportIssue.
 
-export default function AddLocationDialog({ onCancel, onSave }) {
-  const [name, setName] = useState("");
-  const [state, setState] = useState("");
+export default function AddLocationDialog({ onCancel, onSave, initialName = "", initialState = "" }) {
+  const [name, setName] = useState(initialName);
+  const [state, setState] = useState(initialState);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
   const [errors, setErrors] = useState({});

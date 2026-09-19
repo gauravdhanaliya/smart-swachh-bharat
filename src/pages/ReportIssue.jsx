@@ -1,22 +1,20 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import CitizenShell from "../components/CitizenShell";
 import PrimaryButton from "../components/PrimaryButton";
+import LiveCameraCapture from "../components/LiveCameraCapture";
 import { createComplaint } from "../services/complaintService";
 import {
   COMPLAINT_TYPES,
   DEMO_LOCATIONS,
   DEMO_CITIZEN_NAME,
   DESCRIPTION_MAX_LENGTH,
-  MAX_PHOTO_SIZE_BYTES,
-  ALLOWED_PHOTO_TYPES,
   priorityForIssueType,
 } from "../data/complaints";
 
 export default function ReportIssue() {
   const navigate = useNavigate();
   const routerLocation = useLocation();
-  const fileInputRef = useRef(null);
 
   // Step 4 — Bin/Toilet Details screens can deep-link here with
   // { issueType, location } in router state so the report opens
@@ -42,36 +40,9 @@ export default function ReportIssue() {
   );
   const [locationIndex, setLocationIndex] = useState(prefillLocationIndex);
   const [description, setDescription] = useState("");
-  const [photo, setPhoto] = useState(null); // { dataUrl, name }
+  const [photo, setPhoto] = useState(null); // { dataUrl }
   const [errors, setErrors] = useState({});
-  const [photoError, setPhotoError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  const handlePhotoChange = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-selecting the same file later
-    if (!file) return;
-
-    setPhotoError("");
-
-    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
-      setPhotoError("Please upload a JPG, PNG, or WEBP image.");
-      return;
-    }
-    if (file.size > MAX_PHOTO_SIZE_BYTES) {
-      setPhotoError("Image is too large. Max size is 3 MB.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPhoto({ dataUrl: reader.result, name: file.name });
-    };
-    reader.onerror = () => {
-      setPhotoError("Couldn't read that image. Please try another one.");
-    };
-    reader.readAsDataURL(file);
-  };
 
   const validate = () => {
     const next = {};
@@ -170,44 +141,17 @@ export default function ReportIssue() {
 
         <div>
           <label className="mb-1.5 block text-sm font-semibold text-emerald-950">
-            Upload Photo (Optional)
+            Add a Photo (Live Camera)
           </label>
-          <div className="flex items-center gap-3">
-            {photo ? (
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-emerald-100">
-                <img src={photo.dataUrl} alt="Selected issue" className="h-full w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => setPhoto(null)}
-                  aria-label="Remove photo"
-                  className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white"
-                >
-                  <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
-              </div>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50"
-              aria-label="Add photo"
-            >
-              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ALLOWED_PHOTO_TYPES.join(",")}
-              onChange={handlePhotoChange}
-              className="hidden"
-            />
-          </div>
-          {photoError && <p className="mt-1.5 text-xs font-medium text-red-600">{photoError}</p>}
+          <p className="mb-2 text-xs text-emerald-800/60">
+            Only a live photo taken right now is accepted — this keeps reports honest and
+            tied to the actual spot.
+          </p>
+          <LiveCameraCapture
+            photo={photo}
+            onCapture={(dataUrl) => setPhoto({ dataUrl })}
+            onRetake={() => setPhoto(null)}
+          />
         </div>
 
         <div>

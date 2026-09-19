@@ -22,6 +22,7 @@ export default function CitizenHome() {
   const complaints = useComplaints();
   const { city, cities, selectCity, addLocation, removeLocation } = useCity();
   const [addingLocation, setAddingLocation] = useState(false);
+  const [locationPrefill, setLocationPrefill] = useState(null);
   const { unreadCount } = useCitizenNotifications();
 
   // Everything on this screen follows the chosen city. Demo data only
@@ -51,7 +52,10 @@ export default function CitizenHome() {
           city={city}
           cities={cities}
           onSelect={selectCity}
-          onAddLocation={() => setAddingLocation(true)}
+          onAddLocation={(prefill) => {
+            setLocationPrefill(prefill ?? null);
+            setAddingLocation(true);
+          }}
           onRemoveLocation={removeLocation}
         />
 
@@ -198,6 +202,8 @@ export default function CitizenHome() {
 
       {addingLocation && (
         <AddLocationDialog
+          initialName={locationPrefill?.name ?? ""}
+          initialState={locationPrefill?.state ?? ""}
           onCancel={() => setAddingLocation(false)}
           onSave={(data) => {
             addLocation(data);

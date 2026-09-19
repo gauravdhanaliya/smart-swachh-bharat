@@ -10,7 +10,6 @@ import { useComplaints } from "../hooks/useComplaints";
 import { useCitizenNotifications } from "../hooks/useCitizenNotifications";
 import { useCitizenPreferences } from "../hooks/useCitizenPreferences";
 import { DEMO_CITIZEN_NAME, STATUS } from "../data/complaints";
-import { resetDemoData } from "../services/complaintService";
 
 const ICON = {
   fill: "none",
@@ -55,7 +54,6 @@ export default function Profile() {
   const complaints = useComplaints();
   const { unreadCount } = useCitizenNotifications();
   const { preferences, toggle } = useCitizenPreferences();
-  const [resetDone, setResetDone] = useState(false);
   const [confirmingLogout, setConfirmingLogout] = useState(false);
   const [addingLocation, setAddingLocation] = useState(false);
 
@@ -65,12 +63,6 @@ export default function Profile() {
   const handleLogout = () => {
     resetAuth();
     navigate("/login", { replace: true });
-  };
-
-  const handleResetDemoData = () => {
-    resetDemoData();
-    setResetDone(true);
-    setTimeout(() => setResetDone(false), 2500);
   };
 
   return (
@@ -204,23 +196,6 @@ export default function Profile() {
             onClick={() => navigate("/citizen/help")}
           />
         </SettingsGroup>
-
-        <div className="rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/60 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700/70">
-            Demo tools
-          </p>
-          <p className="mt-1 text-xs text-emerald-800/70">
-            Restores the predefined demo complaints for a repeatable SIH presentation. Your alert
-            settings are kept.
-          </p>
-          <button
-            type="button"
-            onClick={handleResetDemoData}
-            className="mt-3 w-full rounded-full border border-emerald-300 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm active:scale-[0.98]"
-          >
-            {resetDone ? "Demo data reset ✓" : "Reset Demo Data"}
-          </button>
-        </div>
 
         {confirmingLogout ? (
           <div className="rounded-2xl border border-red-200 bg-white p-4 shadow-sm">
