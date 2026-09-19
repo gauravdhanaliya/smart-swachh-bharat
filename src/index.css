@@ -1,0 +1,119 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Poppins", "Segoe UI", system-ui, sans-serif;
+
+  --color-brand-green-50: #eefbf3;
+  --color-brand-green-100: #d7f5e0;
+  --color-brand-green-500: #1f9d55;
+  --color-brand-green-600: #178a49;
+  --color-brand-green-700: #0f6e3a;
+  --color-brand-green-800: #0b5c30;
+  --color-brand-green-900: #0a4526;
+
+  --color-brand-orange-400: #ffab3d;
+  --color-brand-orange-500: #f5920e;
+  --color-brand-orange-600: #e07a00;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Phone frame used to preview the mobile-first screens on wider viewports */
+.device-frame {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  position: relative;
+  background: linear-gradient(180deg, #eef8f0 0%, #ffffff 55%);
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .device-frame {
+    min-height: 900px;
+    margin: 24px auto;
+    border-radius: 2.5rem;
+    box-shadow: 0 25px 60px -20px rgba(15, 110, 58, 0.35);
+    border: 10px solid #0b1f14;
+    overflow: hidden;
+  }
+}
+
+.otp-input {
+  caret-color: #178a49;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out both;
+}
+
+/* Facility map (react-leaflet) — bin/toilet pins are custom divIcons,
+   so strip Leaflet's default white-box-with-border div-icon styling and
+   let our own SVG pin markup show through instead. */
+.leaflet-div-icon.ssb-pin {
+  background: transparent;
+  border: none;
+}
+
+.leaflet-container {
+  font-family: var(--font-sans);
+}
+
+@keyframes ssb-pin-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.7);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.8);
+    opacity: 0;
+  }
+}
+
+@keyframes ssb-me-pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Respect the OS-level reduced-motion setting. Not an in-app toggle —
+   the browser already owns this preference. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
