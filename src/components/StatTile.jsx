@@ -1,4 +1,3 @@
-import { CARD_BUTTON } from "./buttonStyles";
 
 const ICON_BG = {
   emerald: "bg-emerald-100 text-emerald-700",
@@ -8,9 +7,15 @@ const ICON_BG = {
   slate: "bg-slate-200 text-slate-700",
 };
 
+// Tighter than the shared CARD_BUTTON token (gap-2.5 / p-3 instead of
+// gap-3 / p-3.5) so two tiles fit side by side on a phone without the
+// label running under the chevron. Same border, radius, hover and focus.
+const INTERACTIVE_CARD =
+  "flex w-full items-center gap-2.5 rounded-2xl border border-emerald-100 bg-white p-3 text-left shadow-sm transition hover:bg-emerald-50 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
+
 // Non-interactive tiles keep the plain card look: no hover, no chevron.
 const STATIC_CARD =
-  "flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-3.5 text-left shadow-sm";
+  "flex items-center gap-2.5 rounded-2xl border border-emerald-100 bg-white p-3 text-left shadow-sm";
 
 export default function StatTile({ icon, label, value, color = "emerald", onClick }) {
   const Comp = onClick ? "button" : "div";
@@ -18,14 +23,14 @@ export default function StatTile({ icon, label, value, color = "emerald", onClic
     <Comp
       onClick={onClick}
       type={onClick ? "button" : undefined}
-      className={onClick ? CARD_BUTTON : STATIC_CARD}
+      className={onClick ? INTERACTIVE_CARD : STATIC_CARD}
     >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${ICON_BG[color]}`}>
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${ICON_BG[color]}`}>
         {icon}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-xl font-bold leading-tight text-emerald-950">{value}</span>
-        <span className="block text-xs leading-tight text-emerald-800/60">{label}</span>
+        <span className="block text-[11px] leading-tight text-emerald-800/60">{label}</span>
       </span>
       {/* USABILITY AUDIT FIX (round 2, issue 4 — unclear which cards are
           interactive): "Total Bins Nearby" and the "Small Actions" banner

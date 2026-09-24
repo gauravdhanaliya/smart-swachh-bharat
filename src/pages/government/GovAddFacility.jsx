@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import GovShell from "../../components/GovShell";
 import SimpleMap from "../../components/SimpleMap";
+import IndiaLocationPicker from "../../components/IndiaLocationPicker";
 import { addGovernmentFacility } from "../../services/facilityService";
 import { FACILITY_TYPE, FACILITY_TYPES, FACILITY_PICK_LOCATIONS } from "../../data/facilityRequests";
 
@@ -19,7 +20,7 @@ export default function GovAddFacility() {
   const [facilityType, setFacilityType] = useState(normalizedType(searchParams.get("type")));
   const [name, setName] = useState("");
   const [addressText, setAddressText] = useState("");
-  const [pickLocationIndex, setPickLocationIndex] = useState("");
+  const [pickedLocation, setPickedLocation] = useState(null);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
 
@@ -46,13 +47,15 @@ export default function GovAddFacility() {
     [hasCoords, latitude, longitude]
   );
 
-  const handlePickLocation = (index) => {
-    setPickLocationIndex(index);
-    if (index === "") return;
-    const loc = FACILITY_PICK_LOCATIONS[Number(index)];
+  // Any place in India: search, or State -> District -> City, plus an
+  // optional locality / GPS pin. Coordinates and address fill in below and
+  // can still be fine-tuned by hand.
+  const handlePickLocation = (loc) => {
+    setPickedLocation(loc);
+    if (!loc) return;
     setLatitude(String(loc.latitude));
     setLongitude(String(loc.longitude));
-    setAddressText((prev) => prev || loc.address);
+    setAddressText(loc.address);
     if (errors.location) setErrors((e) => ({ ...e, location: undefined }));
   };
 
@@ -103,7 +106,7 @@ export default function GovAddFacility() {
     setSavedFacility(null);
     setName("");
     setAddressText("");
-    setPickLocationIndex("");
+    setPickedLocation(null);
     setLatitude("");
     setLongitude("");
     setFillLevel("0");
@@ -255,22 +258,17 @@ export default function GovAddFacility() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm font-semibold text-slate-900">Location</p>
 
-          <label className="mt-3 block text-xs font-medium text-slate-500" htmlFor="facility-pick">
-            Pick a known area (optional)
-          </label>
-          <select
-            id="facility-pick"
-            value={pickLocationIndex}
-            onChange={(e) => handlePickLocation(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
-          >
-            <option value="">Select area…</option>
-            {FACILITY_PICK_LOCATIONS.map((loc, index) => (
-              <option key={loc.address} value={index}>
-                {loc.address}
-              </option>
-            ))}
-          </select>
+          <p className="mt-3 text-xs font-medium text-slate-500">Pick an area anywhere in India</p>
+          <div className="mt-1.5">
+            <IndiaLocationPicker
+              id="gov-facility-location"
+              theme="sky"
+              value={pickedLocation}
+              onChange={handlePickLocation}
+              presets={FACILITY_PICK_LOCATIONS}
+              presetsLabel="Known areas"
+            />
+          </div>
 
           <label className="mt-4 block text-xs font-medium text-slate-500" htmlFor="facility-address">
             Address

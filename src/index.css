@@ -48,6 +48,60 @@ body {
   }
 }
 
+/* Fixed-height phone frame used by EVERY screen (auth, citizen, worker, role
+   shells). The plain .device-frame only sets a *min*-height, so its
+   height grows with the content and the whole document scrolls — which
+   carries the bottom nav away with it. Giving the frame a real height makes
+   the shell's inner content area the only thing that scrolls, so the nav
+   stays put. */
+.device-frame.device-frame--app {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  /* Use as much of the browser window as possible (16px breathing room top
+     and bottom, supplied by the shell wrapper's sm:py-4) so the page itself
+     never needs to scroll on desktop. */
+  .device-frame.device-frame--app {
+    margin: 0 auto;
+    /* ONE phone size for every screen in the app (splash, login, OTP,
+       citizen, worker, official-shell): 430px wide, up to 864px tall
+       (~9:19), shrinking in height on short browser windows. Fixed width
+       means layouts never get cramped and every screen matches. */
+    width: 430px;
+    height: min(864px, calc(100dvh - 32px));
+    min-height: 0;
+  }
+}
+
+/* Slim, quiet scrollbars inside the app frame (the default chunky grey bar
+   fought with the rounded corners), and no scroll-chaining to the page. */
+.device-frame--app .overflow-y-auto {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(23, 138, 73, 0.3) transparent;
+}
+
+.device-frame--app .overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.device-frame--app .overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 14px 0;
+}
+
+.device-frame--app .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgba(23, 138, 73, 0.3);
+  border-radius: 9999px;
+}
+
+.device-frame--app .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(23, 138, 73, 0.5);
+}
+
 .otp-input {
   caret-color: #178a49;
 }

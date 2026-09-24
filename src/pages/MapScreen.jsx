@@ -14,6 +14,7 @@ import { useLiveLocation } from "../hooks/useLiveLocation";
 import { TOILET_STATUS } from "../data/toilets";
 import { BIN_STATUS } from "../data/bins";
 import { FACILITY_PICK_LOCATIONS } from "../data/facilityRequests";
+import IndiaLocationPicker from "../components/IndiaLocationPicker";
 import { TAP_LINK } from "../components/buttonStyles";
 
 // FIX — this screen previously rendered its map with SimpleMap, a plain
@@ -185,6 +186,9 @@ export default function MapScreen() {
       longitude: loc.longitude,
       manual: true,
       label: loc.address,
+      // Picking a whole city/town (from the India-wide picker) should show
+      // the city, not zoom to street level like a known locality does.
+      zoom: loc.city ? CITY_ZOOM : SELECTED_ZOOM,
     });
   };
 
@@ -247,7 +251,7 @@ export default function MapScreen() {
   };
 
   const mapCenter = selected
-    ? { latitude: selected.latitude, longitude: selected.longitude, zoom: SELECTED_ZOOM }
+    ? { latitude: selected.latitude, longitude: selected.longitude, zoom: selected.zoom ?? SELECTED_ZOOM }
     : { latitude: DEFAULT_CENTER.latitude, longitude: DEFAULT_CENTER.longitude, zoom: CITY_ZOOM };
 
   return (
@@ -355,18 +359,15 @@ export default function MapScreen() {
           {showAreaPicker && (
             <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
               <p className="mb-2 text-xs font-semibold text-emerald-950">Set your area manually</p>
-              <div className="flex flex-wrap gap-2">
-                {FACILITY_PICK_LOCATIONS.map((loc) => (
-                  <button
-                    key={loc.address}
-                    type="button"
-                    onClick={() => handlePickArea(loc)}
-                    className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-100"
-                  >
-                    {loc.address}
-                  </button>
-                ))}
-              </div>
+              <IndiaLocationPicker
+                id="map-area"
+                value={null}
+                onChange={(loc) => loc && handlePickArea(loc)}
+                presets={FACILITY_PICK_LOCATIONS}
+                presetsLabel="Known areas"
+                allowLocality={false}
+                allowGps={false}
+              />
             </div>
           )}
 

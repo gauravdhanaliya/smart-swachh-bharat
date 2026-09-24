@@ -112,7 +112,7 @@ export default function BottomNavigation() {
       )}
 
       <nav
-        className={`relative ${showQuickActions ? "z-30" : "z-10"} flex items-end border-t border-emerald-100 bg-white px-2 pb-2 pt-1`}
+        className={`relative shrink-0 ${showQuickActions ? "z-30" : "z-10"} flex items-end border-t border-emerald-100 bg-white px-2 pb-2 pt-1 shadow-[0_-6px_16px_-8px_rgba(15,110,58,0.18)]`}
       >
         {showQuickActions && (
           <QuickActionsSheet

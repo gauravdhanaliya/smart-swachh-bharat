@@ -16,6 +16,7 @@ import ComplaintTracking from "./pages/ComplaintTracking";
 import Profile from "./pages/Profile";
 import CitizenNotifications from "./pages/CitizenNotifications";
 import CitizenHelp from "./pages/CitizenHelp";
+import CitizenEcoGuide from "./pages/CitizenEcoGuide";
 import GovDashboard from "./pages/government/GovDashboard";
 import GovComplaints from "./pages/government/GovComplaints";
 import GovComplaintDetails from "./pages/government/GovComplaintDetails";
@@ -119,6 +120,14 @@ export default function App() {
           element={
             <RequireRole role="citizen">
               <CitizenHelp />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/citizen/eco-guide"
+          element={
+            <RequireRole role="citizen">
+              <CitizenEcoGuide />
             </RequireRole>
           }
         />

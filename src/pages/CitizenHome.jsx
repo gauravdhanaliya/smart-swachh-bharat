@@ -149,6 +149,7 @@ export default function CitizenHome() {
         {/* Small actions banner */}
         <button
           type="button"
+          onClick={() => navigate("/citizen/eco-guide")}
           className={`mt-3 ${CARD_BUTTON_FILLED}`}
         >
           <span className="text-xl">🌿</span>
@@ -156,6 +157,9 @@ export default function CitizenHome() {
             Small Actions
             <br />
             Make a Big Difference
+            <span className="mt-0.5 block text-xs font-normal text-white/80">
+              Open the Eco Guide — learn easy ways to help
+            </span>
           </span>
           <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 6l6 6-6 6" />

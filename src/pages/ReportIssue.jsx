@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import CitizenShell from "../components/CitizenShell";
 import PrimaryButton from "../components/PrimaryButton";
 import LiveCameraCapture from "../components/LiveCameraCapture";
+import IndiaLocationPicker from "../components/IndiaLocationPicker";
 import { createComplaint } from "../services/complaintService";
 import {
   COMPLAINT_TYPES,
@@ -21,24 +22,12 @@ export default function ReportIssue() {
   // pre-filled (e.g. "Overflowing Bin" + that bin's address).
   const prefill = routerLocation.state ?? {};
 
-  const locations = useMemo(() => {
-    if (!prefill.location) return DEMO_LOCATIONS;
-    const alreadyListed = DEMO_LOCATIONS.some(
-      (loc) => loc.address === prefill.location.address
-    );
-    return alreadyListed ? DEMO_LOCATIONS : [prefill.location, ...DEMO_LOCATIONS];
-  }, [prefill.location]);
-
-  const prefillLocationIndex = useMemo(() => {
-    if (!prefill.location) return "";
-    const idx = locations.findIndex((loc) => loc.address === prefill.location.address);
-    return idx === -1 ? "" : String(idx);
-  }, [locations, prefill.location]);
-
   const [issueType, setIssueType] = useState(
     () => COMPLAINT_TYPES.find((t) => t.label === prefill.issueType) ?? null
   );
-  const [locationIndex, setLocationIndex] = useState(prefillLocationIndex);
+  // The chosen place — { address, latitude, longitude, ... } — from the
+  // India-wide picker, or the pre-filled bin/toilet address.
+  const [location, setLocation] = useState(prefill.location ?? null);
   const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState(null); // { dataUrl }
   const [errors, setErrors] = useState({});
@@ -47,7 +36,7 @@ export default function ReportIssue() {
   const validate = () => {
     const next = {};
     if (!issueType) next.issueType = "Select a complaint type.";
-    if (locationIndex === "") next.location = "Select a location.";
+    if (!location) next.location = "Select a location.";
     if (!description.trim()) next.description = "Description is required.";
     else if (description.trim().length < 10)
       next.description = "Please add a little more detail (at least 10 characters).";
@@ -61,7 +50,6 @@ export default function ReportIssue() {
 
     setSubmitting(true);
     try {
-      const location = locations[Number(locationIndex)];
       const complaint = createComplaint({
         citizenName: DEMO_CITIZEN_NAME,
         issueType: issueType.label,
@@ -155,40 +143,17 @@ export default function ReportIssue() {
         </div>
 
         <div>
-          <label htmlFor="location" className="mb-1.5 block text-sm font-semibold text-emerald-950">
-            Location
-          </label>
-          <div className="relative">
-            <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-500">
-              <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s7-6.1 7-12a7 7 0 10-14 0c0 5.9 7 12 7 12z" />
-                <circle cx="12" cy="10" r="2.5" />
-              </svg>
-            </span>
-            <select
-              id="location"
-              value={locationIndex}
-              onChange={(e) => {
-                setLocationIndex(e.target.value);
-                if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
-              }}
-              className="w-full appearance-none rounded-2xl border border-emerald-100 bg-white py-3 pl-10 pr-9 text-sm text-emerald-950 focus:border-emerald-400 focus:outline-none"
-            >
-              <option value="" disabled>
-                Select a location…
-              </option>
-              {locations.map((loc, i) => (
-                <option key={loc.address} value={i}>
-                  {loc.address}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-500">
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </span>
-          </div>
+          <p className="mb-1.5 text-sm font-semibold text-emerald-950">Location</p>
+          <IndiaLocationPicker
+            id="report-location"
+            value={location}
+            onChange={(loc) => {
+              setLocation(loc);
+              if (loc && errors.location) setErrors((er) => ({ ...er, location: undefined }));
+            }}
+            presets={DEMO_LOCATIONS}
+            presetsLabel="Popular localities (Lucknow)"
+          />
           {errors.location && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.location}</p>}
         </div>
 

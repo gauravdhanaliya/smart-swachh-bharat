@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WorkerShell from "../../components/WorkerShell";
 import SimpleMap from "../../components/SimpleMap";
+import IndiaLocationPicker from "../../components/IndiaLocationPicker";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
 import { createFacilityRequest } from "../../services/facilityRequestService";
 import {
@@ -36,7 +37,7 @@ export default function WorkerRequestFacility() {
   const [locationMode, setLocationMode] = useState("gps");
   const [gpsStatus, setGpsStatus] = useState("idle"); // idle | locating | done | error
   const [gpsError, setGpsError] = useState("");
-  const [mapLocationIndex, setMapLocationIndex] = useState("");
+  const [pickedLocation, setPickedLocation] = useState(null);
   const [addressText, setAddressText] = useState("");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
@@ -73,10 +74,15 @@ export default function WorkerRequestFacility() {
     );
   };
 
-  const handlePickMapLocation = (index) => {
-    setMapLocationIndex(index);
-    if (index === "") return;
-    const loc = FACILITY_PICK_LOCATIONS[Number(index)];
+  // "Pick on Map" — search / browse anywhere in India (state -> district ->
+  // city), optionally add a locality, or pin the spot with GPS.
+  const handlePickMapLocation = (loc) => {
+    setPickedLocation(loc);
+    if (!loc) {
+      setLatitude("");
+      setLongitude("");
+      return;
+    }
     setLatitude(String(loc.latitude));
     setLongitude(String(loc.longitude));
     setAddressText(loc.address);
@@ -243,21 +249,15 @@ export default function WorkerRequestFacility() {
 
           {locationMode === "map" && (
             <div className="rounded-2xl border border-orange-100 bg-white p-3.5">
-              <select
-                value={mapLocationIndex}
-                onChange={(e) => handlePickMapLocation(e.target.value)}
-                className="w-full appearance-none rounded-2xl border border-orange-100 bg-white py-2.5 px-3.5 text-sm text-slate-900 focus:border-orange-400 focus:outline-none"
-              >
-                <option value="" disabled>
-                  Select a location on the map…
-                </option>
-                {FACILITY_PICK_LOCATIONS.map((loc, i) => (
-                  <option key={loc.address} value={i}>
-                    {loc.address}
-                  </option>
-                ))}
-              </select>
-              {hasCoords && mapLocationIndex !== "" && (
+              <IndiaLocationPicker
+                id="worker-facility-location"
+                theme="orange"
+                value={pickedLocation}
+                onChange={handlePickMapLocation}
+                presets={FACILITY_PICK_LOCATIONS}
+                presetsLabel="Known areas"
+              />
+              {hasCoords && pickedLocation && (
                 <SimpleMap
                   latitude={Number(latitude)}
                   longitude={Number(longitude)}
