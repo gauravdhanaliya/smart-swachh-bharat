@@ -49,12 +49,12 @@ export { WORKERS } from "./workers";
 // Preset localities so the citizen can pick a location without needing
 // real device geolocation permissions during the demo.
 export const DEMO_LOCATIONS = [
-  { address: "Gomti Nagar, Lucknow", latitude: 26.8467, longitude: 80.9462 },
-  { address: "Hazratganj, Lucknow", latitude: 26.8508, longitude: 80.9462 },
-  { address: "Indira Nagar, Lucknow", latitude: 26.8763, longitude: 80.9944 },
-  { address: "Aliganj, Lucknow", latitude: 26.8912, longitude: 80.9219 },
-  { address: "Vibhuti Khand, Lucknow", latitude: 26.8558, longitude: 81.0072 },
-  { address: "Alambagh, Lucknow", latitude: 26.8156, longitude: 80.9096 },
+  { address: "COER Main Gate, Roorkee", latitude: 29.9008, longitude: 77.9772 },
+  { address: "COER Hostel, Roorkee", latitude: 29.9015, longitude: 77.9786 },
+  { address: "COER Canteen, Roorkee", latitude: 29.8999, longitude: 77.9779 },
+  { address: "COER Academic Block, Roorkee", latitude: 29.9021, longitude: 77.9768 },
+  { address: "Vardhman Puram, Roorkee", latitude: 29.899, longitude: 77.9755 },
+  { address: "COER Sports Ground, Roorkee", latitude: 29.903, longitude: 77.9795 },
 ];
 
 // Single demo citizen identity (Step 1/2 auth is OTP-only and doesn't
@@ -112,7 +112,7 @@ export const SEED_COMPLAINTS = [
     citizenName: DEMO_CITIZEN_NAME,
     issueType: "Damaged Bin",
     description: "The dry-waste bin near the park entrance has a cracked lid and won't close.",
-    location: { address: "Indira Nagar, Lucknow", latitude: 26.8763, longitude: 80.9944 },
+    location: { address: "COER Sports Ground, Roorkee", latitude: 29.9030, longitude: 77.9795 },
     priority: PRIORITY.MEDIUM,
     photo: null,
     status: STATUS.RESOLVED,
@@ -127,7 +127,7 @@ export const SEED_COMPLAINTS = [
     citizenName: DEMO_CITIZEN_NAME,
     issueType: "Wrong Waste in Bin",
     description: "Hazardous e-waste dumped in the recyclable-waste bin.",
-    location: { address: "Gomti Nagar, Lucknow", latitude: 26.8467, longitude: 80.9462 },
+    location: { address: "COER Main Gate, Roorkee", latitude: 29.9008, longitude: 77.9772 },
     priority: PRIORITY.LOW,
     photo: null,
     status: STATUS.RESOLVED,
@@ -142,7 +142,7 @@ export const SEED_COMPLAINTS = [
     citizenName: DEMO_CITIZEN_NAME,
     issueType: "Not Collected",
     description: "Garbage has not been collected from this street for 3 days.",
-    location: { address: "Vibhuti Khand, Lucknow", latitude: 26.8558, longitude: 81.0072 },
+    location: { address: "Vardhman Puram, Roorkee", latitude: 29.8990, longitude: 77.9755 },
     priority: PRIORITY.MEDIUM,
     photo: null,
     status: STATUS.IN_PROGRESS,
@@ -157,7 +157,7 @@ export const SEED_COMPLAINTS = [
     citizenName: DEMO_CITIZEN_NAME,
     issueType: "Overflowing Bin",
     description: "Bin is overflowing and waste is spreading around the area.",
-    location: { address: "Gomti Nagar, Lucknow", latitude: 26.8467, longitude: 80.9462 },
+    location: { address: "COER Main Gate, Roorkee", latitude: 29.9008, longitude: 77.9772 },
     priority: PRIORITY.HIGH,
     photo: null,
     status: STATUS.SUBMITTED,

@@ -324,7 +324,7 @@ export default function WorkerRequestFacility() {
               setAddressText(e.target.value);
               if (errors.address) setErrors((er) => ({ ...er, address: undefined }));
             }}
-            placeholder="e.g. Near IIMT University main gate"
+            placeholder="e.g. Near COER University main gate"
             className="w-full rounded-2xl border border-orange-100 bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none"
           />
           {errors.address && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.address}</p>}

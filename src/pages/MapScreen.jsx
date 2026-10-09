@@ -38,8 +38,8 @@ import { TAP_LINK } from "../components/buttonStyles";
 // that's where the IIMT-University-area demo/test facilities actually
 // are (see FACILITY_PICK_LOCATIONS in data/facilityRequests.js), so the
 // map opens centered on the same area those facilities are added to.
-const DEFAULT_CENTER = { latitude: 28.9845, longitude: 77.7064 }; // Meerut
-const DEFAULT_CENTER_LABEL = "Meerut";
+const DEFAULT_CENTER = { latitude: 29.9005, longitude: 77.9775 }; // COER University, Roorkee
+const DEFAULT_CENTER_LABEL = "Roorkee";
 const CITY_ZOOM = 13;
 const SELECTED_ZOOM = 16;
 const VALID_FILTERS = ["all", "bins", "toilets"];
@@ -84,7 +84,7 @@ function NearbyRow({ kind, item, onSelect }) {
         <span className="flex items-center justify-between gap-2">
           {/* USABILITY AUDIT FIX (issues 3 & 4 — "text is truncated"): a
               single-line `truncate` could clip the whole facility name
-              (e.g. "Dustbin near IIMT University gate") when the status
+              (e.g. "Dustbin near COER University gate") when the status
               badge claimed most of the row's width. Wrapping to 2 lines
               keeps the full name readable; `title` covers hover/AT. */}
           <span className="line-clamp-2 text-sm font-semibold text-emerald-950" title={item.name}>

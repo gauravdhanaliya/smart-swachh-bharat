@@ -54,14 +54,12 @@ export const FACILITY_REQUEST_ID_PREFIX = `FR-${YEAR}-`;
 // without needing a click-to-drop-pin map library. Coordinates are
 // prototype approximations for the demo, not surveyed points.
 export const FACILITY_PICK_LOCATIONS = [
-  { address: "Near IIMT University, Meerut", latitude: 28.9846, longitude: 77.7064 },
-  { address: "Ganganagar, Lucknow", latitude: 26.8845, longitude: 80.9614 },
-  { address: "Gomti Nagar, Lucknow", latitude: 26.8467, longitude: 80.9462 },
-  { address: "Hazratganj, Lucknow", latitude: 26.8508, longitude: 80.9462 },
-  { address: "Indira Nagar, Lucknow", latitude: 26.8763, longitude: 80.9944 },
-  { address: "Aliganj, Lucknow", latitude: 26.8912, longitude: 80.9219 },
-  { address: "Vibhuti Khand, Lucknow", latitude: 26.8558, longitude: 81.0072 },
-  { address: "Alambagh, Lucknow", latitude: 26.8156, longitude: 80.9096 },
+  { address: "COER Main Gate, Roorkee", latitude: 29.9008, longitude: 77.9772 },
+  { address: "COER Hostel, Roorkee", latitude: 29.9015, longitude: 77.9786 },
+  { address: "COER Canteen, Roorkee", latitude: 29.8999, longitude: 77.9779 },
+  { address: "COER Academic Block, Roorkee", latitude: 29.9021, longitude: 77.9768 },
+  { address: "Vardhman Puram, Roorkee", latitude: 29.899, longitude: 77.9755 },
+  { address: "COER Sports Ground, Roorkee", latitude: 29.903, longitude: 77.9795 },
 ];
 
 function isoNow() {
@@ -75,8 +73,8 @@ export const SEED_FACILITY_REQUESTS = [
   {
     id: `${FACILITY_REQUEST_ID_PREFIX}001`,
     facilityType: FACILITY_TYPE.DUSTBIN,
-    suggestedName: "Dustbin near IIMT University gate",
-    location: { address: "Near IIMT University, Meerut", latitude: 28.9846, longitude: 77.7064 },
+    suggestedName: "Dustbin near COER University gate",
+    location: { address: "COER Main Gate, Roorkee", latitude: 29.9008, longitude: 77.9772 },
     reason: "No dustbin within 200m of the main gate; students dump waste on the roadside.",
     description: "High footfall area during college hours. A segregated 3-bin unit would help most.",
     priority: FACILITY_PRIORITY.HIGH,
@@ -92,8 +90,8 @@ export const SEED_FACILITY_REQUESTS = [
   {
     id: `${FACILITY_REQUEST_ID_PREFIX}002`,
     facilityType: FACILITY_TYPE.TOILET,
-    suggestedName: "Public toilet, Ganganagar market",
-    location: { address: "Ganganagar, Lucknow", latitude: 26.8845, longitude: 80.9614 },
+    suggestedName: "Public toilet, Vardhman Puram market",
+    location: { address: "Vardhman Puram, Roorkee", latitude: 29.8990, longitude: 77.9755 },
     reason: "Market area has no public toilet; nearest facility is over 1km away.",
     description: "Vendors and visitors currently have no sanitation facility nearby.",
     priority: FACILITY_PRIORITY.MEDIUM,
@@ -110,7 +108,7 @@ export const SEED_FACILITY_REQUESTS = [
     id: `${FACILITY_REQUEST_ID_PREFIX}003`,
     facilityType: FACILITY_TYPE.DUSTBIN,
     suggestedName: "Extra dustbin, demo location",
-    location: { address: "Demo location, Lucknow", latitude: 26.86, longitude: 80.95 },
+    location: { address: "COER Canteen, Roorkee", latitude: 29.8999, longitude: 77.9779 },
     reason: "Sample rejected request for demo purposes.",
     description: "Prototype example showing the rejection-reason state.",
     priority: FACILITY_PRIORITY.LOW,

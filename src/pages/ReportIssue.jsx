@@ -152,7 +152,7 @@ export default function ReportIssue() {
               if (loc && errors.location) setErrors((er) => ({ ...er, location: undefined }));
             }}
             presets={DEMO_LOCATIONS}
-            presetsLabel="Popular localities (Lucknow)"
+            presetsLabel="Popular localities (COER, Roorkee)"
           />
           {errors.location && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.location}</p>}
         </div>

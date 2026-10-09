@@ -43,7 +43,7 @@ export default function GovAddFacility() {
     () =>
       hasCoords
         ? { latitude: Number(latitude), longitude: Number(longitude) }
-        : { latitude: 26.8467, longitude: 80.9462 }, // Lucknow fallback
+        : { latitude: 29.9005, longitude: 77.9775 }, // COER, Roorkee fallback
     [hasCoords, latitude, longitude]
   );
 
@@ -278,7 +278,7 @@ export default function GovAddFacility() {
             type="text"
             value={addressText}
             onChange={(e) => setAddressText(e.target.value)}
-            placeholder="e.g. Gomti Nagar, Lucknow"
+            placeholder="e.g. COER University, Roorkee"
             className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
           />
           {errors.address && <p className="mt-1 text-xs font-medium text-red-600">{errors.address}</p>}

@@ -26,7 +26,7 @@ export default function CitizenHome() {
   const { unreadCount } = useCitizenNotifications();
 
   // Everything on this screen follows the chosen city. Demo data only
-  // exists for Lucknow, so other cities honestly show zero.
+  // exists for Roorkee, so other cities honestly show zero.
   const bins = useMemo(() => allBins.filter((b) => inCity(b, city)), [allBins, city]);
   const toilets = useMemo(() => allToilets.filter((t) => inCity(t, city)), [allToilets, city]);
 
@@ -194,7 +194,7 @@ export default function CitizenHome() {
           />
           {bins.length === 0 && toilets.length === 0 && (
             <p className="mt-2 text-xs text-emerald-800/60">
-              No bins or toilets are mapped in {city.name} yet — the demo data covers Lucknow.
+              No bins or toilets are mapped in {city.name} yet — the demo data covers Roorkee (COER University area).
             </p>
           )}
         </div>
