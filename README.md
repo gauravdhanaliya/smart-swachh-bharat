@@ -1,130 +1,141 @@
-# EcoSetu — Smart Swachh Bharat
+# EcoSetu
 
-**Connecting Citizens, Government & Sanitation Workers**
+A prototype web app that connects citizens, government officials, and sanitation workers around a single sanitation complaint, from the moment it's reported to the moment it's resolved.
 
-A prototype civic-tech platform for urban waste management and sanitation.
-One citizen complaint travels
-through a single shared data store and is visible — in real time — to
-the Citizen who reported it, the Government Official who assigns it, and
-the Sanitation Worker who resolves it.
+## Overview
 
-> **This is a prototype.** All data (bins, toilets, complaints, workers,
-> live fill-levels) is simulated and stored locally in the browser
-> (`localStorage`). Nothing here connects to a real municipal system,
-> SMS gateway, or payment provider. Bin and toilet coordinates are
-> clearly labeled `"Demo Location"` in the data and UI — they are not
-> verified official municipal locations.
+In most cities, reporting a sanitation problem like an overflowing bin or a broken public toilet means a phone call, a form at an office, or just giving up. Once that report is made, the person who filed it has no way to see what happens next. The official in charge of the area has no single place to see every open issue across the city. The worker who actually has to go fix it often finds out secondhand, with no record of what was asked for or what was already tried.
 
-## Technology stack
+EcoSetu is our attempt at closing that loop. It's a single web app with three logins: Citizen, Government Official, and Sanitation Worker. Whichever role you sign in as, you're looking at the same underlying complaint data, just through a different lens. A citizen reports an overflowing bin, the official sees it appear on their dashboard and assigns it to a worker, the worker sees it on their task list and marks it resolved with a note and a photo, and the citizen sees the status update in real time. One complaint, one record, three points of view.
 
-- **React 19** + **Vite** — UI and dev/build tooling
-- **React Router v7** — client-side routing and role-based route guards
-- **Tailwind CSS v4** — styling
-- **Leaflet / React-Leaflet** — interactive bin & public-toilet map (free OpenStreetMap tiles, no paid API keys, no Google Maps JavaScript API/billing). The map supports zoom/pan, marker popups, category + status filters, search, "Use My Location" (browser Geolocation API, never stored or sent anywhere), and a "Navigate" link that opens Google Maps directions by URL — no Maps API key needed for that either.
-- **localStorage** — the prototype's single source of truth for complaints, auth/role state, and the demo worker session (swap-ready: only `src/services/complaintService.js` would need to change for a real backend)
+## Key features
 
-No AI, Redis, message queues, real SMS/push, or payment integrations are used — by design, to keep the prototype lightweight and easy to run anywhere.
+### Citizen
 
-## Documentation
+- Browse a live map of dustbins and public toilets, with filters for category and status
+- See real OpenStreetMap-mapped bins and toilets near you, alongside a demo seed set, through the free Overpass API (no Google Maps billing, no API key)
+- "Use My Location" to center the map, and a one-tap "Navigate" link that opens Google Maps directions
+- Report an issue with a required live camera photo (no gallery upload, so the photo has to be taken on the spot), a description, and a location picked from a searchable India-wide picker (every state, district, and city, plus GPS)
+- Track your own complaints by status: Submitted, Assigned, In Progress, Resolved
+- An Eco Guide page with six sustainability topics (segregation, composting, going plastic-free, saving water, saving energy, going green), each with a short illustrated how-to and a "did you know" fact
+- A notifications feed for complaint and resolution updates, with per-type toggles
+- A Help & Support page with an FAQ and the complaint lifecycle explained in plain language
+- Add and remove your own custom locations on top of the built-in city list
 
-- `README.md` — this file: setup, stack, demo roles, deployment
+### Sanitation Worker
 
+- A task list of complaints assigned to you, with one tap to start work and one to mark resolved (with a note and photo)
+- A map view of your assigned area
+- Request a new bin or public toilet placement, with a location picked on the map or by GPS, which goes to the government queue for approval
+- Track the status of your own facility requests
+- A notifications feed and a profile page
 
-## Installation
+### Government Official
 
-Requires Node.js 18+.
+- A dashboard with city-wide complaint counts, bin and toilet stats, and worker status, centered on your chosen district
+- A full complaints list with the ability to open any complaint, assign it to a specific worker, and set its priority
+- Add new bins and public toilets to the map, or take one off the map (with a reason recorded and a short undo window, never a hard delete)
+- Review and approve or reject facility requests submitted by workers
+- Manage the worker directory: add, remove, and view worker status
+- Analytics on complaint volume and resolution over time
+- An editable profile (name, district, department) instead of a fixed identity
+
+## Tech stack
+
+- React 19 with Vite for the UI and build tooling
+- React Router v7 for client-side routing and role-based route guards
+- Tailwind CSS v4 for styling
+- Leaflet and React-Leaflet for the interactive map, using free OpenStreetMap tiles
+- The Overpass API for live OpenStreetMap point data (real bins and toilets that have been mapped by the OSM community)
+- The browser's localStorage as the data layer for this prototype (complaints, facilities, workers, auth state, preferences)
+
+No backend, no database, no real SMS or push service, and no payment integration are used. Everything the app needs to run lives in the browser or comes from the free OpenStreetMap APIs.
+
+## Getting started
+
+### Prerequisites
+
+- Node.js 18 or later
+- npm
+
+### Install
 
 ```bash
+git clone https://github.com/gauravdhanaliya/smart-swachh-bharat.git
+cd smart-swachh-bharat
 npm install
 ```
 
-## Run commands
+### Run it locally
 
 ```bash
-npm run dev       # start the local dev server (Vite)
-npm run build     # production build, output in dist/
-npm run preview   # preview the production build locally
-npm run lint       # oxlint
+npm run dev
 ```
 
-Then open the printed local URL (typically `http://localhost:5173`).
+This starts the Vite dev server. Open the URL it prints, usually `http://localhost:5173`.
 
-## Environment variables
+### Build for production
 
-None required. The prototype has no backend, no API keys, and no secrets —
-all data is either bundled seed data (`src/data/`) or written to the
-browser's `localStorage` at runtime.
+```bash
+npm run build
+```
 
-## Demo roles
+Output goes to `dist/`. Preview that build locally with:
 
-On the login screen, choose one of three roles. Enter any 10-digit mobile
-number, then use OTP `123456` on the verification screen (demo-only, no
-real SMS is sent).
+```bash
+npm run preview
+```
 
-| Role | What they can do |
-| --- | --- |
-| **Citizen** | Browse the bin/public-toilet map, report an issue, track their own complaints |
-| **Government Official** | See every complaint city-wide, assign a worker, set priority, view bin/toilet/worker analytics |
-| **Sanitation Worker** | See tasks assigned to them, start work, mark a task resolved with a note/photo |
+### Lint
 
-Each role only sees the screens meant for it — role-based route guards
-redirect anyone who isn't signed in as the right role back to login.
+```bash
+npm run lint
+```
 
-## Demo workflow (single shared complaint)
-
-1. **Citizen** → Report an Issue → *Overflowing Bin* at *Gomti Nagar, Lucknow* → Submit.
-   The seed complaint `SSB2026-0048` already ships in this exact state (`SUBMITTED`) so the flow can also be shown without submitting a new one.
-2. **Government Official** → Complaints → open the complaint → Assign Worker → *Vikash Kumar*. Status becomes `ASSIGNED`.
-3. **Sanitation Worker** (signed in as Vikash Kumar, the default demo worker) → My Tasks → open the task → **Start Work**. Status becomes `IN_PROGRESS`.
-4. **Citizen** → My Complaints → the same complaint now shows `IN_PROGRESS`.
-5. **Worker** → same task → **Mark as Resolved** (with an optional note/photo). Status becomes `RESOLVED`.
-6. **Citizen** and **Government Official** → both now see the same complaint as `RESOLVED`, with the same ID, location, description, and assigned worker throughout.
-
+No environment variables or API keys are needed for any of the above.
 
 ## Project structure
 
 ```
 src/
-  components/   Shared UI: shells (Citizen/Gov/Worker), badges, cards, map markers, nav bars
-  context/      AuthContext — selected role + demo auth state (localStorage)
-  data/         Seed data: bins, toilets, workers, complaint constants
-  hooks/        useComplaints/useComplaint, useLiveBins, useWorkerSession
-  services/     complaintService.js — single source of truth for all complaint reads/writes
-  pages/        Citizen, Government (pages/government), Worker (pages/worker) screens
-  utils/        Dashboard/analytics aggregation helpers
-  App.jsx       Route definitions + role guards
-  main.jsx      App entry point
+  App.jsx          route definitions and role guards
+  main.jsx          app entry point
+  components/       shared UI: role shells, cards, badges, map pieces, dialogs
+  context/          AuthContext, the demo role/auth state
+  data/             seed data: bins, toilets, workers, complaints, India's states/districts/cities, Eco Guide content
+  hooks/            useComplaints, useLiveBins, useCity, useGovProfile, and the rest of the state-reading hooks
+  pages/            citizen screens, plus pages/government and pages/worker for those roles
+  services/         the data layer: complaintService, facilityService, workerService, osmService, and so on
+  utils/            small helpers for notifications and dashboard stats
 ```
 
-## Resetting demo data
+Each `services/*.js` file is the single place that reads and writes its slice of data. Screens call into these services and never touch localStorage directly, which is also where a real backend would plug in later.
 
-Each role's Profile screen (Citizen and Government Official) has a
-**Reset Demo Data** button. It restores the four predefined seed
-complaints (`SSB2026-0045`–`0048`) and clears anything created during
-the session, so the same walkthrough can be repeated cleanly for
-multiple audiences without needing to clear browser storage manually.
-It never deletes the app itself — only the complaint records in
-`localStorage`.
+## How the demo works
 
-## Deployment
+This is a prototype, and we want to be upfront about what's real and what's simulated.
 
-This is a static single-page app (Vite build output in `dist/`) with
-no backend, so it deploys to any static host.
+- **Real:** the map tiles (OpenStreetMap), and the bin/toilet points pulled live from the Overpass API. Those are actual points the OSM community has mapped, not invented by us.
+- **Simulated:** bin and toilet fill levels tick up and down on a timer to feel like a live IoT feed. There is no sensor behind them.
+- **Local only:** every complaint, facility request, worker record, and user preference lives in your browser's localStorage. Nothing is sent to a server, because there is no server. Clearing your browser's site data resets everything back to the seed state.
+- **Login:** pick a role on the login screen, enter any 10-digit mobile number, and use the OTP `123456` on the verification screen. This is clearly a demo login, no real SMS is sent.
+- **Seed data:** a handful of complaints, bins, toilets, and workers ship pre-loaded so the whole citizen-to-official-to-worker flow can be shown without creating anything new first. Each role's profile page has a "Reset Demo Data" button that restores that seed state without touching your identity settings.
 
-- **Vercel** — `vercel.json` is already set up (`npm run build`, output
-  `dist/`, SPA rewrite so client-side routes like `/citizen/map` don't
-  404 on refresh).
-- **Netlify** — `netlify.toml` and `public/_redirects` provide the same
-  build settings and SPA fallback.
-- **Any other static host** — run `npm run build` and serve the `dist/`
-  folder, making sure unknown paths fall back to `index.html` (required
-  by React Router's `BrowserRouter`).
+The intended walkthrough: sign in as Citizen and report an overflowing bin, sign in as Government Official and assign it to a worker, sign in as Worker and resolve it, then sign back in as Citizen and Official to see the same complaint marked resolved for everyone.
 
-No environment variables, API keys, or server-side configuration are
-needed.
+## Known limitations and future improvements
 
-## Notes for reviewers
+- No real backend. All state is local to one browser, so it can't be shared between devices or survive a cleared cache.
+- No real SMS, push notifications, or payment integration.
+- No live IoT sensors. Bin fill levels are a client-side simulation, not hardware.
+- Bin and toilet coordinates in the seed data are labeled as demo locations, not verified municipal data. The live OSM layer is community-mapped, not an official registry.
+- The full "View on map" screen doesn't yet follow the city you've picked elsewhere in the app.
+- If we build this further, the next steps are a real backend and database behind `services/`, a genuine SMS/OTP provider, and actual IoT integration for bin fill levels instead of the simulated ticker.
 
-- Complaint statuses are always one of `SUBMITTED / ASSIGNED / IN_PROGRESS / RESOLVED` internally; screens only vary the *display label* ("In Progress" vs `IN_PROGRESS`).
-- Bin fill-levels update on a timer to simulate a live IoT feed for the demo — this is client-side randomness, not a real sensor integration.
-- Data persists across a page refresh (localStorage), but is local to the browser/device — clearing site data resets the demo to its seed state.
+## Team and contact
+
+[TEAM NAME]
+
+- [Member name] - [role/contact]
+- [Member name] - [role/contact]
+- [Member name] - [role/contact]

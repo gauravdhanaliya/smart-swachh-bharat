@@ -49,12 +49,11 @@ export default function ScreenShell({
 
         <div className="flex-1 flex flex-col px-6 pb-6 pt-4">{children}</div>
 
-        <div className="relative mt-auto">
-          <CityIllustration
-            variant="subtle"
-            className="absolute bottom-8 left-0 w-full opacity-70 pointer-events-none"
-          />
-          <p className="relative z-10 pb-6 text-center text-xs font-medium text-emerald-700/70">
+        <div className="mt-auto">
+          <div className="relative h-16 overflow-hidden opacity-70 pointer-events-none">
+            <CityIllustration variant="subtle" className="absolute bottom-0 left-0 w-full" />
+          </div>
+          <p className="pb-6 text-center text-xs font-medium text-emerald-700/70">
             {footer}
           </p>
         </div>
