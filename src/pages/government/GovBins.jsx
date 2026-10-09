@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import GovShell from "../../components/GovShell";
 import StatusBadge from "../../components/StatusBadge";
 import StatusFilterTabs from "../../components/StatusFilterTabs";
-import FillChart from "../../components/FillChart";
 import RemoveFacilityDialog from "../../components/RemoveFacilityDialog";
 import RemovedFacilitiesPanel from "../../components/RemovedFacilitiesPanel";
 import { useLiveBins } from "../../hooks/useLiveBins";
@@ -97,12 +96,6 @@ export default function GovBins() {
             </div>
             <p className="mt-1 text-xs text-slate-500">{bin.address}</p>
             <p className="mt-1 text-xs font-medium text-slate-600">{bin.type}</p>
-
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-2xl font-bold text-slate-900">{bin.fillLevel}%</span>
-              <span className="text-xs text-slate-400">Updated {bin.lastUpdated}</span>
-            </div>
-            <FillChart history={bin.history} className="mt-2 h-16 w-full" />
 
             {removal.removeMode && (
               <button
