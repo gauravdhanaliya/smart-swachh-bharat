@@ -224,7 +224,7 @@ export default function GovProfile() {
                 Demo tools
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Restores the predefined demo complaints for a repeatable SIH presentation. Your
+                Restores the predefined demo complaints for a repeatable presentation. Your
                 profile details are kept.
               </p>
               <button

@@ -164,7 +164,7 @@ export function subscribe(callback) {
 /**
  * Demo/dev helper — wipes any complaints created during the session and
  * restores the predefined seed complaints (SSB2026-0045..0048) so the
- * SIH demo workflow can be re-run from a clean, known state. Does not
+ * demo workflow can be re-run from a clean, known state. Does not
  * touch auth/role or worker-session storage.
  */
 export function resetDemoData() {

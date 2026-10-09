@@ -2,8 +2,8 @@
 
 **Connecting Citizens, Government & Sanitation Workers**
 
-A prototype civic-tech platform for urban waste management and sanitation,
-built for Smart India Hackathon (SIH). One citizen complaint travels
+A prototype civic-tech platform for urban waste management and sanitation.
+One citizen complaint travels
 through a single shared data store and is visible — in real time — to
 the Citizen who reported it, the Government Official who assigns it, and
 the Sanitation Worker who resolves it.
@@ -28,9 +28,6 @@ No AI, Redis, message queues, real SMS/push, or payment integrations are used �
 ## Documentation
 
 - `README.md` — this file: setup, stack, demo roles, deployment
-- `SIH_DEMO_GUIDE.md` — full judge-facing demo script, talking points, and architecture explainer
-- `SIH_JUDGE_QA.md` — prepared answers to likely judge questions
-- `SIH_DEMO_CHECKLIST.md` — a plain step-by-step checklist version of the demo flow
 
 
 ## Installation
@@ -82,11 +79,6 @@ redirect anyone who isn't signed in as the right role back to login.
 4. **Citizen** → My Complaints → the same complaint now shows `IN_PROGRESS`.
 5. **Worker** → same task → **Mark as Resolved** (with an optional note/photo). Status becomes `RESOLVED`.
 6. **Citizen** and **Government Official** → both now see the same complaint as `RESOLVED`, with the same ID, location, description, and assigned worker throughout.
-
-For the full judge-facing script (timing, talking points, and an
-architecture explainer), see **`SIH_DEMO_GUIDE.md`**. For a checklist
-version of the same flow, see **`SIH_DEMO_CHECKLIST.md`**. For
-prepared answers to likely judge questions, see **`SIH_JUDGE_QA.md`**.
 
 
 ## Project structure

@@ -9,7 +9,7 @@ import { validateCustomCity } from "../services/cityService";
 // Two ways in, because neither works everywhere: GPS is one tap but
 // needs an HTTPS page and a granted permission (see useLiveLocation for
 // why it can also be wrong), while typed coordinates always work and are
-// what a judge demoing on a laptop will reach for. Whichever you use,
+// what someone demoing on a laptop will reach for. Whichever you use,
 // the map preview underneath is the confirmation step — same
 // pick-then-preview pattern as GovAddFacility and ReportIssue.
 

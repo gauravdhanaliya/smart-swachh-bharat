@@ -2,7 +2,7 @@
 // Shape mirrors what a future `GET /api/toilets` response would return.
 //
 // DATA ACCURACY NOTE (Step 11): these are prototype/demo coordinates
-// used to populate the map for the SIH demo. They are NOT verified
+// used to populate the map for demo purposes. They are NOT verified
 // municipal facility locations — none of these coordinates have been
 // checked against an official source, so none are labeled "verified".
 

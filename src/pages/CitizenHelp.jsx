@@ -10,7 +10,7 @@ import { STATUS_LABELS, STATUS_ORDER } from "../data/complaints";
 // Written against what this app actually does, not generic filler: the
 // FAQ answers describe the real complaint lifecycle (data/complaints.js),
 // the real photo limits (ReportIssue), and the real offline/demo
-// behaviour, so a judge tapping through it doesn't find claims the
+// behaviour, so someone tapping through it doesn't find claims the
 // prototype can't back up.
 
 const APP_VERSION = "1.0.0 (prototype)";
@@ -240,7 +240,7 @@ export default function CitizenHelp() {
           </h2>
           <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
             <p className="text-xs leading-relaxed text-emerald-800/75">
-              EcoSetu is a Smart Swachh Bharat prototype built for Smart India Hackathon. It
+              EcoSetu is a Smart Swachh Bharat prototype. It
               connects citizens, sanitation workers and municipal officials around one shared
               view of bins, public toilets and complaints.
             </p>

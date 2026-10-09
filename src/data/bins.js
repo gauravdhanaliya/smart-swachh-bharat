@@ -2,7 +2,7 @@
 // Shape mirrors what a future `GET /api/bins` response would return.
 //
 // DATA ACCURACY NOTE (Step 11): these are prototype/demo coordinates
-// used to populate the map for the SIH demo. They are NOT verified
+// used to populate the map for demo purposes. They are NOT verified
 // official municipal bin locations. See README.md for how this is
 // disclosed to anyone viewing the app.
 
