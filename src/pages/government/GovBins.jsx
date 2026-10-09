@@ -69,6 +69,12 @@ export default function GovBins() {
         </div>
       )}
 
+      {removal.error && (
+        <p role="alert" className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {removal.error}
+        </p>
+      )}
+
       <RemovedFacilitiesPanel
         category="bin"
         removed={removal.removed}
@@ -90,12 +96,22 @@ export default function GovBins() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-xs font-medium text-slate-400">{bin.id}</p>
-                <p className="font-semibold text-slate-900">{bin.name}</p>
+                <p className="font-semibold text-slate-900">{bin.name}{bin.isDemo && (
+                <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[10px] font-bold text-amber-800">DEMO</span>
+              )}</p>
               </div>
               <StatusBadge status={bin.status} />
             </div>
             <p className="mt-1 text-xs text-slate-500">{bin.address}</p>
             <p className="mt-1 text-xs font-medium text-slate-600">{bin.type}</p>
+
+            <button
+              type="button"
+              onClick={() => navigate(`/official/add-facility?edit=${encodeURIComponent(bin.id)}`)}
+              className="mt-3 w-full rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Edit
+            </button>
 
             {removal.removeMode && (
               <button

@@ -1,36 +1,76 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import GovShell from "../../components/GovShell";
-import SimpleMap from "../../components/SimpleMap";
+import PickLocationMap from "../../components/PickLocationMap";
 import IndiaLocationPicker from "../../components/IndiaLocationPicker";
-import { addGovernmentFacility } from "../../services/facilityService";
-import { FACILITY_TYPE, FACILITY_TYPES, FACILITY_PICK_LOCATIONS } from "../../data/facilityRequests";
+import {
+  addGovernmentFacility,
+  updateFacility,
+  getAllBins,
+  getAllToilets,
+  getAllBuildings,
+} from "../../services/facilityService";
+import {
+  FACILITY_TYPE,
+  FACILITY_TYPES,
+  FACILITY_PICK_LOCATIONS,
+  CAMPUS_CENTER,
+} from "../../data/facilityRequests";
+import { BUILDING_TYPES, BUILDING_TYPE_LABELS } from "../../services/locationAdapters";
+
+const BUILDING = "Building";
+const ALL_TYPES = [...FACILITY_TYPES, { id: BUILDING, label: "Building", icon: "🏫" }];
 
 const BIN_TYPES = ["Dry Waste", "Wet Waste", "Mixed Waste"];
 const TOILET_FACILITY_OPTIONS = ["Men", "Women", "Accessible"];
 
 function normalizedType(raw) {
+  if (raw === BUILDING) return BUILDING;
   return raw === FACILITY_TYPE.TOILET ? FACILITY_TYPE.TOILET : FACILITY_TYPE.DUSTBIN;
+}
+
+function findForEdit(id) {
+  if (!id) return null;
+  const bin = getAllBins().find((b) => b.id === id);
+  if (bin) return { item: bin, type: FACILITY_TYPE.DUSTBIN };
+  const toilet = getAllToilets().find((t) => t.id === id);
+  if (toilet) return { item: toilet, type: FACILITY_TYPE.TOILET };
+  const building = getAllBuildings().find((b) => b.id === id);
+  if (building) return { item: building, type: BUILDING };
+  return null;
 }
 
 export default function GovAddFacility() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [facilityType, setFacilityType] = useState(normalizedType(searchParams.get("type")));
-  const [name, setName] = useState("");
-  const [addressText, setAddressText] = useState("");
+  // ?edit=<id> turns this page into the Edit form for an existing location.
+  const editId = searchParams.get("edit");
+  const editing = useMemo(() => findForEdit(editId), [editId]);
+  const item = editing?.item;
+
+  const [facilityType, setFacilityType] = useState(
+    editing ? editing.type : normalizedType(searchParams.get("type"))
+  );
+  const [name, setName] = useState(item?.name ?? "");
+  const [addressText, setAddressText] = useState(item?.address ?? "");
+  const [description, setDescription] = useState(item?.isDemo ? "" : item?.description ?? "");
   const [pickedLocation, setPickedLocation] = useState(null);
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
+  const [latitude, setLatitude] = useState(item ? String(item.latitude) : "");
+  const [longitude, setLongitude] = useState(item ? String(item.longitude) : "");
 
   // Dustbin-only
-  const [binType, setBinType] = useState(BIN_TYPES[2]);
-  const [fillLevel, setFillLevel] = useState("0");
+  const [binType, setBinType] = useState(item?.type && BIN_TYPES.includes(item.type) ? item.type : BIN_TYPES[2]);
+  const [fillLevel, setFillLevel] = useState(String(item?.fillLevel ?? 0));
 
   // Toilet-only
-  const [openingHours, setOpeningHours] = useState("6:00 AM – 10:00 PM");
-  const [facilities, setFacilities] = useState(["Men", "Women"]);
+  const [openingHours, setOpeningHours] = useState(item?.openingHours ?? "6:00 AM – 10:00 PM");
+  const [facilities, setFacilities] = useState(item?.facilities ?? ["Men", "Women"]);
+  const [toiletStatus, setToiletStatus] = useState(item?.status ?? "Open");
+
+  // Building-only
+  const [buildingType, setBuildingType] = useState(item?.buildingType ?? BUILDING_TYPES[0]);
+  const [serverError, setServerError] = useState("");
 
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -39,13 +79,8 @@ export default function GovAddFacility() {
   const hasCoords =
     latitude !== "" && longitude !== "" && !Number.isNaN(Number(latitude)) && !Number.isNaN(Number(longitude));
 
-  const previewCenter = useMemo(
-    () =>
-      hasCoords
-        ? { latitude: Number(latitude), longitude: Number(longitude) }
-        : { latitude: 29.9005, longitude: 77.9775 }, // COER, Roorkee fallback
-    [hasCoords, latitude, longitude]
-  );
+  const inRange = hasCoords && Math.abs(Number(latitude)) <= 90 && Math.abs(Number(longitude)) <= 180;
+  const pinned = inRange ? { latitude: Number(latitude), longitude: Number(longitude) } : null;
 
   // Any place in India: search, or State -> District -> City, plus an
   // optional locality / GPS pin. Coordinates and address fill in below and
@@ -69,7 +104,8 @@ export default function GovAddFacility() {
     const next = {};
     if (!name.trim()) next.name = "Give this facility a short name.";
     if (!addressText.trim()) next.address = "Add a short address / location description.";
-    if (!hasCoords) next.location = "Provide coordinates using one of the options below.";
+    if (!hasCoords) next.location = "Tap the map or enter coordinates below.";
+    else if (!inRange) next.location = "Latitude must be -90 to 90 and longitude -180 to 180.";
     if (facilityType === FACILITY_TYPE.DUSTBIN) {
       const level = Number(fillLevel);
       if (fillLevel !== "" && (Number.isNaN(level) || level < 0 || level > 100)) {
@@ -80,23 +116,33 @@ export default function GovAddFacility() {
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setServerError("");
     if (!validate()) return;
 
     setSaving(true);
     try {
-      const facility = addGovernmentFacility({
+      const data = {
         facilityType,
         name: name.trim(),
         address: addressText.trim(),
+        description: description.trim(),
         latitude: Number(latitude),
         longitude: Number(longitude),
         ...(facilityType === FACILITY_TYPE.DUSTBIN
           ? { type: binType, fillLevel: Number(fillLevel) || 0 }
-          : { openingHours: openingHours.trim(), facilities }),
-      });
+          : facilityType === FACILITY_TYPE.TOILET
+            ? { openingHours: openingHours.trim(), facilities, status: editing ? toiletStatus : undefined }
+            : { buildingType }),
+      };
+      const facility = editing ? await updateFacility(editId, data) : await addGovernmentFacility(data);
       setSavedFacility(facility);
+    } catch (err) {
+      if (err.fields) {
+        setErrors((prev) => ({ ...prev, ...err.fields, location: err.fields.latitude || err.fields.longitude }));
+      }
+      setServerError(err.message);
     } finally {
       setSaving(false);
     }
@@ -114,17 +160,23 @@ export default function GovAddFacility() {
   };
 
   if (savedFacility) {
-    const destination = facilityType === FACILITY_TYPE.DUSTBIN ? "/official/bins" : "/official/toilets";
+    const destination =
+      facilityType === FACILITY_TYPE.DUSTBIN
+        ? "/official/bins"
+        : facilityType === FACILITY_TYPE.TOILET
+          ? "/official/toilets"
+          : "/official/locations";
+    const destLabel =
+      facilityType === FACILITY_TYPE.DUSTBIN ? "Bins" : facilityType === FACILITY_TYPE.TOILET ? "Toilets" : "Buildings";
     return (
-      <GovShell title="Add Facility" subtitle="Directly add a Dustbin or Public Toilet">
+      <GovShell title={editing ? "Edit Location" : "Add Facility"} subtitle="Dustbin, Public Toilet or campus building">
         <div className="mx-auto flex max-w-lg flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
           <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">✅</span>
           <div>
-            <p className="text-lg font-bold text-slate-900">Facility saved</p>
+            <p className="text-lg font-bold text-slate-900">{editing ? "Changes saved" : "Facility saved"}</p>
             <p className="mt-1 text-sm text-slate-500">
-              {savedFacility.name} ({savedFacility.id}) has been added and is now visible on the Government{" "}
-              {facilityType === FACILITY_TYPE.DUSTBIN ? "Bins" : "Public Toilets"} page and on the Citizen Bin
-              &amp; Toilet Map.
+              {savedFacility.name} ({savedFacility.id}) has been {editing ? "updated" : "added"} and is visible on
+              the Government {destLabel} page and on the Citizen Bin &amp; Toilet Map after their next refresh.
             </p>
           </div>
           <div className="flex w-full gap-3">
@@ -133,15 +185,17 @@ export default function GovAddFacility() {
               onClick={() => navigate(destination)}
               className="flex-1 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
             >
-              View {facilityType === FACILITY_TYPE.DUSTBIN ? "Bins" : "Toilets"}
+              View {destLabel}
             </button>
-            <button
-              type="button"
-              onClick={handleAddAnother}
-              className="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Add Another
-            </button>
+            {!editing && (
+              <button
+                type="button"
+                onClick={handleAddAnother}
+                className="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Add Another
+              </button>
+            )}
           </div>
         </div>
       </GovShell>
@@ -149,21 +203,30 @@ export default function GovAddFacility() {
   }
 
   return (
-    <GovShell title="Add Facility" subtitle="Directly add a Dustbin or Public Toilet">
+    <GovShell
+      title={editing ? "Edit Location" : "Add Facility"}
+      subtitle={editing ? `Editing ${editId}` : "Directly add a Dustbin, Public Toilet or campus building"}
+    >
+      {editId && !editing && (
+        <p className="mx-auto mb-4 max-w-2xl rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Location {editId} was not found (it may have been removed, or data is still loading).
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="mx-auto flex max-w-2xl flex-col gap-5">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="mb-3 text-sm font-semibold text-slate-900">Facility Type</p>
-          <div className="grid grid-cols-2 gap-3">
-            {FACILITY_TYPES.map((t) => (
+          <div className="grid grid-cols-3 gap-3">
+            {ALL_TYPES.map((t) => (
               <button
                 key={t.id}
                 type="button"
+                disabled={Boolean(editing)}
                 onClick={() => setFacilityType(t.id)}
                 className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
                   facilityType === t.id
                     ? "border-sky-500 bg-sky-50 text-sky-700"
                     : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                } disabled:cursor-not-allowed disabled:opacity-60`}
               >
                 <span>{t.icon}</span>
                 {t.label}
@@ -181,7 +244,13 @@ export default function GovAddFacility() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={facilityType === FACILITY_TYPE.DUSTBIN ? "e.g. Charbagh Main Road Bin" : "e.g. Charbagh Public Toilet"}
+            placeholder={
+              facilityType === FACILITY_TYPE.DUSTBIN
+                ? "e.g. Library Entrance Bin"
+                : facilityType === FACILITY_TYPE.TOILET
+                  ? "e.g. Library Public Toilet"
+                  : "e.g. Central Library"
+            }
             className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
           />
           {errors.name && <p className="mt-1 text-xs font-medium text-red-600">{errors.name}</p>}
@@ -220,8 +289,44 @@ export default function GovAddFacility() {
               />
               {errors.fillLevel && <p className="mt-1 text-xs font-medium text-red-600">{errors.fillLevel}</p>}
             </div>
+          ) : facilityType === BUILDING ? (
+            <div className="mt-4">
+              <label className="block text-sm font-semibold text-slate-900" htmlFor="building-type">
+                Building type
+              </label>
+              <select
+                id="building-type"
+                value={buildingType}
+                onChange={(e) => setBuildingType(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
+              >
+                {BUILDING_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {BUILDING_TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+              {errors.type && <p className="mt-1 text-xs font-medium text-red-600">{errors.type}</p>}
+            </div>
           ) : (
             <div className="mt-4">
+              {editing && (
+                <>
+                  <label className="block text-sm font-semibold text-slate-900" htmlFor="toilet-status">
+                    Status
+                  </label>
+                  <select
+                    id="toilet-status"
+                    value={toiletStatus}
+                    onChange={(e) => setToiletStatus(e.target.value)}
+                    className="mb-4 mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
+                  >
+                    {["Open", "Closed", "Maintenance"].map((st) => (
+                      <option key={st}>{st}</option>
+                    ))}
+                  </select>
+                </>
+              )}
               <label className="block text-sm font-semibold text-slate-900" htmlFor="facility-hours">
                 Opening Hours
               </label>
@@ -258,7 +363,22 @@ export default function GovAddFacility() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm font-semibold text-slate-900">Location</p>
 
-          <p className="mt-3 text-xs font-medium text-slate-500">Pick an area anywhere in India</p>
+          <p className="mt-3 text-xs font-medium text-slate-500">
+            Tap the map to place the pin, or enter exact coordinates below
+          </p>
+          <PickLocationMap
+            value={pinned}
+            center={CAMPUS_CENTER}
+            onPick={({ latitude: la, longitude: lo }) => {
+              setLatitude(String(la));
+              setLongitude(String(lo));
+              setPickedLocation(null);
+              if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
+            }}
+            className="mt-2 h-64"
+          />
+
+          <p className="mt-4 text-xs font-medium text-slate-500">Or search another place in India</p>
           <div className="mt-1.5">
             <IndiaLocationPicker
               id="gov-facility-location"
@@ -297,7 +417,7 @@ export default function GovAddFacility() {
                   setLatitude(e.target.value);
                   if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                 }}
-                placeholder="26.8467"
+                placeholder="29.8905551"
                 className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
               />
             </div>
@@ -314,23 +434,31 @@ export default function GovAddFacility() {
                   setLongitude(e.target.value);
                   if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                 }}
-                placeholder="80.9462"
+                placeholder="77.9601633"
                 className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
               />
             </div>
           </div>
           {errors.location && <p className="mt-2 text-xs font-medium text-red-600">{errors.location}</p>}
 
-          {hasCoords && (
-            <SimpleMap
-              latitude={previewCenter.latitude}
-              longitude={previewCenter.longitude}
-              zoom={15}
-              markerLabel={name || "New facility"}
-              className="mt-4 h-48"
-            />
-          )}
+          <label className="mt-4 block text-xs font-medium text-slate-500" htmlFor="facility-description">
+            Notes (optional)
+          </label>
+          <input
+            id="facility-description"
+            type="text"
+            maxLength={300}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
+          />
         </div>
+
+        {serverError && (
+          <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {serverError}
+          </p>
+        )}
 
         <div className="flex gap-3">
           <button
@@ -345,7 +473,7 @@ export default function GovAddFacility() {
             disabled={saving}
             className="flex-1 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Save Facility"}
+            {saving ? "Saving…" : editing ? "Save Changes" : "Save Facility"}
           </button>
         </div>
       </form>

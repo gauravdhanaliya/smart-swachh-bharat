@@ -33,6 +33,12 @@ export const GovNavIcons = {
       <path d="M4 21h16M9 9h6" />
     </svg>
   ),
+  locations: (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" {...common}>
+      <path d="M4 21V8l8-5 8 5v13" />
+      <path d="M9 21v-6h6v6M9 11h.01M15 11h.01" />
+    </svg>
+  ),
   workers: (
     <svg viewBox="0 0 24 24" className="h-5 w-5" {...common}>
       <circle cx="9" cy="8" r="3" />

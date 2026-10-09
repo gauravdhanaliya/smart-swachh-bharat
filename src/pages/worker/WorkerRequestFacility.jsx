@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WorkerShell from "../../components/WorkerShell";
-import SimpleMap from "../../components/SimpleMap";
+import PickLocationMap from "../../components/PickLocationMap";
 import IndiaLocationPicker from "../../components/IndiaLocationPicker";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
 import { createFacilityRequest } from "../../services/facilityRequestService";
@@ -9,6 +9,7 @@ import {
   FACILITY_TYPES,
   FACILITY_PRIORITIES,
   FACILITY_PICK_LOCATIONS,
+  CAMPUS_CENTER,
   REASON_MAX_LENGTH,
   DESCRIPTION_MAX_LENGTH,
   MAX_PHOTO_SIZE_BYTES,
@@ -121,13 +122,13 @@ export default function WorkerRequestFacility() {
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
     setSubmitting(true);
     try {
-      const request = createFacilityRequest({
+      const request = await createFacilityRequest({
         facilityType: facilityType.id,
         suggestedName: suggestedName.trim(),
         location: {
@@ -146,8 +147,14 @@ export default function WorkerRequestFacility() {
         state: { justSubmitted: true },
         replace: true,
       });
-    } catch {
-      setErrors({ submit: "Something went wrong submitting your request. Please try again." });
+    } catch (err) {
+      setErrors({
+        submit: err.message || "Something went wrong submitting your request. Please try again.",
+        ...(err.fields?.reason ? { reason: err.fields.reason } : {}),
+        ...(err.fields?.latitude || err.fields?.longitude
+          ? { location: err.fields.latitude || err.fields.longitude }
+          : {}),
+      });
       setSubmitting(false);
     }
   };
@@ -257,14 +264,22 @@ export default function WorkerRequestFacility() {
                 presets={FACILITY_PICK_LOCATIONS}
                 presetsLabel="Known areas"
               />
-              {hasCoords && pickedLocation && (
-                <SimpleMap
-                  latitude={Number(latitude)}
-                  longitude={Number(longitude)}
-                  markerLabel={addressText}
-                  className="mt-3 h-40"
-                  interactive={false}
-                />
+              <p className="mt-3 text-xs font-medium text-slate-500">Or tap the map to drop a pin</p>
+              <PickLocationMap
+                value={hasCoords ? { latitude: Number(latitude), longitude: Number(longitude) } : null}
+                center={CAMPUS_CENTER}
+                onPick={({ latitude: la, longitude: lo }) => {
+                  setLatitude(String(la));
+                  setLongitude(String(lo));
+                  setPickedLocation(null);
+                  if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
+                }}
+                className="mt-2 h-56"
+              />
+              {hasCoords && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Pin: {Number(latitude).toFixed(6)}, {Number(longitude).toFixed(6)}
+                </p>
               )}
             </div>
           )}

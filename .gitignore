@@ -21,3 +21,6 @@ dist-ssr/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Local API database
+server/data/

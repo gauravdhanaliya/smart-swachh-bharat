@@ -4,6 +4,9 @@ import ScreenShell from "../components/ScreenShell";
 import PrimaryButton from "../components/PrimaryButton";
 import OtpInput from "../components/OtpInput";
 import { useAuth } from "../context/AuthContext";
+import { loginToApi } from "../services/api";
+import { refreshFresh, resetStore } from "../services/locationStore";
+import { getWorkerById } from "../data/workers";
 
 const DEMO_OTP = "123456";
 const RESEND_SECONDS = 60;
@@ -17,11 +20,13 @@ function formatTime(totalSeconds) {
 export default function OtpVerification() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { completeLogin } = useAuth();
+  const { completeLogin, role } = useAuth();
 
   // If the user lands here directly (e.g. page refresh) without a
   // mobile number in state, send them back to enter one.
   const mobile = location.state?.mobile;
+  const accessCode = location.state?.accessCode;
+  const [signingIn, setSigningIn] = useState(false);
 
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
@@ -42,7 +47,7 @@ export default function OtpVerification() {
 
   if (!mobile) return null;
 
-  const handleVerify = (e) => {
+  const handleVerify = async (e) => {
     e.preventDefault();
     if (otp.length !== 6) {
       setError("Enter the 6-digit OTP.");
@@ -52,6 +57,33 @@ export default function OtpVerification() {
       setError("Incorrect OTP. Please try again. (Hint: use 123456)");
       return;
     }
+
+    // Sign in to the API so the server can enforce this role's permissions.
+    setSigningIn(true);
+    try {
+      let workerId;
+      let name;
+      if (role === "worker") {
+        try {
+          workerId = localStorage.getItem("ssb_worker_session_v1") || "w1";
+        } catch {
+          workerId = "w1";
+        }
+        name = getWorkerById(workerId)?.name;
+      }
+      await loginToApi({ role, mobile, accessCode, workerId, name });
+    } catch (err) {
+      // Citizens only read public data, so an unreachable server shouldn't
+      // lock them out; staff roles can't do anything without the server.
+      if (role !== "citizen" || err.status) {
+        setError(err.message);
+        setSigningIn(false);
+        return;
+      }
+    }
+    setSigningIn(false);
+    resetStore();
+    refreshFresh();
     completeLogin(mobile);
     navigate("/success");
   };
@@ -88,7 +120,9 @@ export default function OtpVerification() {
           )}
         </p>
 
-        <PrimaryButton type="submit">Verify</PrimaryButton>
+        <PrimaryButton type="submit" disabled={signingIn}>
+          {signingIn ? "Signing in…" : "Verify"}
+        </PrimaryButton>
 
         <p className="text-center text-sm text-emerald-800/70">
           Didn&apos;t receive OTP?{" "}

@@ -1,14 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ScreenShell from "../components/ScreenShell";
 import PrimaryButton from "../components/PrimaryButton";
 import { useAuth } from "../context/AuthContext";
+import { api } from "../services/api";
 
 export default function MobileNumber() {
   const navigate = useNavigate();
   const { role } = useAuth();
   const [mobile, setMobile] = useState("");
   const [error, setError] = useState("");
+  // Staff roles must present an access code; the server checks it.
+  const [codeRequired, setCodeRequired] = useState(false);
+  useEffect(() => {
+    api("/auth/config")
+      .then((c) => setCodeRequired(Boolean(c.accessCodeRequired)))
+      .catch(() => {});
+  }, []);
+  const needsCode = codeRequired && role && role !== "citizen";
+  const [accessCode, setAccessCode] = useState("");
+  const [codeError, setCodeError] = useState("");
 
   const handleChange = (e) => {
     const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -26,7 +37,11 @@ export default function MobileNumber() {
       setError("Enter a valid 10-digit mobile number.");
       return;
     }
-    navigate("/otp", { state: { mobile } });
+    if (needsCode && !accessCode.trim()) {
+      setCodeError("Enter the access code issued for your role.");
+      return;
+    }
+    navigate("/otp", { state: { mobile, accessCode: needsCode ? accessCode.trim() : undefined } });
   };
 
   return (
@@ -67,6 +82,26 @@ export default function MobileNumber() {
           </div>
           {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
         </div>
+
+        {needsCode && (
+          <div>
+            <input
+              type="password"
+              autoComplete="off"
+              placeholder={`${ROLE_LABEL[role] ?? "Role"} access code`}
+              value={accessCode}
+              onChange={(e) => {
+                setAccessCode(e.target.value);
+                if (codeError) setCodeError("");
+              }}
+              aria-label="Access code"
+              className={`w-full rounded-2xl border bg-white px-4 py-3.5 text-emerald-950 placeholder:text-emerald-800/40 outline-none ${
+                codeError ? "border-red-400" : "border-emerald-200"
+              }`}
+            />
+            {codeError && <p className="mt-2 text-sm text-red-500">{codeError}</p>}
+          </div>
+        )}
 
         <PrimaryButton type="submit">
           Send OTP

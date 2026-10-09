@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { logoutFromApi } from "../services/api";
+import { resetStore } from "../services/locationStore";
 
 const AuthContext = createContext(null);
 
@@ -38,6 +40,8 @@ export function AuthProvider({ children }) {
   };
 
   const resetAuth = () => {
+    logoutFromApi();
+    resetStore();
     setRole(null);
     setMobileNumber("");
     setIsAuthenticated(false);

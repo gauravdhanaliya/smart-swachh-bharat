@@ -31,7 +31,7 @@ export default function RemoveFacilityDialog({ facility, category, onCancel, onC
   const isOther = reason === OTHER;
   const finalReason = isOther ? otherReason.trim() : reason;
   const canConfirm = finalReason.length > 0;
-  const label = category === "toilet" ? "public toilet" : "dustbin";
+  const label = category === "toilet" ? "public toilet" : category === "building" ? "building" : "dustbin";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
