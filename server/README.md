@@ -13,7 +13,7 @@ npm test            # API + client-adapter tests
 
 Copy `server/.env.example` to `.env` and set the secrets. In development the server falls back to insecure defaults and warns; in production (`NODE_ENV=production`) it refuses to start without them.
 
-Access codes are only required when `ECOSETU_REQUIRE_ACCESS_CODES=true` or in production (see "Access codes" below).
+Every role logs in with a mobile number and OTP `123456`. Access codes are only required when `ECOSETU_REQUIRE_ACCESS_CODES=true` (see "Access codes" below).
 
 ## Database
 
@@ -62,4 +62,4 @@ The whole file is rejected if any row is invalid. `--replace-demo` hides the sim
 
 ## Access codes
 
-In local development staff login is mobile number + OTP `123456`, same as before. Set `ECOSETU_REQUIRE_ACCESS_CODES=true` (always on when `NODE_ENV=production`) to make workers, supervisors and officials enter their role's access code; the app then shows the extra field automatically.
+Staff login is mobile number + OTP `123456`, same as citizens. **This means anyone can sign in as an official or worker**, so do not expose a server configured this way to the public. Set `ECOSETU_REQUIRE_ACCESS_CODES=true` to make workers, supervisors and officials enter their role's access code; the app then shows the extra field automatically.

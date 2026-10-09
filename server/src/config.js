@@ -33,15 +33,16 @@ export function loadConfig(env = process.env) {
     throw new Error("ECOSETU_JWT_SECRET must be at least 16 characters.");
   }
 
+  const requireAccessCodes = env.ECOSETU_REQUIRE_ACCESS_CODES === "true";
   const accessCodes = {};
   for (const [role, name] of Object.entries(ROLE_CODE_ENV)) {
     let code = env[name];
-    if (!code) {
-      if (production) throw new Error(`${name} must be set in production.`);
+    if (!code && requireAccessCodes) {
+      if (production) throw new Error(`${name} must be set when access codes are required.`);
       code = DEV_CODES[role];
       warnings.push(`${name} not set — using the development default for "${role}".`);
     }
-    accessCodes[role] = code;
+    accessCodes[role] = code ?? "";
   }
 
   return {
@@ -55,10 +56,9 @@ export function loadConfig(env = process.env) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    // Staff roles must present their access code in production, or whenever
-    // ECOSETU_REQUIRE_ACCESS_CODES=true. In local development it defaults to
-    // off so the demo login is just mobile number + OTP.
-    requireAccessCodes: production || env.ECOSETU_REQUIRE_ACCESS_CODES === "true",
+    // Login for every role is mobile number + OTP. Staff access codes are
+    // only enforced when ECOSETU_REQUIRE_ACCESS_CODES=true.
+    requireAccessCodes,
     seedDemoData: env.ECOSETU_SEED_DEMO !== "false",
     warnings,
   };
