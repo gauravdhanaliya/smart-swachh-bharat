@@ -73,9 +73,11 @@ export default function OtpVerification() {
       }
       await loginToApi({ role, mobile, accessCode, workerId, name });
     } catch (err) {
-      // Citizens only read public data, so an unreachable server shouldn't
-      // lock them out; staff roles can't do anything without the server.
-      if (role !== "citizen" || err.status) {
+      // Only a real rejection from the API (bad input, wrong code, rate
+      // limit) blocks sign-in. If the API isn't reachable or isn't hosted
+      // here (network error, 404/405 from a static host, 5xx), let the user
+      // in; the map then shows a "can't reach server" banner with Retry.
+      if ([400, 401, 429].includes(err.status)) {
         setError(err.message);
         setSigningIn(false);
         return;
