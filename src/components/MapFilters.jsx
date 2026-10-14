@@ -2,6 +2,7 @@ import { PILL_ACTIVE, PILL_INACTIVE } from "./buttonStyles";
 
 const OPTIONS = [
   { id: "all", label: "All" },
+  { id: "buildings", label: "Buildings" },
   { id: "bins", label: "Bins" },
   { id: "toilets", label: "Toilets" },
 ];

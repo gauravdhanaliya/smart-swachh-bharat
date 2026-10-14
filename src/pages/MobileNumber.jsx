@@ -2,11 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ScreenShell from "../components/ScreenShell";
 import PrimaryButton from "../components/PrimaryButton";
-import { useAuth } from "../context/AuthContext";
+import { sendOtp } from "../services/firebase";
 
 export default function MobileNumber() {
   const navigate = useNavigate();
-  const { role } = useAuth();
   const [mobile, setMobile] = useState("");
   const [error, setError] = useState("");
 
@@ -16,7 +15,9 @@ export default function MobileNumber() {
     if (error) setError("");
   };
 
-  const handleSendOtp = (e) => {
+  const [sending, setSending] = useState(false);
+
+  const handleSendOtp = async (e) => {
     e.preventDefault();
     if (mobile.length === 0) {
       setError("Please enter your mobile number.");
@@ -26,6 +27,17 @@ export default function MobileNumber() {
       setError("Enter a valid 10-digit mobile number.");
       return;
     }
+    setSending(true);
+    try {
+      await sendOtp(mobile);
+    } catch (err) {
+      // Development only: the Firebase error code behind the message shown.
+      if (import.meta.env.DEV) console.error("[MobileNumber] Send OTP failed:", err.code ?? "(no code)", "-", err.message);
+      setError(err.message);
+      setSending(false);
+      return;
+    }
+    setSending(false);
     navigate("/otp", { state: { mobile } });
   };
 
@@ -37,12 +49,6 @@ export default function MobileNumber() {
       <p className="mt-1 text-sm text-emerald-800/70">
         Enter your mobile number to receive an OTP
       </p>
-
-      {role && (
-        <p className="mt-3 inline-flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-          Signing in as {ROLE_LABEL[role] ?? role}
-        </p>
-      )}
 
       <form onSubmit={handleSendOtp} className="mt-6 flex flex-col gap-4">
         <div>
@@ -68,8 +74,10 @@ export default function MobileNumber() {
           {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
         </div>
 
-        <PrimaryButton type="submit">
-          Send OTP
+        <div id="recaptcha-container" />
+
+        <PrimaryButton type="submit" disabled={sending}>
+          {sending ? "Sending OTP…" : "Send OTP"}
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14" />
             <path d="M13 6l6 6-6 6" />
@@ -101,8 +109,3 @@ export default function MobileNumber() {
   );
 }
 
-const ROLE_LABEL = {
-  citizen: "Citizen",
-  official: "Government Official",
-  worker: "Worker",
-};

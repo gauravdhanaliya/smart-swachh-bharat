@@ -23,6 +23,7 @@ import GovComplaintDetails from "./pages/government/GovComplaintDetails";
 import GovBins from "./pages/government/GovBins";
 import GovToilets from "./pages/government/GovToilets";
 import GovAddFacility from "./pages/government/GovAddFacility";
+import GovLocations from "./pages/government/GovLocations";
 import GovFacilityRequests from "./pages/government/GovFacilityRequests";
 import GovWorkers from "./pages/government/GovWorkers";
 import GovAnalytics from "./pages/government/GovAnalytics";
@@ -178,6 +179,14 @@ export default function App() {
           element={
             <RequireRole role="official">
               <GovToilets />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/official/locations"
+          element={
+            <RequireRole role="official">
+              <GovLocations />
             </RequireRole>
           }
         />

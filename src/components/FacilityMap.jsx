@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Circle, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 
 // FIX — bins/toilets stopped appearing as pins on the map when a
@@ -132,6 +132,36 @@ function clusterIcon({ count, severity, compact }) {
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
+}
+
+const STATUS_LABELS = {
+  normal: "Normal",
+  almost_full: "Almost full",
+  overflow: "Overflow",
+};
+
+const KIND_LABELS = { bin: "Dustbin", toilet: "Public toilet" };
+
+// Click popup: name, type, coordinates, status — and a DEMO tag for any
+// simulated location so it is never mistaken for a verified one.
+function InfoPopup({ item, kind }) {
+  const typeLabel = item.typeLabel ?? KIND_LABELS[kind] ?? "Location";
+  const status = STATUS_LABELS[item.status] ?? item.status;
+  return (
+    <Popup>
+      <div style={{ minWidth: 170, fontSize: 12, lineHeight: 1.45 }}>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>{item.name}</div>
+        <div>{typeLabel}</div>
+        <div>
+          {Number(item.latitude).toFixed(6)}, {Number(item.longitude).toFixed(6)}
+        </div>
+        {status && <div>Status: {status}</div>}
+        {item.isDemo && (
+          <div style={{ marginTop: 4, fontWeight: 700, color: "#92400e" }}>DEMO — simulated location</div>
+        )}
+      </div>
+    </Popup>
+  );
 }
 
 function meIcon() {
@@ -276,6 +306,7 @@ function FacilityPoints({
                 {item.name}
               </Tooltip>
             )}
+            {interactive && !compact && <InfoPopup item={item} kind={kind} />}
           </Marker>
         );
       })}
@@ -346,6 +377,7 @@ export default function FacilityMap({
   selectedKind = null,
   selectedId = null,
   userLocation,
+  radiusCircle,
   onSelectBin,
   onSelectToilet,
   onSelectMarker,
@@ -381,6 +413,7 @@ export default function FacilityMap({
                   {marker.name}
                 </Tooltip>
               )}
+              {interactive && marker.popup && <InfoPopup item={marker.popup} kind="building" />}
             </Marker>
           );
         }),
@@ -437,6 +470,14 @@ export default function FacilityMap({
           onSelectToilet={onSelectToilet}
         />
         {genericMarkers}
+        {radiusCircle && (
+          <Circle
+            center={[radiusCircle.latitude, radiusCircle.longitude]}
+            radius={radiusCircle.radius}
+            pathOptions={{ color: "#059669", weight: 2, fillColor: "#10b981", fillOpacity: 0.08 }}
+            interactive={false}
+          />
+        )}
         {userLocation &&
           typeof userLocation.latitude === "number" &&
           typeof userLocation.longitude === "number" && (

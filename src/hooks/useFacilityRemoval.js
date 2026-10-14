@@ -41,34 +41,49 @@ export function useFacilityRemoval(category) {
   const requestRemove = useCallback((facility) => setPending(facility), []);
   const cancelRemove = useCallback(() => setPending(null), []);
 
+  const [error, setError] = useState("");
+  const attempt = useCallback(async (fn) => {
+    setError("");
+    try {
+      return await fn();
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
   const confirmRemove = useCallback(
-    (reason) => {
+    async (reason) => {
       if (!pending) return;
-      const record = removeFacility(pending, { category, reason, removedBy: profile.name });
+      const facility = pending;
       setPending(null);
+      const record = await attempt(() =>
+        removeFacility(facility, { category, reason, removedBy: profile.name })
+      );
       if (record) setLastRemoved(record);
     },
-    [pending, category, profile.name]
+    [pending, category, profile.name, attempt]
   );
 
-  const undoRemove = useCallback(() => {
+  const undoRemove = useCallback(async () => {
     if (!lastRemoved) return;
-    restoreFacility(lastRemoved.id);
+    const id = lastRemoved.id;
     setLastRemoved(null);
-  }, [lastRemoved]);
+    await attempt(() => restoreFacility(id));
+  }, [lastRemoved, attempt]);
 
   const restore = useCallback(
-    (id) => {
-      restoreFacility(id);
+    async (id) => {
       setLastRemoved((current) => (current && current.id === id ? null : current));
+      await attempt(() => restoreFacility(id));
     },
-    []
+    [attempt]
   );
 
-  const restoreAll = useCallback(() => {
-    restoreAllFacilities(category);
+  const restoreAll = useCallback(async () => {
     setLastRemoved(null);
-  }, [category]);
+    await attempt(() => restoreAllFacilities(category));
+  }, [category, attempt]);
 
   const dismissUndo = useCallback(() => setLastRemoved(null), []);
 
@@ -92,5 +107,6 @@ export function useFacilityRemoval(category) {
     removed,
     restore,
     restoreAll,
+    error,
   };
 }

@@ -1,4 +1,7 @@
 import { useMemo, useState } from "react";
+import { useGpsConsent } from "../hooks/useGpsConsent";
+import GpsConsentNotice, { GpsAlert } from "./GpsConsentNotice";
+import { gpsBlocker, gpsErrorMessage, lowAccuracyMessage } from "../utils/gps";
 import {
   CITIES,
   getCitiesForDistrict,
@@ -85,17 +88,19 @@ function compose(place, locality) {
 
 function getGpsFix() {
   return new Promise((resolve, reject) => {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      reject(new Error("Geolocation isn't supported in this browser."));
+    const blocker = gpsBlocker();
+    if (blocker) {
+      reject(new Error(blocker));
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) reject(new Error("Location permission denied."));
-        else if (err.code === err.TIMEOUT) reject(new Error("Couldn't get a location fix in time."));
-        else reject(new Error("Location unavailable right now."));
-      },
+      (pos) =>
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }),
+      (err) => reject(new Error(gpsErrorMessage(err))),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   });
@@ -131,6 +136,7 @@ export default function IndiaLocationPicker({
   const [districtId, setDistrictId] = useState("");
   const [gpsStatus, setGpsStatus] = useState("idle"); // idle | locating
   const [gpsError, setGpsError] = useState("");
+  const [gpsAccuracy, setGpsAccuracy] = useState(null); // metres, only for the warning
 
   const states = useMemo(() => getStatesList(), []);
   const districts = useMemo(() => (stateId ? getDistrictsForState(stateId) : []), [stateId]);
@@ -165,6 +171,7 @@ export default function IndiaLocationPicker({
     setPlace(null);
     setLocality("");
     setGpsError("");
+    setGpsAccuracy(null);
     onChange(null);
   };
 
@@ -177,7 +184,8 @@ export default function IndiaLocationPicker({
     setGpsStatus("locating");
     setGpsError("");
     try {
-      const fix = await getGpsFix();
+      const { accuracy, ...fix } = await getGpsFix();
+      setGpsAccuracy(accuracy);
       if (place?.kind === "city") {
         const next = { ...place, ...fix, pinned: true };
         setPlace(next);
@@ -192,13 +200,24 @@ export default function IndiaLocationPicker({
     }
   };
 
+  // GPS starts only from the button, after the notice. "Enter manually" just
+  // closes it: search, State → District → City and known areas stay on screen.
+  const gps = useGpsConsent({ run: handleGps });
+
   const renderGpsButton = (label) =>
     allowGps ? (
       <div>
+        {gps.asking && (
+          <GpsConsentNotice
+            theme={theme === "orange" ? "orange" : "emerald"}
+            onAllow={gps.allow}
+            onManual={gps.decline}
+          />
+        )}
         <button
           type="button"
-          onClick={handleGps}
-          disabled={gpsStatus === "locating"}
+          onClick={gps.request}
+          disabled={gpsStatus === "locating" || gps.asking}
           className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-xs font-semibold disabled:opacity-60 ${t.action}`}
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -208,7 +227,14 @@ export default function IndiaLocationPicker({
           </svg>
           {gpsStatus === "locating" ? "Getting location…" : label}
         </button>
-        {gpsError && <p className="px-3 text-xs font-medium text-red-600">{gpsError}</p>}
+        {gpsError && (
+          <GpsAlert tone="error" className="mt-1">
+            <p>{gpsError}</p>
+            <button type="button" onClick={gps.request} className="mt-1.5 font-semibold underline">
+              Try again
+            </button>
+          </GpsAlert>
+        )}
       </div>
     ) : null;
 
@@ -221,6 +247,9 @@ export default function IndiaLocationPicker({
           <div className="min-w-0 flex-1">
             <p className="break-words text-sm font-semibold leading-snug">{value.address}</p>
             {place?.pinned && <p className={`mt-0.5 text-xs ${t.muted}`}>Exact spot pinned with GPS</p>}
+            {(place?.pinned || place?.kind === "gps") && lowAccuracyMessage(gpsAccuracy) && (
+              <GpsAlert className="mt-1.5">{lowAccuracyMessage(gpsAccuracy)}</GpsAlert>
+            )}
           </div>
           <button
             type="button"
@@ -273,7 +302,7 @@ export default function IndiaLocationPicker({
             e.preventDefault();
             if (results[0]) chooseCity(results[0]);
           }}
-          placeholder="e.g. Meerut, Jaipur, Kochi, Guwahati…"
+          placeholder="e.g. Roorkee, Haridwar, Jaipur, Kochi, Guwahati…"
           autoComplete="off"
           className={t.field}
         />

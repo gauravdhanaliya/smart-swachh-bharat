@@ -6,15 +6,15 @@ import { useAuth } from "../context/AuthContext";
 
 export default function Success() {
   const navigate = useNavigate();
-  const { isAuthenticated, role } = useAuth();
+  const { isAuthenticated, loading, role } = useAuth();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!loading && !isAuthenticated) {
       navigate("/mobile", { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, loading, navigate]);
 
-  if (!isAuthenticated) return null;
+  if (loading || !isAuthenticated) return null;
 
   return (
     <ScreenShell>

@@ -1,39 +1,13 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ScreenShell from "../components/ScreenShell";
 import TaglineStrip from "../components/TaglineStrip";
-import RoleCard from "../components/RoleCard";
 import PrimaryButton from "../components/PrimaryButton";
-import { useAuth } from "../context/AuthContext";
 
-const ROLES = [
-  {
-    id: "citizen",
-    title: "Citizen",
-    description: "Report issues, track complaints, find nearby bins and more.",
-  },
-  {
-    id: "official",
-    title: "Government Official",
-    description: "Monitor city-wide data, manage operations, track performance.",
-  },
-  {
-    id: "worker",
-    title: "Worker",
-    description: "View assigned tasks, update collection status, report issues.",
-  },
-];
-
+// Everyone signs in the same way. Which dashboard opens afterwards depends on
+// the role the server holds for the account — it can't be picked here, so
+// nobody can sign in as a worker or government official by choosing to.
 export default function ChooseRole() {
   const navigate = useNavigate();
-  const { role, selectRole } = useAuth();
-  const [selected, setSelected] = useState(role ?? null);
-
-  const handleContinue = () => {
-    if (!selected) return;
-    selectRole(selected);
-    navigate("/mobile");
-  };
 
   return (
     <ScreenShell>
@@ -51,20 +25,17 @@ export default function ChooseRole() {
         Login to continue to your account
       </p>
 
-      <div className="mt-6 flex flex-col gap-3">
-        {ROLES.map((r) => (
-          <RoleCard
-            key={r.id}
-            id={r.id}
-            title={r.title}
-            description={r.description}
-            selected={selected === r.id}
-            onSelect={setSelected}
-          />
-        ))}
+      <div className="mt-6 rounded-2xl border border-emerald-100 bg-white p-4 text-sm text-emerald-900/80">
+        <p>
+          Sign in with your mobile number. New accounts start as <b>Citizen</b>.
+        </p>
+        <p className="mt-2">
+          Government officials and sanitation workers: your administrator sets up your role on
+          your number, and your own dashboard opens after you sign in.
+        </p>
       </div>
 
-      <PrimaryButton onClick={handleContinue} disabled={!selected} className="mt-6">
+      <PrimaryButton onClick={() => navigate("/mobile")} className="mt-6">
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="7" y="2" width="10" height="20" rx="2" />
           <line x1="11" y1="18" x2="13" y2="18" />

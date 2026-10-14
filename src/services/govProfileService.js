@@ -14,11 +14,11 @@ import { INDIAN_STATES } from "../data/indianStates";
 
 const STORAGE_KEY = "ssb_gov_profile_v1";
 
-// Meerut is the default jurisdiction — was Lucknow.
+// Haridwar (Roorkee) is the default jurisdiction — was Lucknow.
 export const DEFAULT_GOV_PROFILE = {
   name: "District Officer",
-  state: "Uttar Pradesh",
-  district: "Meerut",
+  state: "Uttarakhand",
+  district: "Haridwar",
   ministry: "Ministry of Housing & Urban Affairs",
 };
 

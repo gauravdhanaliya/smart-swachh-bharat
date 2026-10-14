@@ -1,54 +1,73 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { logoutFromApi, refreshSession, setSessionLostHandler, setSessionRole } from "../services/api";
+import { signOutFirebase } from "../services/firebase";
+import { resetStore } from "../services/locationStore";
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEY = "ssb_auth_state";
-
-function loadInitialState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore malformed storage and fall back to defaults
-  }
-  return { role: null, mobileNumber: "", isAuthenticated: false };
-}
-
+// Session = the server's access token (held in memory by services/api.js)
+// plus its refresh token in an httpOnly cookie. Firebase only proves the
+// phone number at sign-in. On a page load the cookie is exchanged for a fresh
+// access token, which is also how the user's role is restored.
 export function AuthProvider({ children }) {
-  const [role, setRole] = useState(() => loadInitialState().role);
-  const [mobileNumber, setMobileNumber] = useState(
-    () => loadInitialState().mobileNumber
-  );
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    () => loadInitialState().isAuthenticated
-  );
+  const [session, setSession] = useState({ role: null, mobileNumber: "" });
+  const [loading, setLoading] = useState(true);
 
+  const apply = (user) => {
+    const next = { role: user?.role ?? null, mobileNumber: user?.mobile ?? "" };
+    setSessionRole(next.role);
+    setSession(next);
+  };
+
+  // Clear leftovers of earlier session storage (old demo / Firebase-only builds).
   useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ role, mobileNumber, isAuthenticated })
-    );
-  }, [role, mobileNumber, isAuthenticated]);
+    try {
+      ["ssb_auth_state", "ssb_api_token_v1", "ssb_api_role_v1"].forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // storage blocked — nothing to clean
+    }
+  }, []);
 
-  const selectRole = (selectedRole) => setRole(selectedRole);
+  // Restore the session on load, and sign out if a refresh ever fails later.
+  useEffect(() => {
+    let live = true;
+    refreshSession().then((result) => {
+      if (!live) return;
+      apply(result?.user ?? null);
+      setLoading(false);
+    });
+    setSessionLostHandler(() => {
+      apply(null);
+      resetStore();
+      signOutFirebase();
+    });
+    return () => {
+      live = false;
+      setSessionLostHandler(() => {});
+    };
+  }, []);
 
-  const completeLogin = (verifiedMobileNumber) => {
-    setMobileNumber(verifiedMobileNumber);
-    setIsAuthenticated(true);
+  /** Called right after POST /auth/firebase-login succeeds, with the user it returned. */
+  const completeLogin = (user) => {
+    apply(user);
+    setLoading(false);
   };
 
   const resetAuth = () => {
-    setRole(null);
-    setMobileNumber("");
-    setIsAuthenticated(false);
-    localStorage.removeItem(STORAGE_KEY);
+    apply(null);
+    resetStore();
+    logoutFromApi(); // revokes the refresh token and clears the cookie
+    signOutFirebase();
   };
 
+  const isAuthenticated = Boolean(session.role);
+
   const value = {
-    role,
-    mobileNumber,
+    // The role the server holds for this account (null when signed out).
+    role: session.role,
+    mobileNumber: session.mobileNumber,
     isAuthenticated,
-    selectRole,
+    loading,
     completeLogin,
     resetAuth,
   };

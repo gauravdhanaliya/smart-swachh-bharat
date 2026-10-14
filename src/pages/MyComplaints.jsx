@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import CitizenShell from "../components/CitizenShell";
 import StatusBadge from "../components/StatusBadge";
 import { useComplaints } from "../hooks/useComplaints";
+import { voteComplaint } from "../services/complaintService";
 import { STATUS } from "../data/complaints";
 
 const TABS = [
@@ -20,6 +21,29 @@ function timeAgo(iso) {
   if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
   const days = Math.round(hours / 24);
   return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function VoteButton({ direction, active, count, onClick }) {
+  const up = direction === "up";
+  const activeStyle = up
+    ? "border-emerald-600 bg-emerald-600 text-white"
+    : "border-red-500 bg-red-500 text-white";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={`${up ? "Upvote" : "Downvote"}, ${count}`}
+      className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+        active ? activeStyle : "border-emerald-100 bg-white text-emerald-800/70 hover:bg-emerald-50"
+      }`}
+    >
+      <svg viewBox="0 0 24 24" className={`h-4 w-4 ${up ? "" : "rotate-180"}`} fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M7 11v9H4v-9h3zm0 0l4-8c1.5 0 2.5 1 2.5 2.5V9H19a2 2 0 012 2.3l-1 7A2 2 0 0118 20H7" />
+      </svg>
+      {count}
+    </button>
+  );
 }
 
 export default function MyComplaints() {
@@ -74,21 +98,39 @@ export default function MyComplaints() {
         )}
 
         {filtered.map((c) => (
-          <button
+          <div
             key={c.id}
-            type="button"
-            onClick={() => navigate(`/citizen/complaints/${c.id}`)}
-            className="flex items-start justify-between gap-3 rounded-2xl border border-emerald-100 bg-white p-4 text-left shadow-sm"
+            className="rounded-2xl border border-emerald-100 bg-white shadow-sm"
           >
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-emerald-950">{c.issueType}</p>
-              <p className="mt-0.5 text-xs text-emerald-800/60">{c.location.address}</p>
-              <p className="mt-0.5 text-[11px] text-emerald-800/40">
-                #{c.id} · {timeAgo(c.createdAt)}
-              </p>
+            <button
+              type="button"
+              onClick={() => navigate(`/citizen/complaints/${c.id}`)}
+              className="flex w-full items-start justify-between gap-3 p-4 pb-3 text-left"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-emerald-950">{c.issueType}</p>
+                <p className="mt-0.5 text-xs text-emerald-800/60">{c.location.address}</p>
+                <p className="mt-0.5 text-[11px] text-emerald-800/40">
+                  #{c.id} · {timeAgo(c.createdAt)}
+                </p>
+              </div>
+              <StatusBadge status={c.status} className="shrink-0" />
+            </button>
+            <div className="flex items-center gap-2 border-t border-emerald-50 px-4 py-2">
+              <VoteButton
+                direction="up"
+                active={c.myVote === "up"}
+                count={c.upvotes ?? 0}
+                onClick={() => voteComplaint(c.id, "up")}
+              />
+              <VoteButton
+                direction="down"
+                active={c.myVote === "down"}
+                count={c.downvotes ?? 0}
+                onClick={() => voteComplaint(c.id, "down")}
+              />
             </div>
-            <StatusBadge status={c.status} className="shrink-0" />
-          </button>
+          </div>
         ))}
       </div>
     </CitizenShell>

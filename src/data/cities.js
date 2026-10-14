@@ -7,12 +7,12 @@
 // picker built on top of it.
 //
 // DATA ACCURACY NOTE: the demo bin/toilet dataset (data/bins.js,
-// data/toilets.js) only covers Lucknow. Choosing another city recentres
+// data/toilets.js) only covers Roorkee (around COER University). Choosing another city recentres
 // the map and filters the counts to facilities actually near that city,
 // so it honestly shows "none mapped yet" rather than pretending.
 export { CITIES } from "./indiaLocations";
 
-export const DEFAULT_CITY_ID = "lucknow-up";
+export const DEFAULT_CITY_ID = "roorkee-uk";
 
 // Facilities within this many km of a city's centre count as "in" it.
 export const CITY_RADIUS_KM = 40;

@@ -3,11 +3,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import CitizenShell from "../components/CitizenShell";
 import PrimaryButton from "../components/PrimaryButton";
 import LiveCameraCapture from "../components/LiveCameraCapture";
-import IndiaLocationPicker from "../components/IndiaLocationPicker";
+import ComplaintLocationPicker from "../components/ComplaintLocationPicker";
 import { createComplaint } from "../services/complaintService";
 import {
   COMPLAINT_TYPES,
-  DEMO_LOCATIONS,
   DEMO_CITIZEN_NAME,
   DESCRIPTION_MAX_LENGTH,
   priorityForIssueType,
@@ -27,7 +26,8 @@ export default function ReportIssue() {
   );
   // The chosen place — { address, latitude, longitude, ... } — from the
   // India-wide picker, or the pre-filled bin/toilet address.
-  const [location, setLocation] = useState(prefill.location ?? null);
+  // Always the citizen's live GPS position — never typed or searched.
+  const [location, setLocation] = useState(null);
   const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState(null); // { dataUrl }
   const [errors, setErrors] = useState({});
@@ -36,7 +36,7 @@ export default function ReportIssue() {
   const validate = () => {
     const next = {};
     if (!issueType) next.issueType = "Select a complaint type.";
-    if (!location) next.location = "Select a location.";
+    if (!location) next.location = "A location is required to report an issue. Use your current location, or choose the place manually.";
     if (!description.trim()) next.description = "Description is required.";
     else if (description.trim().length < 10)
       next.description = "Please add a little more detail (at least 10 characters).";
@@ -144,15 +144,21 @@ export default function ReportIssue() {
 
         <div>
           <p className="mb-1.5 text-sm font-semibold text-emerald-950">Location</p>
-          <IndiaLocationPicker
-            id="report-location"
+          <ComplaintLocationPicker
             value={location}
+            extra={
+              prefill.location?.facilityId
+                ? {
+                    facilityId: prefill.location.facilityId,
+                    facilityType: prefill.location.facilityType,
+                    facilityAddress: prefill.location.address,
+                  }
+                : undefined
+            }
             onChange={(loc) => {
               setLocation(loc);
               if (loc && errors.location) setErrors((er) => ({ ...er, location: undefined }));
             }}
-            presets={DEMO_LOCATIONS}
-            presetsLabel="Popular localities (Lucknow)"
           />
           {errors.location && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.location}</p>}
         </div>

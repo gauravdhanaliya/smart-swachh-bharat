@@ -4,8 +4,10 @@ import ScreenShell from "../components/ScreenShell";
 import PrimaryButton from "../components/PrimaryButton";
 import OtpInput from "../components/OtpInput";
 import { useAuth } from "../context/AuthContext";
+import { loginToApi } from "../services/api";
+import { confirmOtp, sendOtp, signOutFirebase } from "../services/firebase";
+import { refreshFresh, resetStore } from "../services/locationStore";
 
-const DEMO_OTP = "123456";
 const RESEND_SECONDS = 60;
 
 function formatTime(totalSeconds) {
@@ -22,6 +24,7 @@ export default function OtpVerification() {
   // If the user lands here directly (e.g. page refresh) without a
   // mobile number in state, send them back to enter one.
   const mobile = location.state?.mobile;
+  const [signingIn, setSigningIn] = useState(false);
 
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
@@ -42,22 +45,51 @@ export default function OtpVerification() {
 
   if (!mobile) return null;
 
-  const handleVerify = (e) => {
+  const handleVerify = async (e) => {
     e.preventDefault();
     if (otp.length !== 6) {
       setError("Enter the 6-digit OTP.");
       return;
     }
-    if (otp !== DEMO_OTP) {
-      setError("Incorrect OTP. Please try again. (Hint: use 123456)");
+
+    setSigningIn(true);
+    let idToken;
+    try {
+      // Firebase checks the OTP and signs the user in…
+      idToken = await confirmOtp(otp);
+    } catch (err) {
+      setError(err.message);
+      setSigningIn(false);
       return;
     }
-    completeLogin(mobile);
+
+    // …then the API verifies that token and starts the app session (access + refresh tokens).
+    let user;
+    try {
+      user = await loginToApi({ idToken });
+    } catch (err) {
+      // The OTP is single-use, so after a rejected login the user has to
+      // start again rather than stay half signed-in.
+      await signOutFirebase();
+      setError(`${err.message} Go back and request a new OTP to try again.`);
+      setSigningIn(false);
+      return;
+    }
+    setSigningIn(false);
+    resetStore();
+    completeLogin(user);
+    refreshFresh();
     navigate("/success");
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (secondsLeft > 0) return;
+    try {
+      await sendOtp(mobile);
+    } catch (err) {
+      setError(err.message);
+      return;
+    }
     setSecondsLeft(RESEND_SECONDS);
     setOtp("");
     setError("");
@@ -88,7 +120,9 @@ export default function OtpVerification() {
           )}
         </p>
 
-        <PrimaryButton type="submit">Verify</PrimaryButton>
+        <PrimaryButton type="submit" disabled={signingIn}>
+          {signingIn ? "Signing in…" : "Verify"}
+        </PrimaryButton>
 
         <p className="text-center text-sm text-emerald-800/70">
           Didn&apos;t receive OTP?{" "}
@@ -103,9 +137,8 @@ export default function OtpVerification() {
         </p>
       </form>
 
-      <p className="mt-6 text-center text-xs text-emerald-800/40">
-        Demo mode — use OTP 123456 to continue.
-      </p>
+      <div id="recaptcha-container" />
+
     </ScreenShell>
   );
 }

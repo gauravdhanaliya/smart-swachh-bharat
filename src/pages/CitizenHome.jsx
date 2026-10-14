@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CitizenShell from "../components/CitizenShell";
 import StatTile from "../components/StatTile";
@@ -15,8 +15,27 @@ import { inCity } from "../data/cities";
 import { BIN_STATUS } from "../data/bins";
 import { STATUS } from "../data/complaints";
 
+function greetingFor(date) {
+  const h = date.getHours();
+  if (h >= 5 && h < 12) return "Good Morning";
+  if (h >= 12 && h < 17) return "Good Afternoon";
+  if (h >= 17 && h < 21) return "Good Evening";
+  return "Good Night";
+}
+
+function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
 export default function CitizenHome() {
   const navigate = useNavigate();
+  const now = useNow();
+  const timeLabel = now.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
   const allBins = useLiveBins();
   const allToilets = useLiveToilets();
   const complaints = useComplaints();
@@ -26,7 +45,7 @@ export default function CitizenHome() {
   const { unreadCount } = useCitizenNotifications();
 
   // Everything on this screen follows the chosen city. Demo data only
-  // exists for Lucknow, so other cities honestly show zero.
+  // exists for Roorkee, so other cities honestly show zero.
   const bins = useMemo(() => allBins.filter((b) => inCity(b, city)), [allBins, city]);
   const toilets = useMemo(() => allToilets.filter((t) => inCity(t, city)), [allToilets, city]);
 
@@ -82,12 +101,12 @@ export default function CitizenHome() {
         <div className="mt-5 flex items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-emerald-950">
-              Good Morning,
+              {greetingFor(now)},
               <br />
               Citizen!
             </h1>
             <p className="mt-1 text-sm text-emerald-800/70">
-              Let&apos;s keep our city clean and green.
+              {timeLabel} · Let&apos;s keep our city clean and green.
             </p>
           </div>
           <span className="text-3xl">🌱</span>
@@ -194,7 +213,7 @@ export default function CitizenHome() {
           />
           {bins.length === 0 && toilets.length === 0 && (
             <p className="mt-2 text-xs text-emerald-800/60">
-              No bins or toilets are mapped in {city.name} yet — the demo data covers Lucknow.
+              No bins or toilets are mapped in {city.name} yet — the demo data covers Roorkee (COER University area).
             </p>
           )}
         </div>

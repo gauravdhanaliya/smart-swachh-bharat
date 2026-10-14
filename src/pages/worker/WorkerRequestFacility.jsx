@@ -1,14 +1,18 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WorkerShell from "../../components/WorkerShell";
-import SimpleMap from "../../components/SimpleMap";
+import PickLocationMap from "../../components/PickLocationMap";
 import IndiaLocationPicker from "../../components/IndiaLocationPicker";
+import GpsConsentNotice, { GpsAlert } from "../../components/GpsConsentNotice";
+import { useGpsConsent } from "../../hooks/useGpsConsent";
+import { gpsBlocker, gpsErrorMessage, lowAccuracyMessage } from "../../utils/gps";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
 import { createFacilityRequest } from "../../services/facilityRequestService";
 import {
   FACILITY_TYPES,
   FACILITY_PRIORITIES,
   FACILITY_PICK_LOCATIONS,
+  CAMPUS_CENTER,
   REASON_MAX_LENGTH,
   DESCRIPTION_MAX_LENGTH,
   MAX_PHOTO_SIZE_BYTES,
@@ -37,6 +41,7 @@ export default function WorkerRequestFacility() {
   const [locationMode, setLocationMode] = useState("gps");
   const [gpsStatus, setGpsStatus] = useState("idle"); // idle | locating | done | error
   const [gpsError, setGpsError] = useState("");
+  const [gpsAccuracy, setGpsAccuracy] = useState(null); // metres, only for the warning
   const [pickedLocation, setPickedLocation] = useState(null);
   const [addressText, setAddressText] = useState("");
   const [latitude, setLatitude] = useState("");
@@ -49,9 +54,10 @@ export default function WorkerRequestFacility() {
     latitude !== "" && longitude !== "" && !Number.isNaN(Number(latitude)) && !Number.isNaN(Number(longitude));
 
   const handleUseGps = () => {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+    const blocker = gpsBlocker();
+    if (blocker) {
       setGpsStatus("error");
-      setGpsError("Geolocation isn't supported in this browser.");
+      setGpsError(blocker);
       return;
     }
     setGpsStatus("locating");
@@ -60,19 +66,22 @@ export default function WorkerRequestFacility() {
       (pos) => {
         setLatitude(String(pos.coords.latitude));
         setLongitude(String(pos.coords.longitude));
+        setGpsAccuracy(pos.coords.accuracy);
         setAddressText((prev) => prev || "My current location");
         setGpsStatus("done");
         if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
       },
       (err) => {
         setGpsStatus("error");
-        if (err.code === err.PERMISSION_DENIED) setGpsError("Location permission denied.");
-        else if (err.code === err.TIMEOUT) setGpsError("Couldn't get a location fix in time.");
-        else setGpsError("Location unavailable right now.");
+        setGpsError(gpsErrorMessage(err));
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 }
     );
   };
+
+  // GPS starts only from the button, after the notice; "Enter manually"
+  // switches to the latitude / longitude fields.
+  const gps = useGpsConsent({ run: handleUseGps, onManual: () => setLocationMode("manual") });
 
   // "Pick on Map" — search / browse anywhere in India (state -> district ->
   // city), optionally add a locality, or pin the spot with GPS.
@@ -121,13 +130,13 @@ export default function WorkerRequestFacility() {
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
     setSubmitting(true);
     try {
-      const request = createFacilityRequest({
+      const request = await createFacilityRequest({
         facilityType: facilityType.id,
         suggestedName: suggestedName.trim(),
         location: {
@@ -146,8 +155,14 @@ export default function WorkerRequestFacility() {
         state: { justSubmitted: true },
         replace: true,
       });
-    } catch {
-      setErrors({ submit: "Something went wrong submitting your request. Please try again." });
+    } catch (err) {
+      setErrors({
+        submit: err.message || "Something went wrong submitting your request. Please try again.",
+        ...(err.fields?.reason ? { reason: err.fields.reason } : {}),
+        ...(err.fields?.latitude || err.fields?.longitude
+          ? { location: err.fields.latitude || err.fields.longitude }
+          : {}),
+      });
       setSubmitting(false);
     }
   };
@@ -231,18 +246,38 @@ export default function WorkerRequestFacility() {
 
           {locationMode === "gps" && (
             <div className="rounded-2xl border border-orange-100 bg-white p-3.5">
-              <button
-                type="button"
-                onClick={handleUseGps}
-                className="w-full rounded-full bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white"
-              >
-                {gpsStatus === "locating" ? "Locating…" : "Use Current GPS Location"}
-              </button>
-              {gpsStatus === "error" && <p className="mt-2 text-xs font-medium text-red-600">{gpsError}</p>}
+              {gps.asking ? (
+                <GpsConsentNotice theme="orange" onAllow={gps.allow} onManual={gps.decline} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={gps.request}
+                  disabled={gpsStatus === "locating"}
+                  className="w-full rounded-full bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {gpsStatus === "locating" ? "Locating…" : "Use Current GPS Location"}
+                </button>
+              )}
+              {gpsStatus === "error" && (
+                <GpsAlert tone="error" className="mt-2">
+                  <p>{gpsError}</p>
+                  <div className="mt-1.5 flex gap-4">
+                    <button type="button" onClick={gps.request} className="font-semibold underline">
+                      Try again
+                    </button>
+                    <button type="button" onClick={() => setLocationMode("manual")} className="font-semibold underline">
+                      Enter manually
+                    </button>
+                  </div>
+                </GpsAlert>
+              )}
               {gpsStatus === "done" && hasCoords && (
                 <p className="mt-2 text-xs text-slate-500">
                   Lat: {Number(latitude).toFixed(5)} · Lng: {Number(longitude).toFixed(5)}
                 </p>
+              )}
+              {gpsStatus === "done" && lowAccuracyMessage(gpsAccuracy) && (
+                <GpsAlert className="mt-2">{lowAccuracyMessage(gpsAccuracy)}</GpsAlert>
               )}
             </div>
           )}
@@ -257,14 +292,22 @@ export default function WorkerRequestFacility() {
                 presets={FACILITY_PICK_LOCATIONS}
                 presetsLabel="Known areas"
               />
-              {hasCoords && pickedLocation && (
-                <SimpleMap
-                  latitude={Number(latitude)}
-                  longitude={Number(longitude)}
-                  markerLabel={addressText}
-                  className="mt-3 h-40"
-                  interactive={false}
-                />
+              <p className="mt-3 text-xs font-medium text-slate-500">Or tap the map to drop a pin</p>
+              <PickLocationMap
+                value={hasCoords ? { latitude: Number(latitude), longitude: Number(longitude) } : null}
+                center={CAMPUS_CENTER}
+                onPick={({ latitude: la, longitude: lo }) => {
+                  setLatitude(String(la));
+                  setLongitude(String(lo));
+                  setPickedLocation(null);
+                  if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
+                }}
+                className="mt-2 h-56"
+              />
+              {hasCoords && (
+                <p className="mt-2 text-xs text-slate-500">
+                  Pin: {Number(latitude).toFixed(6)}, {Number(longitude).toFixed(6)}
+                </p>
               )}
             </div>
           )}
@@ -324,7 +367,7 @@ export default function WorkerRequestFacility() {
               setAddressText(e.target.value);
               if (errors.address) setErrors((er) => ({ ...er, address: undefined }));
             }}
-            placeholder="e.g. Near IIMT University main gate"
+            placeholder="e.g. Near COER University main gate"
             className="w-full rounded-2xl border border-orange-100 bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none"
           />
           {errors.address && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.address}</p>}
