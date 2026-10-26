@@ -9,8 +9,8 @@ export default function Splash() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-dvh bg-emerald-50/40 sm:py-6">
-      <div className="device-frame relative overflow-hidden">
+    <div className="min-h-dvh bg-emerald-50/40 sm:py-4">
+      <div className="device-frame device-frame--app relative overflow-hidden">
         {/* soft background flourishes */}
         <div className="pointer-events-none absolute inset-0 -z-0">
           <div className="absolute -left-16 top-24 h-48 w-48 rounded-full bg-emerald-100/50 blur-2xl" />
@@ -20,7 +20,7 @@ export default function Splash() {
           </svg>
         </div>
 
-        <div className="relative z-10 flex flex-1 flex-col">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto">
           <GovHeader />
 
           <div className="mt-5 flex flex-col items-center px-5">

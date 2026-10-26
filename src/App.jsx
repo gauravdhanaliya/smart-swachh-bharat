@@ -3,9 +3,6 @@ import { AuthProvider } from "./context/AuthContext";
 import RequireRole from "./components/RequireRole";
 import Splash from "./pages/Splash";
 import ChooseRole from "./pages/ChooseRole";
-import MobileNumber from "./pages/MobileNumber";
-import OtpVerification from "./pages/OtpVerification";
-import Success from "./pages/Success";
 import CitizenHome from "./pages/CitizenHome";
 import MapScreen from "./pages/MapScreen";
 import BinDetails from "./pages/BinDetails";
@@ -16,12 +13,14 @@ import ComplaintTracking from "./pages/ComplaintTracking";
 import Profile from "./pages/Profile";
 import CitizenNotifications from "./pages/CitizenNotifications";
 import CitizenHelp from "./pages/CitizenHelp";
+import CitizenEcoGuide from "./pages/CitizenEcoGuide";
 import GovDashboard from "./pages/government/GovDashboard";
 import GovComplaints from "./pages/government/GovComplaints";
 import GovComplaintDetails from "./pages/government/GovComplaintDetails";
 import GovBins from "./pages/government/GovBins";
 import GovToilets from "./pages/government/GovToilets";
 import GovAddFacility from "./pages/government/GovAddFacility";
+import GovLocations from "./pages/government/GovLocations";
 import GovFacilityRequests from "./pages/government/GovFacilityRequests";
 import GovWorkers from "./pages/government/GovWorkers";
 import GovAnalytics from "./pages/government/GovAnalytics";
@@ -43,9 +42,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Splash />} />
         <Route path="/login" element={<ChooseRole />} />
-        <Route path="/mobile" element={<MobileNumber />} />
-        <Route path="/otp" element={<OtpVerification />} />
-        <Route path="/success" element={<Success />} />
 
         {/* Step 2 — Citizen dashboard & live bin/toilet map */}
         <Route
@@ -123,6 +119,14 @@ export default function App() {
           }
         />
         <Route
+          path="/citizen/eco-guide"
+          element={
+            <RequireRole role="citizen">
+              <CitizenEcoGuide />
+            </RequireRole>
+          }
+        />
+        <Route
           path="/citizen/profile"
           element={
             <RequireRole role="citizen">
@@ -169,6 +173,14 @@ export default function App() {
           element={
             <RequireRole role="official">
               <GovToilets />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/official/locations"
+          element={
+            <RequireRole role="official">
+              <GovLocations />
             </RequireRole>
           }
         />

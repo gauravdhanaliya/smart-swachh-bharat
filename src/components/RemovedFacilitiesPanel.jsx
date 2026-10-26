@@ -8,7 +8,7 @@ import { useState } from "react";
 //      Restore on each row.
 // Because removals are tombstones (see services/facilityService.js),
 // Restore always works — including for seeded demo facilities, which
-// matters during a live SIH demo where a wrong click shouldn't
+// matters during a live demo where a wrong click shouldn't
 // permanently break the dataset.
 
 function formatWhen(iso) {

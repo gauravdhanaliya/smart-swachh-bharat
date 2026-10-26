@@ -9,7 +9,7 @@ import { useCity } from "../hooks/useCity";
 import { useComplaints } from "../hooks/useComplaints";
 import { useCitizenNotifications } from "../hooks/useCitizenNotifications";
 import { useCitizenPreferences } from "../hooks/useCitizenPreferences";
-import { DEMO_CITIZEN_NAME, STATUS } from "../data/complaints";
+import { STATUS } from "../data/complaints";
 
 const ICON = {
   fill: "none",
@@ -49,7 +49,7 @@ function LinkRow({ icon, label, value, badge, onClick }) {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { mobileNumber, resetAuth } = useAuth();
+  const { user, resetAuth } = useAuth();
   const { city, cities, selectCity, addLocation, removeLocation } = useCity();
   const complaints = useComplaints();
   const { unreadCount } = useCitizenNotifications();
@@ -77,8 +77,7 @@ export default function Profile() {
             🙂
           </span>
           <div className="min-w-0">
-            <p className="font-semibold text-emerald-950">{DEMO_CITIZEN_NAME}</p>
-            {mobileNumber && <p className="text-sm text-emerald-800/60">+91 {mobileNumber}</p>}
+            <p className="font-semibold text-emerald-950">{user.name}</p>
             <p className="mt-0.5 text-xs text-emerald-800/50">
               {city.state ? `${city.name}, ${city.state}` : city.name}
             </p>

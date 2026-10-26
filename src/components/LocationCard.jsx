@@ -79,21 +79,28 @@ export default function LocationCard({ kind, item, onViewDetails, onRetryLocatio
   }
 
   const isBin = kind === "bin";
+  const isBuilding = kind === "building";
 
   return (
     <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-950">
-            <span>{isBin ? "🗑️" : "🚻"}</span>
+            <span>{isBin ? "🗑️" : isBuilding ? item.icon : "🚻"}</span>
             <span className="truncate">{item.name}</span>
           </p>
           <p className="text-xs text-emerald-800/60">
-            {item.id} · {item.area}
+            {item.id} · {isBuilding ? item.typeLabel : item.area}
           </p>
         </div>
         <StatusBadge status={item.status} />
       </div>
+
+      {item.isDemo && (
+        <p className="mt-2 rounded-xl bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-800">
+          DEMO — simulated location, not a verified {isBuilding ? "building position" : "facility"}.
+        </p>
+      )}
 
       <div className="mt-2 space-y-1 text-xs text-emerald-800/70">
         <div className="flex items-center justify-between">
@@ -110,7 +117,7 @@ export default function LocationCard({ kind, item, onViewDetails, onRetryLocatio
             <span className="font-semibold">{item.fillLevel}%</span>
           </div>
         )}
-        {!isBin && (
+        {!isBin && !isBuilding && (
           <div className="flex items-center justify-between">
             <span>Opening Hours</span>
             <span className="font-semibold">{item.openingHours}</span>
@@ -127,13 +134,15 @@ export default function LocationCard({ kind, item, onViewDetails, onRetryLocatio
         >
           Open in Google Maps
         </a>
-        <button
-          type="button"
-          onClick={() => onViewDetails(item.id)}
-          className="flex-1 rounded-full bg-emerald-700 px-3 py-2 text-xs font-semibold text-white"
-        >
-          View Details
-        </button>
+        {!isBuilding && (
+          <button
+            type="button"
+            onClick={() => onViewDetails(item.id)}
+            className="flex-1 rounded-full bg-emerald-700 px-3 py-2 text-xs font-semibold text-white"
+          >
+            View Details
+          </button>
+        )}
       </div>
     </div>
   );

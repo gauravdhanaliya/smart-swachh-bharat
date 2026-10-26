@@ -14,7 +14,7 @@ const field =
   "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none";
 
 export default function GovProfile() {
-  const { mobileNumber, resetAuth } = useAuth();
+  const { user, resetAuth } = useAuth();
   const navigate = useNavigate();
   const { profile, updateProfile } = useGovProfile();
   const [resetDone, setResetDone] = useState(false);
@@ -186,7 +186,7 @@ export default function GovProfile() {
             <p className="text-sm text-slate-500">
               {profile.district}, {profileState} &middot; {profile.ministry}
             </p>
-            {mobileNumber && <p className="mt-1 text-xs text-slate-400">+91 {mobileNumber}</p>}
+            <p className="mt-1 text-xs text-slate-400">Signed in as {user.name}</p>
 
             <button
               type="button"
@@ -224,7 +224,7 @@ export default function GovProfile() {
                 Demo tools
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Restores the predefined demo complaints for a repeatable SIH presentation. Your
+                Restores the predefined demo complaints for a repeatable presentation. Your
                 profile details are kept.
               </p>
               <button

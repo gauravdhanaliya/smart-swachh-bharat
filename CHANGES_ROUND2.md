@@ -145,7 +145,7 @@ Removed everywhere it appeared, and the component itself is deleted:
   that pointed to it.
 
 Nothing else referenced the badge, so the app no longer discloses in-UI that its data
-is simulated. `README.md` / `SIH_DEMO_GUIDE.md` still document that separately if you
+is simulated. `README.md` still documents that separately if you
 want that disclosure to live somewhere.
 
 ## Step 14J — Government profile is now editable (defaults to Meerut)

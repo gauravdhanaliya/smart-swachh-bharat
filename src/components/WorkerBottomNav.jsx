@@ -59,7 +59,7 @@ export default function WorkerBottomNav({ notificationCount = 0 }) {
     path === "/worker" ? location.pathname === "/worker" : location.pathname.startsWith(path);
 
   return (
-    <nav className="relative z-10 flex items-end border-t border-orange-100 bg-white px-1 pb-2 pt-1">
+    <nav className="relative z-10 shrink-0 flex items-end border-t border-orange-100 bg-white px-1 pb-2 pt-1 shadow-[0_-6px_16px_-8px_rgba(224,122,0,0.2)]">
       {NAV_ITEMS.map((item) => {
         const active = isActive(item.path);
         return (

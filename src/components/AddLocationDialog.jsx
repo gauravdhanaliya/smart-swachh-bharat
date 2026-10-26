@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import SimpleMap from "./SimpleMap";
 import { useLiveLocation } from "../hooks/useLiveLocation";
+import { useGpsConsent } from "../hooks/useGpsConsent";
+import GpsConsentNotice, { GpsAlert } from "./GpsConsentNotice";
+import { gpsBlocker, lowAccuracyMessage } from "../utils/gps";
 import { validateCustomCity } from "../services/cityService";
 
 // "Add custom location" — the escape hatch from the six built-in cities
@@ -9,7 +12,7 @@ import { validateCustomCity } from "../services/cityService";
 // Two ways in, because neither works everywhere: GPS is one tap but
 // needs an HTTPS page and a granted permission (see useLiveLocation for
 // why it can also be wrong), while typed coordinates always work and are
-// what a judge demoing on a laptop will reach for. Whichever you use,
+// what someone demoing on a laptop will reach for. Whichever you use,
 // the map preview underneath is the confirmation step — same
 // pick-then-preview pattern as GovAddFacility and ReportIssue.
 
@@ -25,10 +28,16 @@ export default function AddLocationDialog({ onCancel, onSave, initialName = "", 
     status,
     error: gpsError,
     supported,
-    approximate,
     start,
     stop,
   } = useLiveLocation();
+
+  // GPS only starts from the tap below, after the notice; "Enter manually"
+  // just moves on to the coordinate fields.
+  const gps = useGpsConsent({
+    run: start,
+    onManual: () => document.getElementById("location-lat")?.focus(),
+  });
 
   // Stop the geolocation watch as soon as the sheet closes — it's a
   // battery drain and a privacy surprise if it keeps running.
@@ -119,8 +128,8 @@ export default function AddLocationDialog({ onCancel, onSave, initialName = "", 
         <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
           <button
             type="button"
-            onClick={start}
-            disabled={!supported || status === "locating"}
+            onClick={gps.request}
+            disabled={!supported || status === "locating" || gps.asking}
             className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -131,18 +140,17 @@ export default function AddLocationDialog({ onCancel, onSave, initialName = "", 
             {status === "locating" ? "Finding you…" : "Use my current location"}
           </button>
 
-          {!supported && (
-            <p className="mt-2 text-xs text-emerald-800/60">
-              Your browser can&apos;t share location here (it needs an HTTPS page). Enter
-              coordinates below instead.
-            </p>
+          {gps.asking && (
+            <GpsConsentNotice className="mt-3" onAllow={gps.allow} onManual={gps.decline} />
           )}
-          {gpsError && <p className="mt-2 text-xs font-medium text-red-600">{gpsError}</p>}
-          {position && approximate && (
-            <p className="mt-2 text-xs text-orange-700">
-              This fix is approximate (±{Math.round(position.accuracy)} m). Check the map below
-              before saving.
-            </p>
+          {!supported && <GpsAlert className="mt-2">{gpsBlocker()}</GpsAlert>}
+          {gpsError && supported && (
+            <GpsAlert tone="error" className="mt-2">
+              {gpsError}
+            </GpsAlert>
+          )}
+          {position && lowAccuracyMessage(position.accuracy) && (
+            <GpsAlert className="mt-2">{lowAccuracyMessage(position.accuracy)}</GpsAlert>
           )}
         </div>
 

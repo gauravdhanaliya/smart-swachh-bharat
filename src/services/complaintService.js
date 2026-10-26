@@ -143,6 +143,29 @@ export function updateComplaint(id, updates) {
   return next.find((c) => c.id === id) ?? null;
 }
 
+/**
+ * Records this device's up/down vote on a complaint. Voting the same way
+ * again clears the vote; voting the other way switches it. Votes don't
+ * bump `updatedAt` — they aren't a status change.
+ */
+export function voteComplaint(id, direction) {
+  const all = readAll();
+  const next = all.map((c) => {
+    if (c.id !== id) return c;
+    const prev = c.myVote ?? null;
+    const vote = prev === direction ? null : direction;
+    let upvotes = c.upvotes ?? 0;
+    let downvotes = c.downvotes ?? 0;
+    if (prev === "up") upvotes -= 1;
+    if (prev === "down") downvotes -= 1;
+    if (vote === "up") upvotes += 1;
+    if (vote === "down") downvotes += 1;
+    return { ...c, upvotes, downvotes, myVote: vote };
+  });
+  writeAll(next);
+  return next.find((c) => c.id === id) ?? null;
+}
+
 export function assignComplaint(id, workerId, workerName) {
   return updateComplaint(id, {
     status: STATUS.ASSIGNED,
@@ -164,7 +187,7 @@ export function subscribe(callback) {
 /**
  * Demo/dev helper — wipes any complaints created during the session and
  * restores the predefined seed complaints (SSB2026-0045..0048) so the
- * SIH demo workflow can be re-run from a clean, known state. Does not
+ * demo workflow can be re-run from a clean, known state. Does not
  * touch auth/role or worker-session storage.
  */
 export function resetDemoData() {

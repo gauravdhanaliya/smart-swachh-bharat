@@ -17,7 +17,7 @@ function formatDateTime(iso) {
   });
 }
 
-function RequestCard({ request, onApprove, onReject }) {
+function RequestCard({ request, onApprove, onReject, busy }) {
   const [rejecting, setRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const isPending = request.status === REQUEST_STATUS.PENDING || request.status === REQUEST_STATUS.UNDER_REVIEW;
@@ -53,7 +53,7 @@ function RequestCard({ request, onApprove, onReject }) {
       )}
       {request.status === REQUEST_STATUS.APPROVED && (
         <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-          Approved — now visible on Government and Citizen maps as {request.facilityType === "Dustbin" ? "WB" : "WT"}-{request.id}.
+          Approved — now on the shared map for Government and Citizens (after their next refresh).
         </p>
       )}
 
@@ -76,7 +76,8 @@ function RequestCard({ request, onApprove, onReject }) {
                     setRejecting(false);
                     setRejectionReason("");
                   }}
-                  className="flex-1 rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+                  disabled={busy}
+                  className="flex-1 rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                 >
                   Confirm Reject
                 </button>
@@ -94,6 +95,7 @@ function RequestCard({ request, onApprove, onReject }) {
               <button
                 type="button"
                 onClick={() => onApprove(request.id)}
+                disabled={busy}
                 className="flex-1 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
               >
                 Approve
@@ -129,9 +131,27 @@ export default function GovFacilityRequests() {
     [requests, filter]
   );
 
-  const handleApprove = (id) => updateFacilityRequestStatus(id, REQUEST_STATUS.APPROVED);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const run = async (action) => {
+    setError("");
+    setBusy(true);
+    try {
+      await action();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const handleApprove = (id) => run(() => updateFacilityRequestStatus(id, REQUEST_STATUS.APPROVED));
   const handleReject = (id, reason) =>
-    updateFacilityRequestStatus(id, REQUEST_STATUS.REJECTED, { rejectionReason: reason || "Not approved by Government Official." });
+    run(() =>
+      updateFacilityRequestStatus(id, REQUEST_STATUS.REJECTED, {
+        rejectionReason: reason || "Not approved by Government Official.",
+      })
+    );
 
   return (
     <GovShell title="Facility Requests" subtitle="Review Worker-submitted Dustbin & Public Toilet requests">
@@ -142,6 +162,12 @@ export default function GovFacilityRequests() {
         <StatusFilterTabs options={FILTERS} value={filter} onChange={setFilter} />
       </div>
 
+      {error && (
+        <p role="alert" className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </p>
+      )}
+
       {filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
           <p className="font-semibold text-slate-900">No requests here</p>
@@ -150,7 +176,7 @@ export default function GovFacilityRequests() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((request) => (
-            <RequestCard key={request.id} request={request} onApprove={handleApprove} onReject={handleReject} />
+            <RequestCard key={request.id} request={request} onApprove={handleApprove} onReject={handleReject} busy={busy} />
           ))}
         </div>
       )}

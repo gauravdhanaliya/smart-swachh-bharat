@@ -38,9 +38,9 @@ export default function WorkerShell({
   };
 
   return (
-    <div className="min-h-dvh bg-orange-50/40 sm:py-6">
-      <div className="device-frame">
-        <div className="bg-orange-600 px-5 pb-4 pt-5 text-white">
+    <div className="min-h-dvh bg-orange-50/40 sm:py-4">
+      <div className="device-frame device-frame--app">
+        <div className="shrink-0 bg-orange-600 px-5 pb-4 pt-5 text-white">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
               EcoSetu · Smart Swachh Bharat
@@ -106,7 +106,7 @@ export default function WorkerShell({
           {headerExtra}
         </div>
 
-        <div className={noScroll ? "flex-1 flex flex-col min-h-0" : "flex-1 flex flex-col overflow-y-auto"}>
+        <div className={noScroll ? "flex-1 flex flex-col min-h-0" : "flex-1 flex flex-col min-h-0 overflow-y-auto pb-4"}>
           {children}
         </div>
 

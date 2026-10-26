@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { id: "complaints", label: "Complaints", path: "/official/complaints" },
   { id: "bins", label: "Bins", path: "/official/bins" },
   { id: "toilets", label: "Public Toilets", path: "/official/toilets" },
+  { id: "locations", label: "Campus Buildings", path: "/official/locations" },
   { id: "facilityRequests", label: "Facility Requests", path: "/official/facility-requests" },
   { id: "workers", label: "Workers", path: "/official/workers" },
   { id: "analytics", label: "Analytics", path: "/official/analytics" },

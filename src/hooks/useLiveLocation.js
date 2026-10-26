@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { gpsBlocker, gpsErrorMessage } from "../utils/gps";
 
 // Continuous "my location" tracking using only the browser's built-in
 // Geolocation API — the same blue-dot-with-accuracy-circle behaviour
@@ -14,6 +15,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // (rather than a deployed HTTPS URL from Vercel/Netlify), the browser
 // will refuse silently — this hook detects that case and reports it
 // instead of leaving the button looking broken.
+//
+// CONSENT: start() is the moment the browser's permission prompt fires, so
+// callers must only call it from a user tap, after the GPS notice
+// (components/GpsConsentNotice + hooks/useGpsConsent). Never on mount.
 //
 // WRONG-LOCATION FIX: the browser has two very different ways of
 // answering "where am I" —
@@ -59,13 +64,9 @@ export function useLiveLocation() {
   }, [hasApi]);
 
   const start = useCallback(() => {
-    if (!hasApi) {
-      setError("Geolocation isn't supported in this browser.");
-      setStatus("error");
-      return;
-    }
-    if (!isSecure) {
-      setError("Live location needs a secure (HTTPS) connection to work.");
+    const blocker = gpsBlocker();
+    if (blocker) {
+      setError(blocker);
       setStatus("error");
       return;
     }
@@ -115,19 +116,13 @@ export function useLiveLocation() {
         }
         setTracking(false);
         setStatus("error");
-        if (err.code === err.PERMISSION_DENIED) {
-          setError("Location permission denied. Allow location for this site, then try again.");
-        } else if (err.code === err.TIMEOUT) {
-          setError("Couldn't get a location fix in time. Try again outdoors, or set your area manually.");
-        } else {
-          setError("Location unavailable right now. You can set your area manually instead.");
-        }
+        setError(gpsErrorMessage(err));
       },
       // maximumAge: 0 — never accept a cached fix; that's what made the
       // map open on an old/other-network city.
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
-  }, [hasApi, isSecure]);
+  }, []);
 
   // Always clear the watch when the map screen unmounts.
   useEffect(() => stop, [stop]);

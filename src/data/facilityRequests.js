@@ -1,8 +1,6 @@
-// Step 14A — Worker "Request Facility" data model.
-// Shape mirrors what a future `GET /api/facility-requests` response would
-// return, so `facilityRequestService.js` can later swap localStorage for a
-// real API without touching any UI code (same pattern as data/complaints.js
-// + services/complaintService.js).
+// Step 14A — Worker "Request Facility" constants. The requests themselves
+// live in the EcoSetu API (see services/facilityRequestService.js); demo
+// requests are seeded on the server.
 
 export const FACILITY_TYPE = {
   DUSTBIN: "Dustbin",
@@ -50,79 +48,17 @@ export const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const YEAR = 2026;
 export const FACILITY_REQUEST_ID_PREFIX = `FR-${YEAR}-`;
 
-// Named locations a worker can pick from the existing map preview,
-// without needing a click-to-drop-pin map library. Coordinates are
-// prototype approximations for the demo, not surveyed points.
+// Reference points a worker can pick without a click-to-drop-pin map.
+// Only the first is verified (OpenStreetMap, ODbL); workers can also drop a
+// pin on the map or type coordinates.
+export const CAMPUS_CENTER = { latitude: 29.8905551, longitude: 77.9601633 };
 export const FACILITY_PICK_LOCATIONS = [
-  { address: "Near IIMT University, Meerut", latitude: 28.9846, longitude: 77.7064 },
-  { address: "Ganganagar, Lucknow", latitude: 26.8845, longitude: 80.9614 },
-  { address: "Gomti Nagar, Lucknow", latitude: 26.8467, longitude: 80.9462 },
-  { address: "Hazratganj, Lucknow", latitude: 26.8508, longitude: 80.9462 },
-  { address: "Indira Nagar, Lucknow", latitude: 26.8763, longitude: 80.9944 },
-  { address: "Aliganj, Lucknow", latitude: 26.8912, longitude: 80.9219 },
-  { address: "Vibhuti Khand, Lucknow", latitude: 26.8558, longitude: 81.0072 },
-  { address: "Alambagh, Lucknow", latitude: 26.8156, longitude: 80.9096 },
+  { address: "COER University — campus centre (map reference)", ...CAMPUS_CENTER },
+  { address: "COER University — OpenStreetMap campus centroid", latitude: 29.8905429, longitude: 77.9594553 },
 ];
 
 function isoNow() {
   return new Date().toISOString();
 }
-
-// Pre-seeded demo requests so "My Facility Requests" doesn't look empty
-// on first load. Clearly prototype/demo data — never a real municipal
-// submission. Ids match the STEP 14A spec exactly (FR-2026-001..003).
-export const SEED_FACILITY_REQUESTS = [
-  {
-    id: `${FACILITY_REQUEST_ID_PREFIX}001`,
-    facilityType: FACILITY_TYPE.DUSTBIN,
-    suggestedName: "Dustbin near IIMT University gate",
-    location: { address: "Near IIMT University, Meerut", latitude: 28.9846, longitude: 77.7064 },
-    reason: "No dustbin within 200m of the main gate; students dump waste on the roadside.",
-    description: "High footfall area during college hours. A segregated 3-bin unit would help most.",
-    priority: FACILITY_PRIORITY.HIGH,
-    photo: null,
-    status: REQUEST_STATUS.PENDING,
-    rejectionReason: "",
-    requestedByWorkerId: "w1",
-    requestedByWorkerName: "Vikash Kumar",
-    isDemo: true,
-    createdAt: "2026-06-02T09:10:00.000Z",
-    updatedAt: "2026-06-02T09:10:00.000Z",
-  },
-  {
-    id: `${FACILITY_REQUEST_ID_PREFIX}002`,
-    facilityType: FACILITY_TYPE.TOILET,
-    suggestedName: "Public toilet, Ganganagar market",
-    location: { address: "Ganganagar, Lucknow", latitude: 26.8845, longitude: 80.9614 },
-    reason: "Market area has no public toilet; nearest facility is over 1km away.",
-    description: "Vendors and visitors currently have no sanitation facility nearby.",
-    priority: FACILITY_PRIORITY.MEDIUM,
-    photo: null,
-    status: REQUEST_STATUS.APPROVED,
-    rejectionReason: "",
-    requestedByWorkerId: "w2",
-    requestedByWorkerName: "Ramesh Kumar",
-    isDemo: true,
-    createdAt: "2026-05-18T11:45:00.000Z",
-    updatedAt: "2026-05-27T14:20:00.000Z",
-  },
-  {
-    id: `${FACILITY_REQUEST_ID_PREFIX}003`,
-    facilityType: FACILITY_TYPE.DUSTBIN,
-    suggestedName: "Extra dustbin, demo location",
-    location: { address: "Demo location, Lucknow", latitude: 26.86, longitude: 80.95 },
-    reason: "Sample rejected request for demo purposes.",
-    description: "Prototype example showing the rejection-reason state.",
-    priority: FACILITY_PRIORITY.LOW,
-    photo: null,
-    status: REQUEST_STATUS.REJECTED,
-    rejectionReason: "A dustbin already exists within 50m of this location.",
-    requestedByWorkerId: "w1",
-    requestedByWorkerName: "Vikash Kumar",
-    isDemo: true,
-    createdAt: "2026-05-10T08:30:00.000Z",
-    updatedAt: "2026-05-12T10:05:00.000Z",
-  },
-];
 
 export { isoNow };

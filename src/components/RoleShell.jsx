@@ -30,9 +30,9 @@ export default function RoleShell({
   };
 
   return (
-    <div className="min-h-dvh bg-emerald-50/40 sm:py-6">
-      <div className="device-frame">
-        <div className={`${theme.bg} px-5 pb-4 pt-5 text-white`}>
+    <div className="min-h-dvh bg-emerald-50/40 sm:py-4">
+      <div className="device-frame device-frame--app">
+        <div className={`${theme.bg} shrink-0 px-5 pb-4 pt-5 text-white`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {showBack && (
@@ -66,7 +66,7 @@ export default function RoleShell({
           <h1 className="mt-3 text-lg font-bold">{title}</h1>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-y-auto">{children}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
       </div>
     </div>
   );

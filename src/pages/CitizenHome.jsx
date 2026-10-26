@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CitizenShell from "../components/CitizenShell";
 import StatTile from "../components/StatTile";
 import MapPreview from "../components/MapPreview";
 import CitySelector from "../components/CitySelector";
 import AddLocationDialog from "../components/AddLocationDialog";
-import { CARD_BUTTON, CARD_BUTTON_FILLED, TAP_LINK } from "../components/buttonStyles";
+import { CARD_BUTTON, CARD_BUTTON_FILLED } from "../components/buttonStyles";
 import { useLiveBins } from "../hooks/useLiveBins";
 import { useLiveToilets } from "../hooks/useLiveToilets";
 import { useComplaints } from "../hooks/useComplaints";
@@ -15,8 +15,27 @@ import { inCity } from "../data/cities";
 import { BIN_STATUS } from "../data/bins";
 import { STATUS } from "../data/complaints";
 
+function greetingFor(date) {
+  const h = date.getHours();
+  if (h >= 5 && h < 12) return "Good Morning";
+  if (h >= 12 && h < 17) return "Good Afternoon";
+  if (h >= 17 && h < 21) return "Good Evening";
+  return "Good Night";
+}
+
+function useNow() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
 export default function CitizenHome() {
   const navigate = useNavigate();
+  const now = useNow();
+  const timeLabel = now.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
   const allBins = useLiveBins();
   const allToilets = useLiveToilets();
   const complaints = useComplaints();
@@ -26,7 +45,7 @@ export default function CitizenHome() {
   const { unreadCount } = useCitizenNotifications();
 
   // Everything on this screen follows the chosen city. Demo data only
-  // exists for Lucknow, so other cities honestly show zero.
+  // exists for Roorkee, so other cities honestly show zero.
   const bins = useMemo(() => allBins.filter((b) => inCity(b, city)), [allBins, city]);
   const toilets = useMemo(() => allToilets.filter((t) => inCity(t, city)), [allToilets, city]);
 
@@ -86,8 +105,8 @@ export default function CitizenHome() {
         {/* Greeting */}
         <div className="mt-2 flex shrink-0 items-start justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold leading-tight text-emerald-950">Good Morning, Citizen!</h1>
-            <p className="text-xs text-emerald-800/70">Let&apos;s keep our city clean and green.</p>
+            <h1 className="text-lg font-bold leading-tight text-emerald-950">{greetingFor(now)}, Citizen!</h1>
+            <p className="text-xs text-emerald-800/70">{timeLabel} · Let&apos;s keep our city clean and green.</p>
           </div>
           <span className="text-2xl">🌱</span>
         </div>
@@ -150,12 +169,19 @@ export default function CitizenHome() {
         </div>
 
         {/* Small actions banner */}
-        <button type="button" className={`mt-2 shrink-0 ${CARD_BUTTON_FILLED} p-2.5`}>
+        <button
+          type="button"
+          onClick={() => navigate("/citizen/eco-guide")}
+          className={`mt-2 shrink-0 ${CARD_BUTTON_FILLED} p-2.5`}
+        >
           <span className="text-base">🌿</span>
           <span className="flex-1 text-xs font-semibold leading-tight">
             Small Actions
             <br />
             Make a Big Difference
+            <span className="mt-0.5 block text-xs font-normal text-white/80">
+              Open the Eco Guide — learn easy ways to help
+            </span>
           </span>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 6l6 6-6 6" />
@@ -188,7 +214,7 @@ export default function CitizenHome() {
           </div>
           {bins.length === 0 && toilets.length === 0 && (
             <p className="mt-1 shrink-0 text-[11px] text-emerald-800/60">
-              No bins or toilets are mapped in {city.name} yet — the demo data covers Lucknow.
+              No bins or toilets are mapped in {city.name} yet — the demo data covers Roorkee (COER University area).
             </p>
           )}
         </div>

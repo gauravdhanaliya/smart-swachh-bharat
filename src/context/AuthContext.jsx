@@ -1,55 +1,53 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import {
+  clearLegacySessions,
+  clearSession,
+  isSessionKey,
+  readSession,
+  startSession,
+} from "../services/authSession";
+import { selectWorker } from "../hooks/useWorkerSession";
+import { resetStore } from "../services/locationStore";
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEY = "ssb_auth_state";
-
-function loadInitialState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // ignore malformed storage and fall back to defaults
-  }
-  return { role: null, mobileNumber: "", isAuthenticated: false };
-}
-
+// The signed-in demo user ({ id, name, role, loginAt }) from services/authSession.js.
 export function AuthProvider({ children }) {
-  const [role, setRole] = useState(() => loadInitialState().role);
-  const [mobileNumber, setMobileNumber] = useState(
-    () => loadInitialState().mobileNumber
-  );
-  const [isAuthenticated, setIsAuthenticated] = useState(
-    () => loadInitialState().isAuthenticated
-  );
+  const [user, setUser] = useState(readSession);
 
   useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ role, mobileNumber, isAuthenticated })
-    );
-  }, [role, mobileNumber, isAuthenticated]);
+    clearLegacySessions();
+  }, []);
 
-  const selectRole = (selectedRole) => setRole(selectedRole);
+  // Signing in or out in another tab applies here too.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === null || isSessionKey(e.key)) setUser(readSession());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
-  const completeLogin = (verifiedMobileNumber) => {
-    setMobileNumber(verifiedMobileNumber);
-    setIsAuthenticated(true);
+  /** Signs in as `role` straight away. Returns the new session. */
+  const login = (role, name) => {
+    const session = startSession(role, name);
+    if (role === "worker") selectWorker(session.id);
+    resetStore();
+    setUser(session);
+    return session;
   };
 
   const resetAuth = () => {
-    setRole(null);
-    setMobileNumber("");
-    setIsAuthenticated(false);
-    localStorage.removeItem(STORAGE_KEY);
+    clearSession();
+    resetStore();
+    setUser(null);
   };
 
   const value = {
-    role,
-    mobileNumber,
-    isAuthenticated,
-    selectRole,
-    completeLogin,
+    user,
+    role: user?.role ?? null,
+    isAuthenticated: Boolean(user),
+    login,
     resetAuth,
   };
 

@@ -17,7 +17,7 @@ function initials(name) {
 
 export default function WorkerProfile() {
   const navigate = useNavigate();
-  const { resetAuth } = useAuth();
+  const { user, resetAuth } = useAuth();
   const complaints = useComplaints();
   const { worker, setWorkerId } = useWorkerSession();
 
@@ -41,6 +41,7 @@ export default function WorkerProfile() {
           <div className="min-w-0">
             <p className="font-semibold text-slate-900">{worker.name}</p>
             <p className="text-sm text-slate-500">{worker.role}</p>
+            <p className="text-xs text-slate-400">Signed in as {user.name}</p>
             <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
               <span className={`h-2 w-2 rounded-full ${STATUS_DOT[worker.status] ?? "bg-slate-400"}`} />
               {worker.status}
