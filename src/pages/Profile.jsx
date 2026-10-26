@@ -5,6 +5,8 @@ import SettingsGroup from "../components/SettingsGroup";
 import AddLocationDialog from "../components/AddLocationDialog";
 import ToggleSwitch from "../components/ToggleSwitch";
 import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../hooks/useProfile";
+import ResetAllDataButton from "../components/ResetAllDataButton";
 import { useCity } from "../hooks/useCity";
 import { useComplaints } from "../hooks/useComplaints";
 import { useCitizenNotifications } from "../hooks/useCitizenNotifications";
@@ -49,7 +51,8 @@ function LinkRow({ icon, label, value, badge, onClick }) {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, resetAuth } = useAuth();
+  const { resetAuth } = useAuth();
+  const profile = useProfile("citizen");
   const { city, cities, selectCity, addLocation, removeLocation } = useCity();
   const complaints = useComplaints();
   const { unreadCount } = useCitizenNotifications();
@@ -76,12 +79,23 @@ export default function Profile() {
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-2xl">
             🙂
           </span>
-          <div className="min-w-0">
-            <p className="font-semibold text-emerald-950">{user.name}</p>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-emerald-950">{profile?.fullName}</p>
+            {profile?.mobile && <p className="text-sm text-emerald-800/60">+91 {profile.mobile}</p>}
             <p className="mt-0.5 text-xs text-emerald-800/50">
-              {city.state ? `${city.name}, ${city.state}` : city.name}
+              {[profile?.ward, profile?.city ? (profile.city.state ? `${profile.city.name}, ${profile.city.state}` : profile.city.name) : null]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
+            {profile?.address && <p className="mt-0.5 text-xs text-emerald-800/50">{profile.address}</p>}
           </div>
+          <button
+            type="button"
+            onClick={() => navigate("/profile/setup", { state: { edit: true } })}
+            className="shrink-0 self-start rounded-full border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+          >
+            Edit details
+          </button>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
@@ -200,7 +214,7 @@ export default function Profile() {
           <div className="rounded-2xl border border-red-200 bg-white p-4 shadow-sm">
             <p className="text-sm font-semibold text-emerald-950">Log out of EcoSetu?</p>
             <p className="mt-0.5 text-xs text-emerald-800/60">
-              You&apos;ll need your mobile number and OTP to sign back in.
+              You can sign back in any time by choosing Citizen on the login page.
             </p>
             <div className="mt-3 flex gap-3">
               <button
@@ -232,6 +246,7 @@ export default function Profile() {
             Logout
           </button>
         )}
+        <ResetAllDataButton />
       </div>
 
       {addingLocation && (

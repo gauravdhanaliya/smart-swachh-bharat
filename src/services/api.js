@@ -1,15 +1,15 @@
 // Local, in-browser stand-in for the EcoSetu API (server/).
 //
-// The demo build runs with no backend (Vercel serves only the static app), so
+// The web app runs with no backend (Vercel serves only the static app), so
 // `api(path, opts)` answers the same paths with the same response shapes as
-// server/src/app.js — and reuses the server's own validation, constants and
-// seed data — but keeps the records in this browser's localStorage. The
-// services above it (locationStore, facilityService, facilityRequestService)
-// don't know the difference. Role checks use the local demo session.
+// server/src/app.js — and reuses the server's own validation and constants —
+// but keeps the records in this browser's localStorage. The services above
+// it (locationStore, facilityService, facilityRequestService) don't know the
+// difference. Role checks use the local session. It starts empty: bins,
+// toilets and buildings come only from officials and approved requests.
 
 import { ValidationError, cleanText, validateLocation, validateRequest } from "../../server/src/validate.js";
 import { ADMIN_ROLES, REQUEST_FACILITY_TYPES, REQUEST_STATUS } from "../../server/src/constants.js";
-import { CAMPUS, DEMO_BUILDINGS, DEMO_REQUESTS } from "../../server/src/seed-data.js";
 import { readSession } from "./authSession";
 
 const STORAGE_KEY = "ssb_local_api_v1";
@@ -66,7 +66,7 @@ function insertLocation(db, loc) {
 }
 
 function insertRequest(db, r) {
-  const id = r.id ?? nextId("FR-2026-", db.requests);
+  const id = r.id ?? nextId(`FR-${new Date().getFullYear()}-`, db.requests);
   const ts = r.createdAt ?? now();
   db.requests.push({
     id,
@@ -115,39 +115,30 @@ function publishRequest(db, req, approver) {
   });
 }
 
-// Same seed as server/src/seed.js.
+// A fresh store is empty: nothing is seeded.
 function seed() {
-  const db = { locations: [], requests: [] };
-  insertLocation(db, { ...CAMPUS, createdBy: "system" });
-  for (const loc of DEMO_BUILDINGS) insertLocation(db, { ...loc, createdBy: "system" });
-  for (const r of DEMO_REQUESTS) {
-    insertRequest(db, {
-      ...r,
-      requestedByUser: "demo-seed",
-      reviewedBy: r.status === "PENDING" ? null : "system",
-      isDemo: true,
-      updatedAt: r.createdAt,
-    });
-    if (r.status === REQUEST_STATUS.APPROVED) publishRequest(db, { ...r, isDemo: true }, "system");
-  }
-  return db;
+  return { locations: [], requests: [] };
 }
 
-// Last state this tab saw — used if storage is blocked or full.
+// Last state this tab saw — used only while storage can't be read at all.
+// Empty storage means the data was cleared, so it starts over empty.
 let memory = null;
 
 function load() {
+  let raw = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    if (memory) return clone(memory);
+  }
+  try {
     const db = raw ? JSON.parse(raw) : null;
     if (Array.isArray(db?.locations) && Array.isArray(db?.requests)) return db;
   } catch {
-    // malformed or blocked storage — fall through
+    // malformed — start over below
   }
-  if (memory) return clone(memory);
-  const db = seed();
-  save(db); // persist right away so seeded timestamps stay stable
-  return db;
+  // Nothing stored: start empty, and write only once something is added.
+  return seed();
 }
 
 // If a request's photo pushes storage over quota, keep the request without it.

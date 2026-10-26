@@ -40,8 +40,8 @@ export default function ToiletDetails() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-emerald-950">Toilet not found</p>
           <p className="text-sm text-emerald-800/60">
-            This isn't in the demo data set, and live OpenStreetMap pins aren't kept after a page
-            refresh — try opening it again from the map.
+            It may have been removed by an official, or the app's data was reset. Try opening it
+            again from the map.
           </p>
           <button
             type="button"
@@ -114,7 +114,6 @@ export default function ToiletDetails() {
               {toilet.locationLabel && (
                 <p className="text-xs text-emerald-800/40">
                   {toilet.locationLabel}
-                  {toilet.source !== "osm" && " · prototype data"}
                 </p>
               )}
             </div>

@@ -18,7 +18,8 @@ import { useLiveBuildings } from "../hooks/useLiveBuildings";
 import { useSyncStatus } from "../hooks/useSyncStatus";
 import { TOILET_STATUS } from "../data/toilets";
 import { BIN_STATUS } from "../data/bins";
-import { FACILITY_PICK_LOCATIONS } from "../data/facilityRequests";
+import { useCity } from "../hooks/useCity";
+import { inCity } from "../data/cities";
 import IndiaLocationPicker from "../components/IndiaLocationPicker";
 import { TAP_LINK } from "../components/buttonStyles";
 
@@ -39,13 +40,8 @@ import { TAP_LINK } from "../components/buttonStyles";
 // disturbing the demo latitude/longitude used here. Not implemented in
 // this step.
 
-// DEFAULT MAP CENTER — was hardcoded to Lucknow; changed to Meerut since
-// that's where the IIMT-University-area demo/test facilities actually
-// are (see FACILITY_PICK_LOCATIONS in data/facilityRequests.js), so the
-// map opens centered on the same area those facilities are added to.
-const DEFAULT_CENTER = { latitude: 29.8905551, longitude: 77.9601633 }; // COER University campus
-const DEFAULT_CENTER_LABEL = "COER University";
-const CAMPUS_ZOOM = 17;
+// The map opens on the citizen's chosen city (from their profile, or the
+// Home city picker) until they pick an area or use GPS.
 const CITY_ZOOM = 13;
 const SELECTED_ZOOM = 16;
 
@@ -122,16 +118,11 @@ function NearbyRow({ kind, item, onSelect }) {
         <span className="flex items-center justify-between gap-2">
           {/* USABILITY AUDIT FIX (issues 3 & 4 — "text is truncated"): a
               single-line `truncate` could clip the whole facility name
-              (e.g. "Dustbin near COER University gate") when the status
+              (e.g. "Dustbin near the main gate") when the status
               badge claimed most of the row's width. Wrapping to 2 lines
               keeps the full name readable; `title` covers hover/AT. */}
           <span className="line-clamp-2 text-sm font-semibold text-emerald-950" title={item.name}>
             {item.name}
-            {item.isDemo && (
-              <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[9px] font-bold text-amber-800">
-                DEMO
-              </span>
-            )}
           </span>
           <StatusBadge status={item.status} className="shrink-0" />
         </span>
@@ -157,6 +148,9 @@ export default function MapScreen() {
   const toilets = useLiveToilets();
   const buildings = useLiveBuildings();
   const sync = useSyncStatus();
+  const { city } = useCity();
+  const cityPresets = [{ address: city.state ? `${city.name}, ${city.state}` : city.name, latitude: city.latitude, longitude: city.longitude }];
+  const cityHasFacilities = [...bins, ...toilets].some((f) => inCity(f, city));
   const [view, setView] = useState("map"); // "map" | "list"
   const [radiusTouched, setRadiusTouched] = useState(false);
   const {
@@ -249,8 +243,8 @@ export default function MapScreen() {
   const origin = useMemo(() => {
     if (selected?.kind === "me") return { latitude: selected.latitude, longitude: selected.longitude };
     if (position) return { latitude: position.lat, longitude: position.lng };
-    return { latitude: DEFAULT_CENTER.latitude, longitude: DEFAULT_CENTER.longitude };
-  }, [selected, position]);
+    return { latitude: city.latitude, longitude: city.longitude };
+  }, [selected, position, city.latitude, city.longitude]);
 
   const withDistance = (items) =>
     items
@@ -290,7 +284,7 @@ export default function MapScreen() {
   const inRangeToilets = rankedToilets.filter(inRange);
 
   // Nothing within the chosen distance (typically: "Use My Location" from
-  // somewhere that isn't Roorkee). Rather than an empty map, fall back to
+  // far from every facility). Rather than an empty map, fall back to
   // the nearest facilities and say so.
   const outOfRange =
     inRangeBins.length + inRangeToilets.length === 0 &&
@@ -378,7 +372,7 @@ export default function MapScreen() {
                 ? CITY_ZOOM
                 : radiusTouched
                   ? RADIUS_ZOOM[radiusM] ?? CITY_ZOOM
-                  : CAMPUS_ZOOM,
+                  : CITY_ZOOM,
           };
 
   return (
@@ -552,8 +546,8 @@ export default function MapScreen() {
                 id="map-area"
                 value={null}
                 onChange={(loc) => loc && handlePickArea(loc)}
-                presets={FACILITY_PICK_LOCATIONS}
-                presetsLabel="Known areas"
+                presets={cityPresets}
+                presetsLabel="Your city"
                 allowLocality={false}
                 allowGps={false}
               />
@@ -622,21 +616,26 @@ export default function MapScreen() {
               kind={selected.kind}
               item={selected}
               onViewDetails={handleViewDetails}
-              onRetryLocation={selected.kind === "me" ? handleUseMyLocation : undefined}
+              onRetryLocation={selected.kind === "me" ? gps.request : undefined}
               onSetManually={selected.kind === "me" ? () => setShowAreaPicker((v) => !v) : undefined}
             />
           )}
 
-          {!selected && (
+          {!selected && sync.loaded && !cityHasFacilities && (
+            <p className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-medium text-emerald-900 shadow-sm">
+              No bins or toilets in this city yet.
+            </p>
+          )}
+          {!selected && (!sync.loaded || cityHasFacilities) && (
             <p className="rounded-2xl bg-white px-4 py-3 text-xs text-emerald-800/60 shadow-sm">
-              Showing {DEFAULT_CENTER_LABEL}. Search, or pick a bin/toilet from the list below, to see its exact
+              Showing {city.name}. Search, or pick a bin/toilet from the list below, to see its exact
               location and open it in Google Maps.
             </p>
           )}
 
           {(filter === "all" || filter === "buildings") && visibleBuildings.length > 0 && (
             <div>
-              <h2 className="mb-2 text-sm font-semibold text-emerald-950">Campus Buildings</h2>
+              <h2 className="mb-2 text-sm font-semibold text-emerald-950">Buildings</h2>
               <div className="flex flex-col gap-2">
                 {(view === "list" || filter === "buildings" ? visibleBuildings : visibleBuildings.slice(0, LIST_PREVIEW_COUNT)).map((b) => (
                   <NearbyRow
@@ -663,7 +662,7 @@ export default function MapScreen() {
               <h2 className="mb-2 text-sm font-semibold text-emerald-950">Nearby Dustbins</h2>
               <div className="flex flex-col gap-2">
                 {visibleBins.length === 0 && (
-                  <p className="text-xs text-emerald-800/50">{sync.loaded ? "No bins within this distance — try a larger range." : "Loading bins…"}</p>
+                  <p className="text-xs text-emerald-800/50">{!sync.loaded ? "Loading bins…" : cityHasFacilities ? "No bins within this distance — try a larger range." : "No bins in this city yet."}</p>
                 )}
                 {(showAllBins || view === "list" ? visibleBins : visibleBins.slice(0, LIST_PREVIEW_COUNT)).map((bin) => (
                   <NearbyRow
@@ -694,7 +693,7 @@ export default function MapScreen() {
               <h2 className="mb-2 text-sm font-semibold text-emerald-950">Nearby Public Toilets</h2>
               <div className="flex flex-col gap-2">
                 {visibleToilets.length === 0 && (
-                  <p className="text-xs text-emerald-800/50">{sync.loaded ? "No toilets within this distance — try a larger range." : "Loading toilets…"}</p>
+                  <p className="text-xs text-emerald-800/50">{!sync.loaded ? "Loading toilets…" : cityHasFacilities ? "No toilets within this distance — try a larger range." : "No toilets in this city yet."}</p>
                 )}
                 {(showAllToilets || view === "list" ? visibleToilets : visibleToilets.slice(0, LIST_PREVIEW_COUNT)).map(
                   (toilet) => (

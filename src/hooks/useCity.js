@@ -6,6 +6,7 @@ import {
   removeCustomCity,
   subscribe as subscribeCities,
 } from "../services/cityService";
+import { getProfile } from "../services/profileService";
 
 // The citizen's chosen city, remembered in localStorage (demo persistence,
 // same approach as the rest of the app). The list is no longer the static
@@ -14,13 +15,16 @@ import {
 // on the Profile immediately shows up in the Home city picker.
 const STORAGE_KEY = "ssb_citizen_city_v1";
 
+// The city picked on Home, else the city in the citizen's profile.
 function readCityId(cities) {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (cities.some((c) => c.id === saved)) return saved;
   } catch {
-    // storage blocked — use default
+    // storage blocked — fall through
   }
+  const fromProfile = getProfile("citizen")?.cityId;
+  if (cities.some((c) => c.id === fromProfile)) return fromProfile;
   return DEFAULT_CITY_ID;
 }
 

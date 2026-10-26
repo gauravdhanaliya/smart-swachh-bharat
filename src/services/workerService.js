@@ -1,23 +1,19 @@
 // Government "Workers" directory — Add Worker / Remove Worker.
 //
-// Mirrors the services/facilityService.js pattern exactly:
-//   1. the existing demo staff       (src/data/workers.js, WORKERS)
+// Two sources combine into the one list getAllWorkers() every screen reads
+// from (Workers page, complaint assignment, the worker's own header):
+//   1. the sanitation worker who signs in on this device, from their saved
+//      profile (services/profileService.js) — id "w1", so tasks assigned to
+//      them show up when they log in
 //   2. Government-added workers      (this file, localStorage)
-// combine into the one list getAllWorkers() every screen reads from.
-// Removal is a tombstone (like facility removal), not a mutation of the
-// demo array, so it stays reversible and keeps an audit trail of who
-// was taken off the roster and why.
-//
-// Deliberately NOT wired into the Worker-side demo login switcher
-// (hooks/useWorkerSession.js) or the complaint assignment dropdown —
-// those still read the original static WORKERS list. This directory is
-// the Government Official's view of staff; unifying the two would be a
-// separate step if ever needed.
+// No workers ship with the app. Removal is a tombstone, so it stays
+// reversible and keeps an audit trail of who was taken off and why.
 
-import { WORKERS } from "../data/workers";
+import { getProfile, subscribe as subscribeProfiles } from "./profileService";
+import { DEMO_USERS } from "./authSession";
 
 export const WORKER_SOURCE = {
-  DEMO: "DEMO",
+  REGISTERED: "REGISTERED",
   GOVERNMENT: "GOVERNMENT",
 };
 
@@ -111,17 +107,35 @@ function nextWorkerIds(existingDisplayIds) {
   };
 }
 
+/** The worker who signs in on this device, built from their profile (null until it's saved). */
+export function getRegisteredWorker() {
+  const p = getProfile("worker");
+  if (!p) return null;
+  return {
+    id: DEMO_USERS.worker.id,
+    displayId: p.employeeId || "W001",
+    name: p.fullName,
+    role: "Sanitation Worker",
+    area: p.zone,
+    city: p.city?.name ?? "",
+    status: "Available",
+    phone: p.mobile ? `+91 ${p.mobile}` : "",
+    source: WORKER_SOURCE.REGISTERED,
+  };
+}
+
 /**
- * GET /api/workers — demo staff + Government-added staff, minus anyone
- * removed. This — not data/workers.js directly — is what the
- * Government "Workers" screen reads from.
+ * GET /api/workers — the registered worker + Government-added staff, minus
+ * anyone removed.
  */
 export function getAllWorkers() {
   const removed = removedIdSet();
-  return [
-    ...WORKERS.map((w) => ({ ...w, source: w.source ?? WORKER_SOURCE.DEMO })),
-    ...readAddedWorkers(),
-  ].filter((w) => !removed.has(w.id));
+  const registered = getRegisteredWorker();
+  return [...(registered ? [registered] : []), ...readAddedWorkers()].filter((w) => !removed.has(w.id));
+}
+
+export function getWorkerById(id) {
+  return getAllWorkers().find((w) => w.id === id) ?? null;
 }
 
 /**
@@ -167,9 +181,9 @@ export function removeWorker(worker, options = {}) {
     displayId: (typeof worker === "object" && worker?.displayId) || id,
     name: (typeof worker === "object" && worker?.name) || id,
     area: (typeof worker === "object" && worker?.area) || "",
-    source: (typeof worker === "object" && worker?.source) || WORKER_SOURCE.DEMO,
+    source: (typeof worker === "object" && worker?.source) || WORKER_SOURCE.GOVERNMENT,
     reason: (options.reason || "").trim() || "No reason recorded",
-    removedBy: options.removedBy || "District Officer",
+    removedBy: options.removedBy || "Government Official",
     removedAt: isoNow(),
   };
 
@@ -193,17 +207,13 @@ export function getRemovedWorkers() {
     .sort((a, b) => String(b.removedAt).localeCompare(String(a.removedAt)));
 }
 
-/** Subscribes to any change (Government add/remove, cross-tab). */
+/** Subscribes to any change (Government add/remove, the worker's profile, cross-tab). */
 export function subscribe(callback) {
   listeners.add(callback);
-  return () => listeners.delete(callback);
+  const offProfiles = subscribeProfiles(callback);
+  return () => {
+    listeners.delete(callback);
+    offProfiles();
+  };
 }
 
-/** Demo/dev helper — wipes Government-added workers and un-removes
- * anyone removed during the session, so a fresh demo run starts from
- * the same seed roster every time. */
-export function resetDemoData() {
-  writeRemovedWorkers([]);
-  writeAddedWorkers([]);
-  return [];
-}

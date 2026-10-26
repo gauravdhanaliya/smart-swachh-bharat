@@ -1,6 +1,6 @@
 // Step 14A — Worker "Request Facility" constants. The requests themselves
-// live in the EcoSetu API (see services/facilityRequestService.js); demo
-// requests are seeded on the server.
+// live in the EcoSetu API (see services/facilityRequestService.js); none
+// ship with the app.
 
 export const FACILITY_TYPE = {
   DUSTBIN: "Dustbin",
@@ -45,17 +45,11 @@ export const DESCRIPTION_MAX_LENGTH = 500;
 export const MAX_PHOTO_SIZE_BYTES = 3 * 1024 * 1024; // 3 MB
 export const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-const YEAR = 2026;
-export const FACILITY_REQUEST_ID_PREFIX = `FR-${YEAR}-`;
+export const FACILITY_REQUEST_ID_PREFIX = `FR-${new Date().getFullYear()}-`;
 
-// Reference points a worker can pick without a click-to-drop-pin map.
-// Only the first is verified (OpenStreetMap, ODbL); workers can also drop a
-// pin on the map or type coordinates.
-export const CAMPUS_CENTER = { latitude: 29.8905551, longitude: 77.9601633 };
-export const FACILITY_PICK_LOCATIONS = [
-  { address: "COER University — campus centre (map reference)", ...CAMPUS_CENTER },
-  { address: "COER University — OpenStreetMap campus centroid", latitude: 29.8905429, longitude: 77.9594553 },
-];
+// Where maps open before a place is known: the centre of India. Screens
+// centre on the signed-in user's profile city instead whenever there is one.
+export const INDIA_CENTER = { latitude: 22.9734, longitude: 78.6569 };
 
 function isoNow() {
   return new Date().toISOString();

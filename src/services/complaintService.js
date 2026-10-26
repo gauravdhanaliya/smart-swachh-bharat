@@ -10,7 +10,6 @@
 import {
   STATUS,
   COMPLAINT_ID_PREFIX,
-  SEED_COMPLAINTS,
 } from "../data/complaints";
 
 const STORAGE_KEY = "ssb_complaints_v1";
@@ -32,10 +31,11 @@ function readAll() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
   } catch {
-    // Corrupt/blocked storage — fall back to seed data below.
+    // Corrupt/blocked storage — fall back to an empty list below.
   }
-  writeAll(SEED_COMPLAINTS, { silent: true });
-  return SEED_COMPLAINTS;
+  // Nothing stored yet: no complaints ship with the app, and nothing is
+  // written until a citizen creates one.
+  return [];
 }
 
 function writeAll(list, { silent = false } = {}) {
@@ -94,6 +94,8 @@ export function createComplaint(data) {
   const complaint = {
     id: generateComplaintId(all),
     citizenName: data.citizenName,
+    citizenId: data.citizenId ?? null,
+    citizenMobile: data.citizenMobile ?? "",
     issueType: data.issueType,
     description: data.description,
     location: data.location,
@@ -184,14 +186,7 @@ export function subscribe(callback) {
   return () => listeners.delete(callback);
 }
 
-/**
- * Demo/dev helper — wipes any complaints created during the session and
- * restores the predefined seed complaints (SSB2026-0045..0048) so the
- * demo workflow can be re-run from a clean, known state. Does not
- * touch auth/role or worker-session storage.
- */
-export function resetDemoData() {
-  const fresh = SEED_COMPLAINTS.map((c) => ({ ...c }));
-  writeAll(fresh);
-  return fresh;
+/** Tells subscribers the list changed outside this module (e.g. "Reset all data" cleared storage). */
+export function notifyComplaintsChanged() {
+  notify(getComplaints());
 }

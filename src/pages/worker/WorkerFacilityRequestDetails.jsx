@@ -31,7 +31,7 @@ export default function WorkerFacilityRequestDetails() {
       <WorkerShell title="Request Details" showBack onBack={() => navigate("/worker/facility-requests")}>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
           <p className="font-semibold text-slate-900">Request not found</p>
-          <p className="text-sm text-slate-500">This request may have been removed from the demo data set.</p>
+          <p className="text-sm text-slate-500">It may have been deleted, or the app's data was reset.</p>
           <button
             type="button"
             onClick={() => navigate("/worker/facility-requests")}
@@ -79,11 +79,6 @@ export default function WorkerFacilityRequestDetails() {
             <StatusBadge status={request.status} />
           </div>
           <p className="mt-1 text-sm text-slate-500">Submitted {formatDateTime(request.createdAt)}</p>
-          {request.isDemo && (
-            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600">
-              Prototype demo data
-            </p>
-          )}
         </div>
 
         <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">

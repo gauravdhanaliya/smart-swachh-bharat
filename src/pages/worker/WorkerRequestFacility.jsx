@@ -7,12 +7,12 @@ import GpsConsentNotice, { GpsAlert } from "../../components/GpsConsentNotice";
 import { useGpsConsent } from "../../hooks/useGpsConsent";
 import { gpsBlocker, gpsErrorMessage, lowAccuracyMessage } from "../../utils/gps";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
+import { useProfile } from "../../hooks/useProfile";
+import { cityCenter, cityPresets } from "../../services/profileService";
 import { createFacilityRequest } from "../../services/facilityRequestService";
 import {
   FACILITY_TYPES,
   FACILITY_PRIORITIES,
-  FACILITY_PICK_LOCATIONS,
-  CAMPUS_CENTER,
   REASON_MAX_LENGTH,
   DESCRIPTION_MAX_LENGTH,
   MAX_PHOTO_SIZE_BYTES,
@@ -28,6 +28,7 @@ const LOCATION_MODES = [
 export default function WorkerRequestFacility() {
   const navigate = useNavigate();
   const { worker } = useWorkerSession();
+  const workerProfile = useProfile("worker");
   const fileInputRef = useRef(null);
 
   const [facilityType, setFacilityType] = useState(null);
@@ -289,13 +290,13 @@ export default function WorkerRequestFacility() {
                 theme="orange"
                 value={pickedLocation}
                 onChange={handlePickMapLocation}
-                presets={FACILITY_PICK_LOCATIONS}
-                presetsLabel="Known areas"
+                presets={cityPresets(workerProfile)}
+                presetsLabel="Your city"
               />
               <p className="mt-3 text-xs font-medium text-slate-500">Or tap the map to drop a pin</p>
               <PickLocationMap
                 value={hasCoords ? { latitude: Number(latitude), longitude: Number(longitude) } : null}
-                center={CAMPUS_CENTER}
+                center={cityCenter(workerProfile)}
                 onPick={({ latitude: la, longitude: lo }) => {
                   setLatitude(String(la));
                   setLongitude(String(lo));
@@ -367,7 +368,7 @@ export default function WorkerRequestFacility() {
               setAddressText(e.target.value);
               if (errors.address) setErrors((er) => ({ ...er, address: undefined }));
             }}
-            placeholder="e.g. Near COER University main gate"
+            placeholder="e.g. Near the main market gate"
             className="w-full rounded-2xl border border-orange-100 bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none"
           />
           {errors.address && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.address}</p>}

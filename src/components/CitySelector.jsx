@@ -28,7 +28,23 @@ import {
  * relative's neighbourhood). Custom entries carry a remove control,
  * dataset ones don't.
  */
-export default function CitySelector({ city, cities, onSelect, onAddLocation, onRemoveLocation }) {
+/**
+ * `variant="pill"` (default) is the compact Home-header picker;
+ * `variant="field"` is a full-width form field (profile setup), which can
+ * start with no city chosen (`city` null) and shows `placeholder` then.
+ */
+export default function CitySelector({
+  city,
+  cities,
+  onSelect,
+  onAddLocation,
+  onRemoveLocation,
+  variant = "pill",
+  id,
+  placeholder = "Choose your city",
+  invalid = false,
+  describedBy,
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [expandedState, setExpandedState] = useState(null);
@@ -90,15 +106,24 @@ export default function CitySelector({ city, cities, onSelect, onAddLocation, on
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label={`Location: ${city.name}. Change location`}
-        className={`-ml-3 gap-1 ${TAP_LINK}`}
+        id={id}
+        aria-label={city ? `Location: ${city.name}. Change location` : placeholder}
+        aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
+        className={
+          variant === "field"
+            ? `flex w-full items-center gap-2 rounded-2xl border bg-white px-4 py-3 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 ${invalid ? "border-red-400" : "border-emerald-200 focus-visible:border-emerald-500"} ${city ? "text-emerald-950" : "text-emerald-800/50"}`
+            : `-ml-3 gap-1 ${TAP_LINK}`
+        }
       >
         <svg viewBox="0 0 24 24" className="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M12 22s7-6.1 7-12a7 7 0 10-14 0c0 5.9 7 12 7 12z" />
           <circle cx="12" cy="10" r="2.5" />
         </svg>
-        {city.name}
-        <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 text-emerald-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <span className={variant === "field" ? "min-w-0 flex-1 truncate" : undefined}>
+          {city ? (variant === "field" && city.state ? `${city.name}, ${city.state}` : city.name) : placeholder}
+        </span>
+        <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 shrink-0 text-emerald-500 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
@@ -136,7 +161,7 @@ export default function CitySelector({ city, cities, onSelect, onAddLocation, on
               {query.trim() ? (
                 searchResults.length > 0 ? (
                   searchResults.map((c) => (
-                    <CityRow key={c.id} c={c} selected={c.id === city.id} onPick={() => pick(c.id)} />
+                    <CityRow key={c.id} c={c} selected={c.id === city?.id} onPick={() => pick(c.id)} />
                   ))
                 ) : (
                   <li className="px-4 py-6 text-center text-sm text-emerald-800/50">
@@ -155,7 +180,7 @@ export default function CitySelector({ city, cities, onSelect, onAddLocation, on
                         <CityRow
                           key={c.id}
                           c={c}
-                          selected={c.id === city.id}
+                          selected={c.id === city?.id}
                           onPick={() => pick(c.id)}
                           onRemove={onRemoveLocation ? () => onRemoveLocation(c.id) : undefined}
                         />
@@ -217,14 +242,14 @@ export default function CitySelector({ city, cities, onSelect, onAddLocation, on
                                           <li key={c.id}>
                                             <button
                                               type="button"
-                                              aria-current={c.id === city.id ? "true" : undefined}
+                                              aria-current={c.id === city?.id ? "true" : undefined}
                                               onClick={() => pick(c.id)}
                                               className={`flex min-h-[36px] w-full items-center justify-between gap-2 py-1 pl-11 pr-4 text-left text-[13px] transition hover:bg-emerald-50 ${
-                                                c.id === city.id ? "font-semibold text-emerald-800" : "text-emerald-950"
+                                                c.id === city?.id ? "font-semibold text-emerald-800" : "text-emerald-950"
                                               }`}
                                             >
                                               {c.name}
-                                              {c.id === city.id && (
+                                              {c.id === city?.id && (
                                                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                                   <path d="M5 12l5 5 9-10" />
                                                 </svg>

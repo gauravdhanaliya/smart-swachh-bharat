@@ -14,6 +14,8 @@ import { useCitizenNotifications } from "../hooks/useCitizenNotifications";
 import { inCity } from "../data/cities";
 import { BIN_STATUS } from "../data/bins";
 import { STATUS } from "../data/complaints";
+import { useProfile } from "../hooks/useProfile";
+import { firstName } from "../services/profileService";
 
 function greetingFor(date) {
   const h = date.getHours();
@@ -43,9 +45,11 @@ export default function CitizenHome() {
   const [addingLocation, setAddingLocation] = useState(false);
   const [locationPrefill, setLocationPrefill] = useState(null);
   const { unreadCount } = useCitizenNotifications();
+  const profile = useProfile("citizen");
+  const name = firstName(profile);
 
-  // Everything on this screen follows the chosen city. Demo data only
-  // exists for Roorkee, so other cities honestly show zero.
+  // Everything on this screen follows the chosen city; a city nobody has
+  // added facilities to honestly shows zero.
   const bins = useMemo(() => allBins.filter((b) => inCity(b, city)), [allBins, city]);
   const toilets = useMemo(() => allToilets.filter((t) => inCity(t, city)), [allToilets, city]);
 
@@ -105,7 +109,7 @@ export default function CitizenHome() {
         {/* Greeting */}
         <div className="mt-2 flex shrink-0 items-start justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold leading-tight text-emerald-950">{greetingFor(now)}, Citizen!</h1>
+            <h1 className="text-lg font-bold leading-tight text-emerald-950">{greetingFor(now)}{name ? `, ${name}!` : "!"}</h1>
             <p className="text-xs text-emerald-800/70">{timeLabel} · Let&apos;s keep our city clean and green.</p>
           </div>
           <span className="text-2xl">🌱</span>
@@ -214,7 +218,7 @@ export default function CitizenHome() {
           </div>
           {bins.length === 0 && toilets.length === 0 && (
             <p className="mt-1 shrink-0 text-[11px] text-emerald-800/60">
-              No bins or toilets are mapped in {city.name} yet — the demo data covers Roorkee (COER University area).
+              No bins or toilets in this city yet.
             </p>
           )}
         </div>

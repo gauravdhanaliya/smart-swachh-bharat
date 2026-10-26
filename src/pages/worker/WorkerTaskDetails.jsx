@@ -41,7 +41,7 @@ export default function WorkerTaskDetails() {
       <WorkerShell title="Task Details" showBack onBack={() => navigate("/worker/tasks")}>
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
           <p className="font-semibold text-slate-900">Task not found</p>
-          <p className="text-sm text-slate-500">It may have been removed from the demo data set.</p>
+          <p className="text-sm text-slate-500">It may have been deleted, or the app's data was reset.</p>
         </div>
       </WorkerShell>
     );

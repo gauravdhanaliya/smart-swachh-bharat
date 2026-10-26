@@ -4,10 +4,12 @@ import GovComplaintsList from "../../components/GovComplaintsList";
 import StatusFilterTabs from "../../components/StatusFilterTabs";
 import { GovNavIcons } from "../../components/GovNavIcons";
 import { useComplaints } from "../../hooks/useComplaints";
+import { useFacilityRequests } from "../../hooks/useFacilityRequests";
 import { STATUS } from "../../data/complaints";
 
 export default function GovComplaints() {
   const complaints = useComplaints();
+  const facilityRequests = useFacilityRequests();
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
 
@@ -71,7 +73,13 @@ export default function GovComplaints() {
 
         <GovComplaintsList
           complaints={filtered}
-          emptyMessage="No complaints match your search/filter."
+          emptyMessage={
+            complaints.length > 0
+              ? "No complaints match your search/filter."
+              : facilityRequests.length === 0
+                ? "No complaints or facility requests yet."
+                : "No complaints yet."
+          }
         />
       </div>
     </GovShell>

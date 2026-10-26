@@ -13,9 +13,9 @@ import {
 import {
   FACILITY_TYPE,
   FACILITY_TYPES,
-  FACILITY_PICK_LOCATIONS,
-  CAMPUS_CENTER,
 } from "../../data/facilityRequests";
+import { useProfile } from "../../hooks/useProfile";
+import { cityCenter, cityPresets } from "../../services/profileService";
 import { BUILDING_TYPES, BUILDING_TYPE_LABELS } from "../../services/locationAdapters";
 
 const BUILDING = "Building";
@@ -42,6 +42,7 @@ function findForEdit(id) {
 
 export default function GovAddFacility() {
   const navigate = useNavigate();
+  const officialProfile = useProfile("official");
   const [searchParams] = useSearchParams();
 
   // ?edit=<id> turns this page into the Edit form for an existing location.
@@ -368,7 +369,7 @@ export default function GovAddFacility() {
           </p>
           <PickLocationMap
             value={pinned}
-            center={CAMPUS_CENTER}
+            center={cityCenter(officialProfile)}
             onPick={({ latitude: la, longitude: lo }) => {
               setLatitude(String(la));
               setLongitude(String(lo));
@@ -385,8 +386,8 @@ export default function GovAddFacility() {
               theme="sky"
               value={pickedLocation}
               onChange={handlePickLocation}
-              presets={FACILITY_PICK_LOCATIONS}
-              presetsLabel="Known areas"
+              presets={cityPresets(officialProfile)}
+              presetsLabel="Your city"
             />
           </div>
 
@@ -398,7 +399,7 @@ export default function GovAddFacility() {
             type="text"
             value={addressText}
             onChange={(e) => setAddressText(e.target.value)}
-            placeholder="e.g. COER University, Roorkee"
+            placeholder="e.g. Near the bus stand, Civil Lines"
             className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
           />
           {errors.address && <p className="mt-1 text-xs font-medium text-red-600">{errors.address}</p>}
@@ -417,7 +418,7 @@ export default function GovAddFacility() {
                   setLatitude(e.target.value);
                   if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                 }}
-                placeholder="29.8905551"
+                placeholder="e.g. 28.6139"
                 className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
               />
             </div>
@@ -434,7 +435,7 @@ export default function GovAddFacility() {
                   setLongitude(e.target.value);
                   if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                 }}
-                placeholder="77.9601633"
+                placeholder="e.g. 77.2090"
                 className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
               />
             </div>

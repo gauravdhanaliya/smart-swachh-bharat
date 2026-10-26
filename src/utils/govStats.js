@@ -38,8 +38,8 @@ export function computeWorkerStats(complaints, workerId) {
   return {
     mine,
     active,
-    assignedCount: assigned.length,
-    newCount: assigned.length,
+    assignedCount: mine.length, // everything given to this worker, matching the Profile page
+    newCount: assigned.length, // not started yet
     inProgressCount: inProgress.length,
     completedCount: resolved.length,
     highPriorityCount: active.filter((c) => c.priority === "HIGH").length,

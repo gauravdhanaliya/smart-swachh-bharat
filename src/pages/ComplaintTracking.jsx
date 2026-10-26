@@ -31,7 +31,7 @@ export default function ComplaintTracking() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-emerald-950">Complaint not found</p>
           <p className="text-sm text-emerald-800/60">
-            This complaint may have been removed from the demo data set.
+            It may have been deleted, or the app's data was reset.
           </p>
           <button
             type="button"

@@ -136,6 +136,14 @@ export const getSyncStatus = () => ({ loaded: state.loaded, error: state.error, 
 /** Forget cached data (e.g. on logout) so one user's lists never leak to the next. */
 export function resetStore() {
   signature = "";
-  Object.assign(state, { removed: [], requests: [], error: null });
+  Object.assign(state, {
+    locations: [],
+    removed: [],
+    requests: [],
+    derived: { bins: [], toilets: [], buildings: [] },
+    loaded: false,
+    error: null,
+  });
   notify();
+  if (listeners.size) refresh();
 }

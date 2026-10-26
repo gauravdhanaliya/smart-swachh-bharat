@@ -302,7 +302,7 @@ export default function IndiaLocationPicker({
             e.preventDefault();
             if (results[0]) chooseCity(results[0]);
           }}
-          placeholder="e.g. Roorkee, Haridwar, Jaipur, Kochi, Guwahati…"
+          placeholder="e.g. Haridwar, Jaipur, Kochi, Guwahati…"
           autoComplete="off"
           className={t.field}
         />

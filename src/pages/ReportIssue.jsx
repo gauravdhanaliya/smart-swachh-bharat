@@ -6,6 +6,7 @@ import LiveCameraCapture from "../components/LiveCameraCapture";
 import ComplaintLocationPicker from "../components/ComplaintLocationPicker";
 import { createComplaint } from "../services/complaintService";
 import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../hooks/useProfile";
 import {
   COMPLAINT_TYPES,
   DESCRIPTION_MAX_LENGTH,
@@ -16,6 +17,7 @@ export default function ReportIssue() {
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const { user } = useAuth();
+  const profile = useProfile("citizen");
 
   // Step 4 — Bin/Toilet Details screens can deep-link here with
   // { issueType, location } in router state so the report opens
@@ -52,7 +54,9 @@ export default function ReportIssue() {
     setSubmitting(true);
     try {
       const complaint = createComplaint({
-        citizenName: user.name,
+        citizenName: profile?.fullName || user.name,
+        citizenId: user.id,
+        citizenMobile: profile?.mobile || "",
         issueType: issueType.label,
         description: description.trim(),
         location,

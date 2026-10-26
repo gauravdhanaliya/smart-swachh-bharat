@@ -91,7 +91,20 @@ export default function MyComplaints() {
       </div>
 
       <div className="flex flex-col gap-3 px-5 pb-8">
-        {filtered.length === 0 && (
+        {complaints.length === 0 && (
+          <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-emerald-200 bg-white px-6 py-10 text-center">
+            <p className="text-sm font-medium text-emerald-900">No complaints yet. Report your first issue.</p>
+            <button
+              type="button"
+              onClick={() => navigate("/citizen/report")}
+              className="rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"
+            >
+              Report Issue
+            </button>
+          </div>
+        )}
+
+        {complaints.length > 0 && filtered.length === 0 && (
           <p className="mt-6 text-center text-sm text-emerald-800/60">
             No complaints in this category yet.
           </p>

@@ -81,7 +81,11 @@ export default function WorkerTasks() {
           {visibleTasks.length} task{visibleTasks.length === 1 ? "" : "s"}
         </p>
 
-        {visibleTasks.length === 0 && (
+        {myTasks.length === 0 && (
+          <p className="mt-6 text-center text-sm text-orange-900/50">No tasks assigned yet.</p>
+        )}
+
+        {myTasks.length > 0 && visibleTasks.length === 0 && (
           <p className="mt-6 text-center text-sm text-orange-900/50">
             No tasks in this view. Check back soon.
           </p>

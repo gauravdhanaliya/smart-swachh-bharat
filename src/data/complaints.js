@@ -41,22 +41,6 @@ export function priorityForIssueType(issueType) {
   return COMPLAINT_TYPES.find((t) => t.label === issueType)?.priority ?? PRIORITY.MEDIUM;
 }
 
-// Demo sanitation workers a Government Official can assign a complaint to.
-// Full worker profiles (area, status, etc.) live in `./workers`; this
-// re-export keeps the existing assignment code untouched.
-export { WORKERS } from "./workers";
-
-// Preset localities so the citizen can pick a location without needing
-// real device geolocation permissions during the demo.
-export const DEMO_LOCATIONS = [
-  { address: "COER University — campus centre", latitude: 29.8905551, longitude: 77.9601633 },
-  { address: "COER University — OpenStreetMap centroid", latitude: 29.8905429, longitude: 77.9594553 },
-];
-
-// Single demo citizen identity (Step 1/2 auth is OTP-only and doesn't
-// collect a name yet), matching the reference-design profile screen.
-export const DEMO_CITIZEN_NAME = "Rahul Sharma";
-
 export const DESCRIPTION_MAX_LENGTH = 500;
 export const MAX_PHOTO_SIZE_BYTES = 3 * 1024 * 1024; // 3 MB
 export const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -68,8 +52,7 @@ export const MAX_RESOLUTION_PHOTO_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 export const RESOLUTION_NOTE_MAX_LENGTH = 300;
 export const RESOLUTION_NOTE_MIN_LENGTH = 5;
 
-const YEAR = 2026;
-export const COMPLAINT_ID_PREFIX = `SSB${YEAR}-`;
+export const COMPLAINT_ID_PREFIX = `SSB${new Date().getFullYear()}-`;
 
 /**
  * Derives the 5-row citizen timeline (Submitted / Received by Government /
@@ -94,73 +77,3 @@ export function getTimelineSteps(status) {
     { key: "resolved", label: "Resolved", state: stateFor(3, true) },
   ];
 }
-
-function isoNow() {
-  return new Date().toISOString();
-}
-
-// A few pre-existing complaints so the screens don't look empty on
-// first load (per the Step 3 spec). Real submissions during the demo
-// receive the next available ID after these.
-export const SEED_COMPLAINTS = [
-  {
-    id: `${COMPLAINT_ID_PREFIX}0045`,
-    citizenName: DEMO_CITIZEN_NAME,
-    issueType: "Damaged Bin",
-    description: "The dry-waste bin near the park entrance has a cracked lid and won't close.",
-    location: { address: "COER University, Roorkee", latitude: 29.8905, longitude: 77.9601 },
-    priority: PRIORITY.MEDIUM,
-    photo: null,
-    status: STATUS.RESOLVED,
-    assignedWorkerId: "w1",
-    assignedWorkerName: "Vikash Kumar",
-    resolutionNote: "Bin replaced with a new one.",
-    createdAt: "2026-05-20T09:15:00.000Z",
-    updatedAt: "2026-05-20T15:40:00.000Z",
-  },
-  {
-    id: `${COMPLAINT_ID_PREFIX}0046`,
-    citizenName: DEMO_CITIZEN_NAME,
-    issueType: "Wrong Waste in Bin",
-    description: "Hazardous e-waste dumped in the recyclable-waste bin.",
-    location: { address: "COER University, Roorkee", latitude: 29.8905, longitude: 77.9601 },
-    priority: PRIORITY.LOW,
-    photo: null,
-    status: STATUS.RESOLVED,
-    assignedWorkerId: "w1",
-    assignedWorkerName: "Vikash Kumar",
-    resolutionNote: "Waste sorted and removed correctly.",
-    createdAt: "2026-05-24T11:05:00.000Z",
-    updatedAt: "2026-05-24T17:20:00.000Z",
-  },
-  {
-    id: `${COMPLAINT_ID_PREFIX}0047`,
-    citizenName: DEMO_CITIZEN_NAME,
-    issueType: "Not Collected",
-    description: "Garbage has not been collected from this street for 3 days.",
-    location: { address: "COER University, Roorkee", latitude: 29.8905, longitude: 77.9601 },
-    priority: PRIORITY.MEDIUM,
-    photo: null,
-    status: STATUS.IN_PROGRESS,
-    assignedWorkerId: "w2",
-    assignedWorkerName: "Ramesh Kumar",
-    resolutionNote: "",
-    createdAt: isoNow(),
-    updatedAt: isoNow(),
-  },
-  {
-    id: `${COMPLAINT_ID_PREFIX}0048`,
-    citizenName: DEMO_CITIZEN_NAME,
-    issueType: "Overflowing Bin",
-    description: "Bin is overflowing and waste is spreading around the area.",
-    location: { address: "COER University, Roorkee", latitude: 29.8905, longitude: 77.9601 },
-    priority: PRIORITY.HIGH,
-    photo: null,
-    status: STATUS.SUBMITTED,
-    assignedWorkerId: null,
-    assignedWorkerName: null,
-    resolutionNote: "",
-    createdAt: isoNow(),
-    updatedAt: isoNow(),
-  },
-];

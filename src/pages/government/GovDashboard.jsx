@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import GovShell from "../../components/GovShell";
 import GovKpiCard from "../../components/GovKpiCard";
 import GovComplaintsList from "../../components/GovComplaintsList";
+import { useFacilityRequests } from "../../hooks/useFacilityRequests";
 import StatusFilterTabs from "../../components/StatusFilterTabs";
 import FacilityMap from "../../components/FacilityMap";
 import { googleMapsSearchUrl } from "../../components/SimpleMap";
@@ -12,6 +13,7 @@ import { useLiveBins } from "../../hooks/useLiveBins";
 import { useLiveToilets } from "../../hooks/useLiveToilets";
 import { useGovProfile } from "../../hooks/useGovProfile";
 import { getGovJurisdictionCenter } from "../../services/govProfileService";
+import { INDIA_CENTER } from "../../data/facilityRequests";
 import { STATUS } from "../../data/complaints";
 import { computeComplaintStats, computeBinStats } from "../../utils/govStats";
 
@@ -23,9 +25,8 @@ const FILTERS = [
   { value: STATUS.RESOLVED, label: "Resolved" },
 ];
 
-// Fallback map center if the officer's chosen district (Profile page)
-// isn't one getGovJurisdictionCenter() has coordinates for.
-const LUCKNOW_CENTER = { latitude: 26.8467, longitude: 80.9462 };
+// The map opens on the official's profile city; INDIA_CENTER is only a
+// fallback before a profile exists.
 const CITY_ZOOM = 12;
 const SELECTED_ZOOM = 16;
 
@@ -67,6 +68,7 @@ function FillBar({ color, label, value, total }) {
 export default function GovDashboard() {
   const navigate = useNavigate();
   const complaints = useComplaints();
+  const facilityRequests = useFacilityRequests();
   const bins = useLiveBins();
   const toilets = useLiveToilets();
   const { profile } = useGovProfile();
@@ -84,8 +86,9 @@ export default function GovDashboard() {
   const recent = filtered.slice(0, 8);
 
   const jurisdictionCenter = useMemo(
-    () => getGovJurisdictionCenter() ?? LUCKNOW_CENTER,
-    [profile.district, profile.state]
+    () => getGovJurisdictionCenter() ?? INDIA_CENTER,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profile.cityName, profile.state]
   );
   const mapCenter = selected
     ? { latitude: selected.data.latitude, longitude: selected.data.longitude }
@@ -95,7 +98,7 @@ export default function GovDashboard() {
   return (
     <GovShell
       title="Dashboard"
-      subtitle={`Overview of Waste Management & Sanitation Activities — ${profile.district} District`}
+      subtitle={`Overview of Waste Management & Sanitation Activities${profile.cityName ? ` — ${profile.cityName}` : ""}`}
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         <GovKpiCard
@@ -236,7 +239,16 @@ export default function GovDashboard() {
           <StatusFilterTabs options={FILTERS} value={filter} onChange={setFilter} />
         </div>
 
-        <GovComplaintsList complaints={recent} />
+        <GovComplaintsList
+          complaints={recent}
+          emptyMessage={
+            complaints.length === 0 && facilityRequests.length === 0
+              ? "No complaints or facility requests yet."
+              : complaints.length === 0
+                ? "No complaints yet."
+                : "No complaints with this status."
+          }
+        />
       </div>
     </GovShell>
   );

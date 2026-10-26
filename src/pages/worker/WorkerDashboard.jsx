@@ -79,19 +79,24 @@ export default function WorkerDashboard() {
   );
 
   return (
-    <WorkerShell title="Dashboard">
-      <div className="flex flex-col gap-4 px-5 py-4">
-        <p className="text-sm text-orange-900/70">
+    <WorkerShell title="Dashboard" noScroll>
+      {/* Sized to fit one screen with no scrolling: header stats/map/
+          request-banner are fixed-height and shrink-0; only the active
+          tasks list below gets its own internal scroll, so the header,
+          stats and bottom nav never move even if there are many tasks. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-5 py-3">
+        <p className="shrink-0 text-xs text-orange-900/70">
           Here's what's on your plate today in <span className="font-semibold">{worker.area}</span>.
         </p>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid shrink-0 grid-cols-2 gap-2">
           <StatTile
             icon={ICONS.assigned}
             label="Assigned Tasks"
             value={stats.assignedCount + stats.inProgressCount}
             color="sky"
             onClick={() => navigate("/worker/tasks")}
+            compact
           />
           <StatTile
             icon={ICONS.new}
@@ -99,6 +104,7 @@ export default function WorkerDashboard() {
             value={stats.newCount}
             color="orange"
             onClick={() => navigate("/worker/tasks?filter=assigned")}
+            compact
           />
           <StatTile
             icon={ICONS.inProgress}
@@ -106,6 +112,7 @@ export default function WorkerDashboard() {
             value={stats.inProgressCount}
             color="orange"
             onClick={() => navigate("/worker/tasks?filter=in_progress")}
+            compact
           />
           <StatTile
             icon={ICONS.completed}
@@ -113,6 +120,7 @@ export default function WorkerDashboard() {
             value={stats.completedCount}
             color="emerald"
             onClick={() => navigate("/worker/tasks?filter=resolved")}
+            compact
           />
         </div>
 
@@ -122,13 +130,14 @@ export default function WorkerDashboard() {
           value={stats.highPriorityCount}
           color="red"
           onClick={() => navigate("/worker/tasks")}
+          compact
         />
 
         <button
           type="button"
           onClick={() => navigate("/worker/map")}
-          className="relative block w-full overflow-hidden rounded-2xl border border-orange-100 shadow-sm"
-          style={{ height: 140 }}
+          className="relative block w-full shrink-0 overflow-hidden rounded-2xl border border-orange-100 shadow-sm"
+          style={{ height: 88 }}
         >
           <FacilityMap
             markers={taskMarkers}
@@ -137,78 +146,81 @@ export default function WorkerDashboard() {
             interactive={false}
             className="h-full"
           />
-          <span className="pointer-events-none absolute inset-0 bg-orange-950/0" />
-          <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-white px-3 py-1 text-xs font-semibold text-orange-800 shadow">
+          <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-orange-800 shadow">
             {taskMarkers.length} Active Task{taskMarkers.length === 1 ? "" : "s"} on Map
           </span>
-          <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-orange-700 shadow">
+          <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-orange-700 shadow">
             Open Map →
           </span>
         </button>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-orange-300 bg-orange-50/60 p-3.5 shadow-sm">
+        <div className="flex shrink-0 items-center gap-2.5 rounded-2xl border border-dashed border-orange-300 bg-orange-50/60 p-2.5 shadow-sm">
           <button
             type="button"
             onClick={() => navigate("/worker/facility-request")}
-            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+            className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-700">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-700">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-bold text-orange-950">Request Facility</span>
-              <span className="block text-xs text-orange-900/60">Ask for a new dustbin or public toilet</span>
+              <span className="block text-xs font-bold text-orange-950">Request Facility</span>
+              <span className="block text-[11px] text-orange-900/60">Ask for a new dustbin/toilet</span>
             </span>
           </button>
           <button
             type="button"
             onClick={() => navigate("/worker/facility-requests")}
-            className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-200"
+            className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-orange-700 ring-1 ring-orange-200"
           >
             My Requests
           </button>
         </div>
 
-        <div className="mt-2 flex items-center justify-between">
-          <p className="text-sm font-bold text-orange-950">Active Tasks</p>
+        <div className="flex shrink-0 items-center justify-between">
+          <p className="text-xs font-bold text-orange-950">Active Tasks</p>
           <button
             type="button"
             onClick={() => navigate("/worker/tasks")}
-            className="text-xs font-semibold text-orange-700"
+            className="text-[11px] font-semibold text-orange-700"
           >
             View All →
           </button>
         </div>
 
-        {activeTasks.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-orange-200 bg-white px-4 py-8 text-center text-sm text-orange-900/50">
-            No active tasks right now. New assignments will show up here.
-          </p>
-        )}
+        {/* Only this list scrolls internally — everything above and the
+            bottom nav stay fixed no matter how many tasks there are. */}
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+          {activeTasks.length === 0 && (
+            <p className="rounded-2xl border border-dashed border-orange-200 bg-white px-4 py-6 text-center text-xs text-orange-900/50">
+              {stats.mine.length === 0 ? "No tasks assigned yet." : "No active tasks right now. New assignments will show up here."}
+            </p>
+          )}
 
-        {activeTasks.slice(0, 4).map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => navigate(`/worker/tasks/${c.id}`)}
-            className="flex flex-col gap-2 rounded-2xl border border-orange-100 bg-white p-4 text-left shadow-sm"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-slate-500">#{c.id}</p>
-                <p className="font-semibold text-slate-900">{c.issueType}</p>
+          {activeTasks.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => navigate(`/worker/tasks/${c.id}`)}
+              className="flex w-full flex-col gap-1.5 rounded-2xl border border-orange-100 bg-white p-3 text-left shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium text-slate-500">#{c.id}</p>
+                  <p className="text-sm font-semibold text-slate-900">{c.issueType}</p>
+                </div>
+                <PriorityBadge priority={c.priority} />
               </div>
-              <PriorityBadge priority={c.priority} />
-            </div>
-            <p className="text-sm text-slate-600">{c.location.address}</p>
-            <div className="flex items-center justify-between border-t border-orange-50 pt-2">
-              <span className="text-xs text-slate-500">Updated {formatDateTime(c.updatedAt)}</span>
-              <StatusBadge status={c.status} />
-            </div>
-          </button>
-        ))}
+              <p className="text-xs text-slate-600">{c.location.address}</p>
+              <div className="flex items-center justify-between border-t border-orange-50 pt-1.5">
+                <span className="text-[11px] text-slate-500">Updated {formatDateTime(c.updatedAt)}</span>
+                <StatusBadge status={c.status} />
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </WorkerShell>
   );

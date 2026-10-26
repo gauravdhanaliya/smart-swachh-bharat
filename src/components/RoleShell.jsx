@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ConfirmDialog from "./ConfirmDialog";
 import { useAuth } from "../context/AuthContext";
 
 const THEME = {
@@ -24,50 +26,62 @@ export default function RoleShell({
   const { resetAuth } = useAuth();
   const theme = THEME[role] ?? THEME.official;
 
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
   const handleLogout = () => {
     resetAuth();
     navigate("/login", { replace: true });
   };
 
   return (
-    <div className="min-h-dvh bg-emerald-50/40 sm:py-4">
-      <div className="device-frame device-frame--app">
-        <div className={`${theme.bg} shrink-0 px-5 pb-4 pt-5 text-white`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {showBack && (
-                <button
-                  type="button"
-                  onClick={onBack ?? (() => navigate(-1))}
-                  aria-label="Go back"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:bg-white/10"
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 6l-6 6 6 6" />
-                  </svg>
-                </button>
-              )}
-              <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${theme.chip}`}>
-                {roleLabel}
-              </span>
+    <>
+      <div className="min-h-dvh bg-emerald-50/40 sm:py-4">
+        <div className="device-frame device-frame--app">
+          <div className={`${theme.bg} shrink-0 px-5 pb-4 pt-5 text-white`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {showBack && (
+                  <button
+                    type="button"
+                    onClick={onBack ?? (() => navigate(-1))}
+                    aria-label="Go back"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:bg-white/10"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M15 6l-6 6 6 6" />
+                    </svg>
+                  </button>
+                )}
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${theme.chip}`}>
+                  {roleLabel}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmingLogout(true)}
+                aria-label="Logout"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:bg-white/10"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                  <path d="M16 17l5-5-5-5M21 12H9" />
+                </svg>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              aria-label="Logout"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-white/90 hover:bg-white/10"
-            >
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-                <path d="M16 17l5-5-5-5M21 12H9" />
-              </svg>
-            </button>
+            <h1 className="mt-3 text-lg font-bold">{title}</h1>
           </div>
-          <h1 className="mt-3 text-lg font-bold">{title}</h1>
-        </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
+        </div>
       </div>
-    </div>
+      <ConfirmDialog
+        open={confirmingLogout}
+        title="Log out of EcoSetu?"
+        message="You can sign back in any time by choosing your role on the login page."
+        confirmLabel="Log out"
+        danger
+        onCancel={() => setConfirmingLogout(false)}
+        onConfirm={handleLogout}
+      />
+    </>
   );
 }

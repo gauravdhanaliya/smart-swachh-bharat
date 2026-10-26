@@ -49,8 +49,8 @@ export default function BinDetails() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-emerald-950">Bin not found</p>
           <p className="text-sm text-emerald-800/60">
-            This bin isn't in the demo data set, and live OpenStreetMap pins aren't kept after a
-            page refresh — try opening it again from the map.
+            It may have been removed by an official, or the app's data was reset. Try opening it
+            again from the map.
           </p>
           <button
             type="button"
@@ -117,15 +117,13 @@ export default function BinDetails() {
               {bin.locationLabel && (
                 <p className="text-xs text-emerald-800/40">
                   {bin.locationLabel}
-                  {bin.source !== "osm" && " · prototype data"}
                 </p>
               )}
             </div>
           </div>
 
           <p className="mt-2 text-[11px] text-emerald-800/40">
-            Fill level is simulated <span className="font-medium">Prototype Live Status</span>,
-            not a real municipal sensor reading.
+            Fill level as last recorded by the municipal team, not a live sensor reading.
           </p>
 
           <div className="mt-2 flex items-center gap-2.5 text-sm text-emerald-800/60">

@@ -6,13 +6,13 @@
 // the CitySelector component for the searchable state -> district -> city
 // picker built on top of it.
 //
-// DATA ACCURACY NOTE: the demo bin/toilet dataset (data/bins.js,
-// data/toilets.js) only covers Roorkee (around COER University). Choosing another city recentres
-// the map and filters the counts to facilities actually near that city,
-// so it honestly shows "none mapped yet" rather than pretending.
+// Bins and toilets come only from officials and approved worker requests.
+// Choosing a city recentres the map and filters the counts to facilities
+// near that city, so a city nobody has added any to honestly shows none.
 export { CITIES } from "./indiaLocations";
 
-export const DEFAULT_CITY_ID = "roorkee-uk";
+// Only used before a citizen has picked a city (their profile sets one).
+export const DEFAULT_CITY_ID = "delhi-dl";
 
 // Facilities within this many km of a city's centre count as "in" it.
 export const CITY_RADIUS_KM = 40;

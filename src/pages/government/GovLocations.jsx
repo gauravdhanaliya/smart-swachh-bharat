@@ -23,7 +23,6 @@ export default function GovLocations() {
     () => (filter === "all" ? buildings : buildings.filter((b) => b.buildingType === filter)),
     [buildings, filter]
   );
-  const demoCount = buildings.filter((b) => b.isDemo).length;
 
   return (
     <GovShell
@@ -55,8 +54,9 @@ export default function GovLocations() {
     >
       <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <p className="text-sm text-slate-500">
-          {buildings.length} locations · {demoCount} are <span className="font-semibold">DEMO</span> (simulated).
-          Replace them with verified coordinates — tap Edit on a card, or see the import steps in server/README.md.
+          {buildings.length === 0
+            ? "No buildings added yet. Use + Add Building to put gates, hostels, libraries and other landmarks on the map."
+            : `${buildings.length} location${buildings.length === 1 ? "" : "s"} on the map. Tap Edit on a card to correct its details or coordinates.`}
         </p>
         <div className="mt-3">
           <StatusFilterTabs options={FILTERS} value={filter} onChange={setFilter} />
@@ -92,9 +92,6 @@ export default function GovLocations() {
                   {b.icon} {b.name}
                 </p>
               </div>
-              {b.isDemo && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">DEMO</span>
-              )}
             </div>
             <p className="mt-1 text-xs text-slate-500">{b.typeLabel}</p>
             <p className="mt-1 text-xs text-slate-400">

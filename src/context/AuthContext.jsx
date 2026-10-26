@@ -6,8 +6,10 @@ import {
   readSession,
   startSession,
 } from "../services/authSession";
-import { selectWorker } from "../hooks/useWorkerSession";
 import { resetStore } from "../services/locationStore";
+import { clearAllData } from "../services/dataReset";
+import { notifyProfilesChanged } from "../services/profileService";
+import { notifyComplaintsChanged } from "../services/complaintService";
 
 const AuthContext = createContext(null);
 
@@ -31,7 +33,6 @@ export function AuthProvider({ children }) {
   /** Signs in as `role` straight away. Returns the new session. */
   const login = (role, name) => {
     const session = startSession(role, name);
-    if (role === "worker") selectWorker(session.id);
     resetStore();
     setUser(session);
     return session;
@@ -43,12 +44,22 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  /** "Reset all data": wipes every EcoSetu key and profile, then signs out. */
+  const resetAllData = () => {
+    clearAllData();
+    resetStore();
+    notifyProfilesChanged();
+    notifyComplaintsChanged();
+    setUser(null);
+  };
+
   const value = {
     user,
     role: user?.role ?? null,
     isAuthenticated: Boolean(user),
     login,
     resetAuth,
+    resetAllData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

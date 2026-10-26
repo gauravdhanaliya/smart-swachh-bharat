@@ -96,9 +96,7 @@ export default function GovBins() {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="text-xs font-medium text-slate-400">{bin.id}</p>
-                <p className="font-semibold text-slate-900">{bin.name}{bin.isDemo && (
-                <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[10px] font-bold text-amber-800">DEMO</span>
-              )}</p>
+                <p className="font-semibold text-slate-900">{bin.name}</p>
               </div>
               <StatusBadge status={bin.status} />
             </div>
@@ -131,12 +129,23 @@ export default function GovBins() {
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {bins.length === 0 && (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+          <p className="text-sm font-semibold text-slate-700">No bins or toilets added yet.</p>
+          <button
+            type="button"
+            onClick={() => navigate("/official/add-facility?type=Dustbin")}
+            className="rounded-full bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+          >
+            Add Facility
+          </button>
+        </div>
+      )}
+
+      {bins.length > 0 && filtered.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <p className="text-sm font-semibold text-slate-700">No bins to show</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Try a different filter, or add a facility to get started.
-          </p>
+          <p className="mt-1 text-sm text-slate-500">Try a different filter.</p>
         </div>
       )}
 

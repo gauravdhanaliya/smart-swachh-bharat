@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
-import { CAMPUS_CENTER, FACILITY_PICK_LOCATIONS } from "../data/facilityRequests";
+import { useProfile } from "../hooks/useProfile";
+import { cityCenter, cityPresets } from "../services/profileService";
 import IndiaLocationPicker from "./IndiaLocationPicker";
 import GpsConsentNotice, { GpsAlert } from "./GpsConsentNotice";
 import { useGpsConsent } from "../hooks/useGpsConsent";
@@ -55,6 +56,7 @@ function Follow({ point }) {
  * - extra: fields merged into the value (e.g. the bin/toilet this report is about)
  */
 export default function ComplaintLocationPicker({ value, onChange, extra }) {
+  const profile = useProfile("citizen");
   const [status, setStatus] = useState("idle"); // idle | locating | error
   const [errorText, setErrorText] = useState("");
   const [mode, setMode] = useState("gps"); // gps | manual
@@ -178,7 +180,7 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
   };
 
   const pinned = value ? { latitude: value.latitude, longitude: value.longitude } : null;
-  const start = pinned ?? CAMPUS_CENTER;
+  const start = pinned ?? cityCenter(profile);
 
   const accuracyWarning = value?.source === "gps" ? lowAccuracyMessage(value.accuracy) : null;
 
@@ -189,8 +191,8 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
           id="complaint-location"
           value={value?.source === "manual" ? value : null}
           onChange={(loc) => onChange(loc ? { ...(extra ?? {}), ...loc, source: "manual" } : null)}
-          presets={FACILITY_PICK_LOCATIONS}
-          presetsLabel="Known areas"
+          presets={cityPresets(profile)}
+          presetsLabel="Your city"
           allowGps={false}
         />
         <button type="button" onClick={switchToGps} className="self-start text-xs font-semibold text-emerald-700 underline">

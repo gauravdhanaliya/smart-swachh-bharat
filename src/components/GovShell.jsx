@@ -7,6 +7,7 @@ import { useComplaints } from "../hooks/useComplaints";
 import { useFacilityRequests } from "../hooks/useFacilityRequests";
 import { useGovProfile, govInitials } from "../hooks/useGovProfile";
 import { STATUS } from "../data/complaints";
+import ConfirmDialog from "./ConfirmDialog";
 import { REQUEST_STATUS } from "../data/facilityRequests";
 
 const NAV_ITEMS = [
@@ -105,109 +106,121 @@ export default function GovShell({ title, subtitle, actions, children }) {
     navigate(path);
   };
 
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
   const handleLogout = () => {
     resetAuth();
     navigate("/login", { replace: true });
   };
 
   return (
-    <div className="min-h-dvh bg-slate-50 lg:flex">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 lg:block">
-        <div className="sticky top-0 h-dvh">
-          <SidebarContent pathname={location.pathname} onNavigate={handleNavigate} pendingFacilityRequests={pendingFacilityRequests} />
-        </div>
-      </aside>
-
-      {/* Mobile sidebar drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div
-            className="absolute inset-0 bg-slate-950/50"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 w-72 max-w-[80%] shadow-2xl">
-            <div className="flex items-center justify-end bg-slate-900 px-3 pt-3">
-              <button
-                type="button"
-                aria-label="Close menu"
-                onClick={() => setMobileOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/10"
-              >
-                {GovNavIcons.close}
-              </button>
-            </div>
+    <>
+      <div className="min-h-dvh bg-slate-50 lg:flex">
+        {/* Desktop sidebar */}
+        <aside className="hidden w-64 shrink-0 lg:block">
+          <div className="sticky top-0 h-dvh">
             <SidebarContent pathname={location.pathname} onNavigate={handleNavigate} pendingFacilityRequests={pendingFacilityRequests} />
           </div>
-        </div>
-      )}
+        </aside>
 
-      <div className="flex min-h-dvh flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-          <button
-            type="button"
-            aria-label="Open menu"
-            onClick={() => setMobileOpen(true)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 lg:hidden"
-          >
-            {GovNavIcons.menu}
-          </button>
-
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-bold text-slate-900 sm:text-xl">{title}</h1>
-            {subtitle && (
-              <p className="truncate text-xs text-slate-500 sm:text-sm">{subtitle}</p>
-            )}
-          </div>
-
-          {actions && <div className="hidden shrink-0 items-center gap-2 sm:flex">{actions}</div>}
-
-          <button
-            type="button"
-            onClick={() => handleNavigate("/official/notifications")}
-            aria-label="Notifications"
-            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
-          >
-            {GovNavIcons.notifications}
-            {unreadCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
-                {unreadCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleNavigate("/official/profile")}
-            className="hidden shrink-0 items-center gap-2 rounded-full border border-slate-200 py-1 pl-1 pr-3 hover:bg-slate-50 sm:flex"
-          >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">
-              {govInitials(profile.name)}
-            </span>
-            <span className="text-left leading-tight">
-              <span className="block text-xs font-semibold text-slate-800">{profile.name}</span>
-              <span className="block text-[10px] text-slate-500">{profile.district} District</span>
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            aria-label="Logout"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
-          >
-            {GovNavIcons.logout}
-          </button>
-        </header>
-
-        {actions && (
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 sm:hidden">
-            {actions}
+        {/* Mobile sidebar drawer */}
+        {mobileOpen && (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <div
+              className="absolute inset-0 bg-slate-950/50"
+              onClick={() => setMobileOpen(false)}
+            />
+            <div className="absolute inset-y-0 left-0 w-72 max-w-[80%] shadow-2xl">
+              <div className="flex items-center justify-end bg-slate-900 px-3 pt-3">
+                <button
+                  type="button"
+                  aria-label="Close menu"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/10"
+                >
+                  {GovNavIcons.close}
+                </button>
+              </div>
+              <SidebarContent pathname={location.pathname} onNavigate={handleNavigate} pendingFacilityRequests={pendingFacilityRequests} />
+            </div>
           </div>
         )}
 
-        <main className="flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</main>
+        <div className="flex min-h-dvh flex-1 flex-col">
+          <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+            <button
+              type="button"
+              aria-label="Open menu"
+              onClick={() => setMobileOpen(true)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 lg:hidden"
+            >
+              {GovNavIcons.menu}
+            </button>
+
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-lg font-bold text-slate-900 sm:text-xl">{title}</h1>
+              {subtitle && (
+                <p className="truncate text-xs text-slate-500 sm:text-sm">{subtitle}</p>
+              )}
+            </div>
+
+            {actions && <div className="hidden shrink-0 items-center gap-2 sm:flex">{actions}</div>}
+
+            <button
+              type="button"
+              onClick={() => handleNavigate("/official/notifications")}
+              aria-label="Notifications"
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              {GovNavIcons.notifications}
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleNavigate("/official/profile")}
+              className="hidden shrink-0 items-center gap-2 rounded-full border border-slate-200 py-1 pl-1 pr-3 hover:bg-slate-50 sm:flex"
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">
+                {govInitials(profile.name)}
+              </span>
+              <span className="text-left leading-tight">
+                <span className="block text-xs font-semibold text-slate-800">{profile.name}</span>
+                <span className="block text-[10px] text-slate-500">{profile.designation || profile.cityName}</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setConfirmingLogout(true)}
+              aria-label="Logout"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              {GovNavIcons.logout}
+            </button>
+          </header>
+
+          {actions && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 sm:hidden">
+              {actions}
+            </div>
+          )}
+
+          <main className="flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</main>
+        </div>
       </div>
-    </div>
+      <ConfirmDialog
+        open={confirmingLogout}
+        title="Log out of EcoSetu?"
+        message="You can sign back in any time by choosing Government Official on the login page."
+        confirmLabel="Log out"
+        danger
+        onCancel={() => setConfirmingLogout(false)}
+        onConfirm={handleLogout}
+      />
+    </>
   );
 }

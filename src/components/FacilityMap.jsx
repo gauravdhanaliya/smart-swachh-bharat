@@ -156,9 +156,6 @@ function InfoPopup({ item, kind }) {
           {Number(item.latitude).toFixed(6)}, {Number(item.longitude).toFixed(6)}
         </div>
         {status && <div>Status: {status}</div>}
-        {item.isDemo && (
-          <div style={{ marginTop: 4, fontWeight: 700, color: "#92400e" }}>DEMO — simulated location</div>
-        )}
       </div>
     </Popup>
   );

@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import WorkerShell from "../../components/WorkerShell";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import ResetAllDataButton from "../../components/ResetAllDataButton";
 import { useAuth } from "../../context/AuthContext";
 import { useComplaints } from "../../hooks/useComplaints";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
-import { WORKERS } from "../../data/workers";
+import { useProfile } from "../../hooks/useProfile";
 import { STATUS } from "../../data/complaints";
 
 const STATUS_DOT = {
@@ -12,14 +15,16 @@ const STATUS_DOT = {
 };
 
 function initials(name) {
-  return name.split(" ").map((n) => n[0]).join("");
+  return name.split(" ").filter(Boolean).slice(0, 2).map((n) => n[0]).join("").toUpperCase();
 }
 
 export default function WorkerProfile() {
   const navigate = useNavigate();
-  const { user, resetAuth } = useAuth();
+  const { resetAuth } = useAuth();
   const complaints = useComplaints();
-  const { worker, setWorkerId } = useWorkerSession();
+  const { worker } = useWorkerSession();
+  const profile = useProfile("worker");
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
 
   const assignedTaskCount = complaints.filter((c) => c.assignedWorkerId === worker.id).length;
   const completedTaskCount = complaints.filter(
@@ -34,21 +39,31 @@ export default function WorkerProfile() {
   return (
     <WorkerShell title="Profile">
       <div className="flex flex-col gap-4 px-5 py-4">
-        <div className="flex items-center gap-3 rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
+        <div className="flex items-start gap-3 rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-orange-100 text-lg font-bold text-orange-700">
             {initials(worker.name)}
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-semibold text-slate-900">{worker.name}</p>
-            <p className="text-sm text-slate-500">{worker.role}</p>
-            <p className="text-xs text-slate-400">Signed in as {user.name}</p>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+            <p className="text-sm text-slate-500">
+              {worker.role}
+              {profile?.employeeId ? ` · ${profile.employeeId}` : ""}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
               <span className={`h-2 w-2 rounded-full ${STATUS_DOT[worker.status] ?? "bg-slate-400"}`} />
               {worker.status}
               <span className="text-slate-300">·</span>
-              {worker.area}
+              {[worker.area, profile?.city?.name].filter(Boolean).join(", ")}
             </div>
+            {profile?.mobile && <p className="mt-0.5 text-xs text-slate-500">+91 {profile.mobile}</p>}
           </div>
+          <button
+            type="button"
+            onClick={() => navigate("/profile/setup", { state: { edit: true } })}
+            className="shrink-0 rounded-full border border-orange-200 px-3 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-50"
+          >
+            Edit details
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -80,27 +95,9 @@ export default function WorkerProfile() {
           </svg>
         </button>
 
-        <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
-          <p className="mb-2 text-sm font-bold text-slate-900">Switch Demo Worker</p>
-          <p className="mb-2 text-xs text-slate-500">
-            For this prototype, pick which sanitation worker you're signed in as.
-          </p>
-          <select
-            value={worker.id}
-            onChange={(e) => setWorkerId(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-orange-400 focus:outline-none"
-          >
-            {WORKERS.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} — {w.area}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setConfirmingLogout(true)}
           className="mt-2 flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-sm"
         >
           <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -109,7 +106,19 @@ export default function WorkerProfile() {
           </svg>
           Logout
         </button>
+
+        <ResetAllDataButton />
       </div>
+
+      <ConfirmDialog
+        open={confirmingLogout}
+        title="Log out of EcoSetu?"
+        message="You can sign back in any time by choosing Sanitation Worker on the login page."
+        confirmLabel="Log out"
+        danger
+        onCancel={() => setConfirmingLogout(false)}
+        onConfirm={handleLogout}
+      />
     </WorkerShell>
   );
 }
