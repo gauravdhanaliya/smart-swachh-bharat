@@ -12,20 +12,24 @@ const ICON_BG = {
 const STATIC_CARD =
   "flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-3.5 text-left shadow-sm";
 
-export default function StatTile({ icon, label, value, color = "emerald", onClick }) {
+// `compact` shrinks padding/icon/text for no-scroll dashboards (see
+// CitizenHome, WorkerDashboard) — same content, tighter footprint.
+export default function StatTile({ icon, label, value, color = "emerald", onClick, compact = false }) {
   const Comp = onClick ? "button" : "div";
   return (
     <Comp
       onClick={onClick}
       type={onClick ? "button" : undefined}
-      className={onClick ? CARD_BUTTON : STATIC_CARD}
+      className={`${onClick ? CARD_BUTTON : STATIC_CARD} ${compact ? "!gap-2 !p-2.5" : ""}`}
     >
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${ICON_BG[color]}`}>
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-full ${ICON_BG[color]} ${compact ? "h-8 w-8 [&_svg]:h-4 [&_svg]:w-4" : "h-10 w-10"}`}
+      >
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-xl font-bold leading-tight text-emerald-950">{value}</span>
-        <span className="block text-xs leading-tight text-emerald-800/60">{label}</span>
+        <span className={`block font-bold leading-tight text-emerald-950 ${compact ? "text-base" : "text-xl"}`}>{value}</span>
+        <span className={`block leading-tight text-emerald-800/60 ${compact ? "text-[11px]" : "text-xs"}`}>{label}</span>
       </span>
       {/* USABILITY AUDIT FIX (round 2, issue 4 — unclear which cards are
           interactive): "Total Bins Nearby" and the "Small Actions" banner
