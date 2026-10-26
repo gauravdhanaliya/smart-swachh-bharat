@@ -1,6 +1,7 @@
 // Facilities (bins + toilets + campus buildings).
 //
-// Single source of truth: the EcoSetu API (server/). This module keeps the
+// Single source of truth: the EcoSetu API (services/api.js, which runs in
+// the browser in the demo build). This module keeps the
 // same function names every screen already imports — getAllBins(),
 // getAllToilets(), addGovernmentFacility(), removeFacility() … — but they
 // now read from the synced cache in locationStore.js and write through the

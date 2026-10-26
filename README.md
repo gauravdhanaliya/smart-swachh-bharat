@@ -118,7 +118,7 @@ This is a prototype, and we want to be upfront about what's real and what's simu
 - **Real:** the map tiles (OpenStreetMap), and the bin/toilet points pulled live from the Overpass API. Those are actual points the OSM community has mapped, not invented by us.
 - **Simulated:** bin and toilet fill levels tick up and down on a timer to feel like a live IoT feed. There is no sensor behind them.
 - **Local only:** every complaint, facility request, worker record, and user preference lives in your browser's localStorage. Nothing is sent to a server, because there is no server. Clearing your browser's site data resets everything back to the seed state.
-- **Login:** pick a role, enter your mobile number and the OTP Firebase sends. Configure Firebase first (see `server/README.md` → Firebase Phone Auth).
+- **Login:** an open demo login. Optionally type your name, then tap Citizen, Sanitation Worker, or Government Official to go straight to that role's dashboard. There's no password or OTP. The session (`{ id, name, role, loginAt }`) is kept in localStorage until you log out, and each role signs in as a fixed demo user, so the seeded complaints, tasks, and facility requests show up.
 - **Seed data:** a handful of complaints, bins, toilets, and workers ship pre-loaded so the whole citizen-to-official-to-worker flow can be shown without creating anything new first. Each role's profile page has a "Reset Demo Data" button that restores that seed state without touching your identity settings.
 
 The intended walkthrough: sign in as Citizen and report an overflowing bin, sign in as Government Official and assign it to a worker, sign in as Worker and resolve it, then sign back in as Citizen and Official to see the same complaint marked resolved for everyone.

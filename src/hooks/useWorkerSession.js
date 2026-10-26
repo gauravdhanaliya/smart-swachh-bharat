@@ -36,6 +36,11 @@ function writeWorkerId(id) {
   });
 }
 
+/** Sets the demo worker from outside React (the login screen signs in as "w1"). */
+export function selectWorker(id) {
+  if (getWorkerById(id)) writeWorkerId(id);
+}
+
 /** The demo worker currently "signed in" on this device, plus a setter
  * used by the Profile screen's worker switcher. */
 export function useWorkerSession() {

@@ -1,14 +1,14 @@
-// Worker "Request Facility" data — backed by the EcoSetu API.
+// Worker "Request Facility" data — backed by the EcoSetu API (services/api.js,
+// which runs in the browser in the demo build).
 //
-//   POST  /api/facility-requests               (worker / supervisor)
-//   GET   /api/facility-requests               (workers see their own; reviewers see all)
-//   PATCH /api/facility-requests/:id/status    (official approves/rejects; supervisor may mark under review)
+//   POST  /facility-requests               (worker / supervisor)
+//   GET   /facility-requests               (workers + reviewers)
+//   PATCH /facility-requests/:id/status    (official approves/rejects; supervisor may mark under review)
 //
 // Reads are synchronous against the synced cache (locationStore.js);
-// writes return Promises and reject with an ApiError on failure. An
-// approved request is published as a real location by the server, in the
-// same transaction, so it appears on every role's map after the next
-// refresh.
+// writes return Promises and reject with an ApiError on failure. Approving
+// a request also publishes it as a real location, so it appears on every
+// role's map after the next refresh.
 
 import { api } from "./api";
 import { REQUEST_STATUS } from "../data/facilityRequests";

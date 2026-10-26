@@ -3,9 +3,6 @@ import { AuthProvider } from "./context/AuthContext";
 import RequireRole from "./components/RequireRole";
 import Splash from "./pages/Splash";
 import ChooseRole from "./pages/ChooseRole";
-import MobileNumber from "./pages/MobileNumber";
-import OtpVerification from "./pages/OtpVerification";
-import Success from "./pages/Success";
 import CitizenHome from "./pages/CitizenHome";
 import MapScreen from "./pages/MapScreen";
 import BinDetails from "./pages/BinDetails";
@@ -45,9 +42,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Splash />} />
         <Route path="/login" element={<ChooseRole />} />
-        <Route path="/mobile" element={<MobileNumber />} />
-        <Route path="/otp" element={<OtpVerification />} />
-        <Route path="/success" element={<Success />} />
 
         {/* Step 2 — Citizen dashboard & live bin/toilet map */}
         <Route

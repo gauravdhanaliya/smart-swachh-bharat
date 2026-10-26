@@ -1,9 +1,9 @@
-// Client-side cache of the server's shared data (locations + facility
-// requests).
+// Client-side cache of the shared data (locations + facility requests).
 //
-// The API is the single source of truth: every role reads the same
-// /api/locations, so a facility an official adds or approves reaches the
-// citizen map on the next refresh. This module keeps the last good copy in
+// The API (services/api.js — local to this browser in the demo build) is the
+// single source of truth: every role reads the same /locations, so a facility
+// an official adds or approves reaches the citizen map on the next refresh,
+// including in other tabs. This module keeps the last good copy in
 // memory so screens can read it synchronously (getAllBins() etc.), and
 // refreshes it:
 //   - right after any write this tab makes,
@@ -12,7 +12,8 @@
 // No WebSocket layer exists in this project, so polling is the "real-time"
 // mechanism.
 
-import { api, getTokenRole } from "./api";
+import { api } from "./api";
+import { readSession } from "./authSession";
 import { splitLocations } from "./locationAdapters";
 
 const POLL_MS = 8000;
@@ -56,7 +57,7 @@ export function refresh() {
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      const role = getTokenRole();
+      const role = readSession()?.role;
       const [loc, removed, requests] = await Promise.all([
         api("/locations"),
         role === "official" || role === "superadmin" ? safe("/locations/removed") : null,

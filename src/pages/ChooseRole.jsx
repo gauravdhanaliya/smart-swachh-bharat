@@ -1,13 +1,29 @@
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import ScreenShell from "../components/ScreenShell";
 import TaglineStrip from "../components/TaglineStrip";
-import PrimaryButton from "../components/PrimaryButton";
+import RoleCard from "../components/RoleCard";
+import { useAuth } from "../context/AuthContext";
+import { ROLE_HOME } from "../services/authSession";
 
-// Everyone signs in the same way. Which dashboard opens afterwards depends on
-// the role the server holds for the account — it can't be picked here, so
-// nobody can sign in as a worker or government official by choosing to.
+const ROLES = [
+  { id: "citizen", title: "Citizen", description: "Report issues and track complaints" },
+  { id: "worker", title: "Sanitation Worker", description: "View assigned tasks and request facilities" },
+  { id: "official", title: "Government Official", description: "Monitor, approve and manage facilities" },
+];
+
+// Open demo sign-in: tapping a role signs in as that role's demo user.
 export default function ChooseRole() {
   const navigate = useNavigate();
+  const { role, isAuthenticated, login } = useAuth();
+  const [name, setName] = useState("");
+
+  if (isAuthenticated) return <Navigate to={ROLE_HOME[role]} replace />;
+
+  const handleSelect = (selected) => {
+    login(selected, name);
+    navigate(ROLE_HOME[selected], { replace: true });
+  };
 
   return (
     <ScreenShell>
@@ -22,26 +38,30 @@ export default function ChooseRole() {
         Welcome Back!
       </h2>
       <p className="mt-1 text-center text-sm text-emerald-800/70">
-        Login to continue to your account
+        Choose your role to continue
       </p>
 
-      <div className="mt-6 rounded-2xl border border-emerald-100 bg-white p-4 text-sm text-emerald-900/80">
-        <p>
-          Sign in with your mobile number. New accounts start as <b>Citizen</b>.
-        </p>
-        <p className="mt-2">
-          Government officials and sanitation workers: your administrator sets up your role on
-          your number, and your own dashboard opens after you sign in.
-        </p>
+      <div className="mt-6">
+        <label htmlFor="login-name" className="text-sm font-semibold text-emerald-950">
+          Your name
+        </label>
+        <input
+          id="login-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter your name"
+          autoComplete="name"
+          maxLength={60}
+          className="mt-1.5 w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-emerald-950 placeholder:text-emerald-800/40 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+        />
       </div>
 
-      <PrimaryButton onClick={() => navigate("/mobile")} className="mt-6">
-        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="7" y="2" width="10" height="20" rx="2" />
-          <line x1="11" y1="18" x2="13" y2="18" />
-        </svg>
-        Continue with Mobile Number
-      </PrimaryButton>
+      <div className="mt-4 flex flex-col gap-3">
+        {ROLES.map((r) => (
+          <RoleCard key={r.id} id={r.id} title={r.title} description={r.description} onSelect={handleSelect} />
+        ))}
+      </div>
 
       <p className="mt-6 mx-auto w-fit rounded-2xl bg-white/80 px-4 py-1.5 text-center font-semibold text-emerald-950 shadow-sm backdrop-blur-sm">
         A Cleaner India

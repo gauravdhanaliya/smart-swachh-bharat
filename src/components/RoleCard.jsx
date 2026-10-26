@@ -21,42 +21,31 @@ const ICONS = {
   ),
 };
 
-const THEME = {
-  citizen: { bg: "bg-emerald-50", ring: "ring-emerald-500", icon: "bg-emerald-500 text-white" },
-  official: { bg: "bg-sky-50", ring: "ring-sky-500", icon: "bg-sky-500 text-white" },
-  worker: { bg: "bg-orange-50", ring: "ring-orange-500", icon: "bg-orange-500 text-white" },
+const ICON_THEME = {
+  citizen: "bg-emerald-500 text-white",
+  official: "bg-sky-500 text-white",
+  worker: "bg-orange-500 text-white",
 };
 
-export default function RoleCard({ id, title, description, selected, onSelect }) {
-  const theme = THEME[id];
+/** A tappable role on the login screen: tapping it signs in as that role. */
+export default function RoleCard({ id, title, description, onSelect }) {
   return (
     <button
       type="button"
       onClick={() => onSelect(id)}
-      className={`w-full flex items-start gap-4 rounded-2xl border p-4 text-left transition ${theme.bg} ${
-        selected
-          ? `ring-2 ${theme.ring} border-transparent`
-          : "border-emerald-100 hover:border-emerald-200"
-      }`}
+      className="group flex w-full items-center gap-4 rounded-2xl border border-emerald-100 bg-white p-4 text-left shadow-[0_6px_20px_-12px_rgba(15,110,58,0.35)] transition hover:border-emerald-300 hover:bg-emerald-50/60 hover:shadow-[0_10px_24px_-12px_rgba(15,110,58,0.45)] active:scale-[0.98] active:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
     >
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${theme.icon}`}>
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${ICON_THEME[id]}`} aria-hidden="true">
         {ICONS[id]}
       </span>
-      <span className="flex-1">
+      <span className="min-w-0 flex-1">
         <span className="block font-semibold text-emerald-950">{title}</span>
-        <span className="block text-sm text-emerald-800/70 mt-0.5">{description}</span>
+        <span className="mt-0.5 block text-sm text-emerald-800/70">{description}</span>
       </span>
-      <span
-        className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-          selected ? "border-emerald-600 bg-emerald-600" : "border-emerald-200"
-        }`}
-      >
-        {selected && (
-          <svg viewBox="0 0 24 24" className="h-3 w-3 text-white" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
-        )}
-      </span>
+      <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-emerald-500 transition group-hover:translate-x-0.5 group-hover:text-emerald-700" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M5 12h14" />
+        <path d="M13 6l6 6-6 6" />
+      </svg>
     </button>
   );
 }
