@@ -6,7 +6,6 @@ import LiveCameraCapture from "../components/LiveCameraCapture";
 import ComplaintLocationPicker from "../components/ComplaintLocationPicker";
 import { createComplaint } from "../services/complaintService";
 import { useAuth } from "../context/AuthContext";
-import { useProfile } from "../hooks/useProfile";
 import {
   COMPLAINT_TYPES,
   DESCRIPTION_MAX_LENGTH,
@@ -17,7 +16,6 @@ export default function ReportIssue() {
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const { user } = useAuth();
-  const profile = useProfile("citizen");
 
   // Step 4 — Bin/Toilet Details screens can deep-link here with
   // { issueType, location } in router state so the report opens
@@ -47,16 +45,15 @@ export default function ReportIssue() {
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
     setSubmitting(true);
     try {
-      const complaint = createComplaint({
-        citizenName: profile?.fullName || user.name,
-        citizenId: user.id,
-        citizenMobile: profile?.mobile || "",
+      // A Promise through the API; an object in the browser-only build.
+      const complaint = await createComplaint({
+        citizenName: user.name,
         issueType: issueType.label,
         description: description.trim(),
         location,
@@ -64,11 +61,11 @@ export default function ReportIssue() {
         photo: photo?.dataUrl ?? null,
       });
       navigate(`/citizen/complaints/${complaint.id}`, {
-        state: { justSubmitted: true },
+        state: { justSubmitted: true, photoWarning: complaint.photoWarning ?? null },
         replace: true,
       });
-    } catch {
-      setErrors({ submit: "Something went wrong submitting your report. Please try again." });
+    } catch (err) {
+      setErrors({ submit: err?.message || "Something went wrong submitting your report. Please try again." });
       setSubmitting(false);
     }
   };

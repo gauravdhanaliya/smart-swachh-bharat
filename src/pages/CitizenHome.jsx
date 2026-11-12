@@ -5,7 +5,7 @@ import StatTile from "../components/StatTile";
 import MapPreview from "../components/MapPreview";
 import CitySelector from "../components/CitySelector";
 import AddLocationDialog from "../components/AddLocationDialog";
-import { CARD_BUTTON, CARD_BUTTON_FILLED } from "../components/buttonStyles";
+import { CARD_BUTTON, CARD_BUTTON_FILLED, TAP_LINK } from "../components/buttonStyles";
 import { useLiveBins } from "../hooks/useLiveBins";
 import { useLiveToilets } from "../hooks/useLiveToilets";
 import { useComplaints } from "../hooks/useComplaints";
@@ -14,8 +14,6 @@ import { useCitizenNotifications } from "../hooks/useCitizenNotifications";
 import { inCity } from "../data/cities";
 import { BIN_STATUS } from "../data/bins";
 import { STATUS } from "../data/complaints";
-import { useProfile } from "../hooks/useProfile";
-import { firstName } from "../services/profileService";
 
 function greetingFor(date) {
   const h = date.getHours();
@@ -45,11 +43,9 @@ export default function CitizenHome() {
   const [addingLocation, setAddingLocation] = useState(false);
   const [locationPrefill, setLocationPrefill] = useState(null);
   const { unreadCount } = useCitizenNotifications();
-  const profile = useProfile("citizen");
-  const name = firstName(profile);
 
-  // Everything on this screen follows the chosen city; a city nobody has
-  // added facilities to honestly shows zero.
+  // Everything on this screen follows the chosen city. Demo data only
+  // exists for Roorkee, so other cities honestly show zero.
   const bins = useMemo(() => allBins.filter((b) => inCity(b, city)), [allBins, city]);
   const toilets = useMemo(() => allToilets.filter((t) => inCity(t, city)), [allToilets, city]);
 
@@ -68,83 +64,83 @@ export default function CitizenHome() {
   );
 
   return (
-    <CitizenShell noScroll>
-      {/* Everything below is sized to fit inside one screen with no
-          scrolling — noScroll on the shell means there's no safety-net
-          scroll area, so every margin/padding/icon size here was trimmed
-          deliberately. Change a value, then re-check the shortest phone
-          height (~660px) still fits before shipping. */}
-      <div className="flex min-h-0 flex-1 flex-col px-5 pt-3">
-        {/* Top bar */}
-        <div className="flex shrink-0 items-center justify-between">
-          <CitySelector
-            city={city}
-            cities={cities}
-            onSelect={selectCity}
-            onAddLocation={(prefill) => {
-              setLocationPrefill(prefill ?? null);
-              setAddingLocation(true);
-            }}
-            onRemoveLocation={removeLocation}
-          />
+    <CitizenShell>
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-5 pt-5">
+        <CitySelector
+          city={city}
+          cities={cities}
+          onSelect={selectCity}
+          onAddLocation={(prefill) => {
+            setLocationPrefill(prefill ?? null);
+            setAddingLocation(true);
+          }}
+          onRemoveLocation={removeLocation}
+        />
 
-          <button
-            type="button"
-            onClick={() => navigate("/citizen/notifications")}
-            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
-            className="relative flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"
-          >
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.7 21a2 2 0 01-3.4 0" />
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/citizen/notifications")}
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+          className="relative flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.7 21a2 2 0 01-3.4 0" />
+          </svg>
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+      </div>
 
+      <div className="px-5 pb-4">
         {/* Greeting */}
-        <div className="mt-2 flex shrink-0 items-start justify-between gap-3">
+        <div className="mt-5 flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-lg font-bold leading-tight text-emerald-950">{greetingFor(now)}{name ? `, ${name}!` : "!"}</h1>
-            <p className="text-xs text-emerald-800/70">{timeLabel} · Let&apos;s keep our city clean and green.</p>
+            <h1 className="text-xl font-bold text-emerald-950">
+              {greetingFor(now)},
+              <br />
+              Citizen!
+            </h1>
+            <p className="mt-1 text-sm text-emerald-800/70">
+              {timeLabel} · Let&apos;s keep our city clean and green.
+            </p>
           </div>
-          <span className="text-2xl">🌱</span>
+          <span className="text-3xl">🌱</span>
         </div>
 
         {/* Total bins nearby */}
         <button
           type="button"
           onClick={() => navigate("/citizen/map")}
-          className={`mt-2 shrink-0 ${CARD_BUTTON} p-2.5`}
+          className={`mt-4 ${CARD_BUTTON}`}
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-base">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-lg">
             🗑️
           </span>
           <span className="flex-1">
-            <span className="block text-[11px] font-medium text-emerald-800/60">Total Bins Nearby</span>
-            <span className="block text-lg font-bold leading-tight text-emerald-950">{stats.total}</span>
+            <span className="block text-xs font-medium text-emerald-800/60">Total Bins Nearby</span>
+            <span className="block text-2xl font-bold text-emerald-950">{stats.total}</span>
           </span>
-          <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700">
+          <span className="flex items-center gap-1 text-sm font-semibold text-emerald-700">
             View on map
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14M13 6l6 6-6 6" />
             </svg>
           </span>
         </button>
 
         {/* Stat grid */}
-        <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <StatTile
             color="orange"
             value={stats.needsCollection}
             label="Bins Need Collection"
             icon={<BinGlyph />}
             onClick={() => navigate("/citizen/map?filter=bins")}
-            compact
           />
           <StatTile
             color="red"
@@ -152,7 +148,6 @@ export default function CitizenHome() {
             label="Overflowing Bins"
             icon={<BinGlyph />}
             onClick={() => navigate("/citizen/map?filter=bins")}
-            compact
           />
           <StatTile
             color="sky"
@@ -160,7 +155,6 @@ export default function CitizenHome() {
             label="Complaints Resolved"
             icon={<CheckGlyph />}
             onClick={() => navigate("/citizen/complaints")}
-            compact
           />
           <StatTile
             color="slate"
@@ -168,7 +162,6 @@ export default function CitizenHome() {
             label="Total Complaints"
             icon={<FileGlyph />}
             onClick={() => navigate("/citizen/complaints")}
-            compact
           />
         </div>
 
@@ -176,10 +169,10 @@ export default function CitizenHome() {
         <button
           type="button"
           onClick={() => navigate("/citizen/eco-guide")}
-          className={`mt-2 shrink-0 ${CARD_BUTTON_FILLED} p-2.5`}
+          className={`mt-3 ${CARD_BUTTON_FILLED}`}
         >
-          <span className="text-base">🌿</span>
-          <span className="flex-1 text-xs font-semibold leading-tight">
+          <span className="text-xl">🌿</span>
+          <span className="flex-1 text-sm font-semibold">
             Small Actions
             <br />
             Make a Big Difference
@@ -187,41 +180,47 @@ export default function CitizenHome() {
               Open the Eco Guide — learn easy ways to help
             </span>
           </span>
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 6l6 6-6 6" />
           </svg>
         </button>
 
-        {/* Map preview — the one section allowed to flex, so it absorbs
-            whatever room is left instead of pushing the page taller. */}
-        <div className="mt-2 flex min-h-0 flex-1 flex-col pb-2">
-          <div className="mb-1 flex shrink-0 items-center justify-between gap-3">
-            <h2 className="text-xs font-semibold text-emerald-950">Nearby Bins &amp; Toilets</h2>
+        {/* Map preview */}
+        <div className="mt-5">
+          {/* USABILITY AUDIT FIX (round 2, issue 5): "See full map" was a
+              12px bare-text link (~16px tall) jammed against the section
+              title. It now uses TAP_LINK (14px, 44px-tall target) with an
+              arrow so it reads as an action, and the header gets a gap so
+              the two never crowd each other. -mr-3 cancels the token's
+              px-3 so the link's text still aligns with the card edge. */}
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-emerald-950">Nearby Bins &amp; Toilets</h2>
             <button
               type="button"
               onClick={() => navigate("/citizen/map")}
-              className="-mr-3 flex items-center gap-1 px-3 py-1 text-xs font-semibold text-emerald-700"
+              className={`-mr-3 gap-1 ${TAP_LINK}`}
             >
               See full map
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M9 6l6 6-6 6" />
               </svg>
             </button>
           </div>
-          <div className="min-h-0 flex-1">
-            <MapPreview
-              bins={bins}
-              toilets={toilets}
-              center={{ latitude: city.latitude, longitude: city.longitude }}
-              fill
-            />
-          </div>
+          <MapPreview
+            bins={bins}
+            toilets={toilets}
+            center={{ latitude: city.latitude, longitude: city.longitude }}
+          />
           {bins.length === 0 && toilets.length === 0 && (
-            <p className="mt-1 shrink-0 text-[11px] text-emerald-800/60">
-              No bins or toilets in this city yet.
+            <p className="mt-2 text-xs text-emerald-800/60">
+              No bins or toilets are mapped in {city.name} yet — the demo data covers Roorkee (COER University area).
             </p>
           )}
         </div>
+
+        <p className="mt-6 pb-2 text-center text-xs text-emerald-800/40">
+          Clean Cities · Healthy Citizens · Sustainable Future
+        </p>
       </div>
 
       {addingLocation && (

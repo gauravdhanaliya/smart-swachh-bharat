@@ -4,9 +4,11 @@ import WorkerShell from "../../components/WorkerShell";
 import StatusBadge from "../../components/StatusBadge";
 import PriorityBadge from "../../components/PriorityBadge";
 import StatusFilterTabs from "../../components/StatusFilterTabs";
-import { useComplaints } from "../../hooks/useComplaints";
+import { useComplaints, useComplaintsStatus } from "../../hooks/useComplaints";
+import ListLoadStatus from "../../components/ListLoadStatus";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
 import { STATUS } from "../../data/complaints";
+import { FACILITY_FILTERS, facilityLabel, matchesFacilityFilter } from "../../utils/facility";
 
 function formatDateTime(iso) {
   return new Date(iso).toLocaleString("en-IN", {
@@ -33,10 +35,12 @@ const FILTER_STATUS = {
 export default function WorkerTasks() {
   const navigate = useNavigate();
   const complaints = useComplaints();
+  const loadStatus = useComplaintsStatus();
   const { worker } = useWorkerSession();
   const [searchParams] = useSearchParams();
 
   const initialFilter = searchParams.get("filter") ?? "all";
+  const [facility, setFacility] = useState("all");
   const [filter, setFilter] = useState(
     FILTERS.some((f) => f.value === initialFilter) ? initialFilter : "all"
   );
@@ -59,17 +63,17 @@ export default function WorkerTasks() {
   );
 
   const visibleTasks = useMemo(() => {
-    const list =
-      filter === "all"
-        ? myTasks
-        : myTasks.filter((c) => c.status === FILTER_STATUS[filter]);
+    const list = (filter === "all" ? myTasks : myTasks.filter((c) => c.status === FILTER_STATUS[filter])).filter((c) =>
+      matchesFacilityFilter(c, facility)
+    );
     return [...list].sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
-  }, [myTasks, filter]);
+  }, [myTasks, filter, facility]);
 
   return (
     <WorkerShell title="My Tasks">
+      <ListLoadStatus status={loadStatus} what="tasks" />
       <div className="flex flex-col gap-3 px-5 py-4">
         <StatusFilterTabs
           options={FILTERS.map((f) => ({ ...f, count: counts[f.value] }))}
@@ -77,15 +81,26 @@ export default function WorkerTasks() {
           onChange={setFilter}
         />
 
+        <label className="flex items-center gap-2 self-start text-sm text-slate-600">
+          <span>Facility</span>
+          <select
+            value={facility}
+            onChange={(e) => setFacility(e.target.value)}
+            className="min-h-10 rounded-full border border-orange-200 bg-white px-3 text-sm text-slate-800 focus:ring-2 focus:ring-orange-400 focus:outline-none"
+          >
+            {FACILITY_FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <p className="text-xs text-orange-900/50">
           {visibleTasks.length} task{visibleTasks.length === 1 ? "" : "s"}
         </p>
 
-        {myTasks.length === 0 && (
-          <p className="mt-6 text-center text-sm text-orange-900/50">No tasks assigned yet.</p>
-        )}
-
-        {myTasks.length > 0 && visibleTasks.length === 0 && (
+        {visibleTasks.length === 0 && (
           <p className="mt-6 text-center text-sm text-orange-900/50">
             No tasks in this view. Check back soon.
           </p>
@@ -102,6 +117,7 @@ export default function WorkerTasks() {
               <div className="min-w-0">
                 <p className="text-xs font-medium text-slate-500">#{c.id}</p>
                 <p className="font-semibold text-slate-900">{c.issueType}</p>
+                {facilityLabel(c) && <p className="text-xs font-medium text-orange-800">{facilityLabel(c)}</p>}
               </div>
               <PriorityBadge priority={c.priority} />
             </div>

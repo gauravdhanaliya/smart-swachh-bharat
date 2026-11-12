@@ -1,7 +1,12 @@
 // Waste-bin constants shared by the screens. The bins themselves come from
 // the EcoSetu API (GET /api/locations?type=dustbin) — see
-// services/facilityService.js. Simulated demo bins are seeded on the server
-// (server/src/seed-data.js) and are flagged isDemo.
+// services/facilityService.js.
+//
+// A bin is described by a categorical status only. There is no fill
+// percentage anywhere in the app; records saved by older builds (which had
+// one) are converted by migrateBinLocation / normalizeBinStatus.
+
+export { normalizeBinStatus, migrateBinLocation } from "../../server/src/constants.js";
 
 export const BIN_STATUS = {
   NORMAL: "normal",
@@ -9,14 +14,15 @@ export const BIN_STATUS = {
   OVERFLOW: "overflow",
 };
 
-// Fill-level thresholds used to derive status from fillLevel.
-export const FILL_THRESHOLDS = {
-  ALMOST_FULL: 71,
-  OVERFLOW: 91,
+export const BIN_STATUS_LABELS = {
+  normal: "Normal",
+  almost_full: "Almost Full",
+  overflow: "Overflow",
 };
 
-export function statusFromFillLevel(fillLevel) {
-  if (fillLevel >= FILL_THRESHOLDS.OVERFLOW) return BIN_STATUS.OVERFLOW;
-  if (fillLevel >= FILL_THRESHOLDS.ALMOST_FULL) return BIN_STATUS.ALMOST_FULL;
-  return BIN_STATUS.NORMAL;
-}
+// One plain-language line per status, shown on the bin details screen.
+export const BIN_STATUS_HINTS = {
+  normal: "This bin has room.",
+  almost_full: "Getting full — due for collection soon.",
+  overflow: "Overflowing — needs collection now.",
+};

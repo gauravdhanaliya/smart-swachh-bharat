@@ -1,35 +1,63 @@
 import { useEffect, useState } from "react";
-import { statusFromFillLevel } from "../data/bins";
+import { BIN_STATUS } from "../data/bins";
 import { getAllBins, subscribe as subscribeFacilities } from "../services/facilityService";
 
-// Bins come from the shared facility store (Government-added +
-// Government-approved Worker requests), so newly added dustbins show up
-// everywhere useLiveBins() is used (Citizen Map, Citizen Home, Bin Details,
+// Step 14D — bins now come from the shared facility store (demo +
+// Government-added + Government-approved Worker requests), not just the
+// static demo seed array, so newly added dustbins show up everywhere
+// useLiveBins() is used (Citizen Map, Citizen Home, Bin Details,
 // Government Bins page).
 const REFRESH_POLL_MS = 8000; // safety-net poll per bug-fix spec §7 (5–10s)
 
 // ---------------------------------------------------------------------
-// FILL-LEVEL SIMULATION (off)
-// When on, this nudges fill levels at random to mimic an IoT feed. It is
-// off so every number shown is one an official actually entered; switch
-// it on only for a presentation that needs the map to "move".
+// DEMO LIVE DATA SIMULATION
+// This mimics an IoT/backend feed pushing status updates so the map
+// "feels" live for the presentation. Bins have a categorical status only
+// (no fill percentage), so the simulation moves a bin from one status to
+// the next. Set SIMULATE_LIVE_DATA to false to freeze the data at its
+// saved values (e.g. once a real backend/IoT feed is wired up).
 // ---------------------------------------------------------------------
-export const SIMULATE_LIVE_DATA = false;
+export const SIMULATE_LIVE_DATA = true;
 const UPDATE_INTERVAL_MS = 20000; // 20s — gentle enough not to be jarring
-const MAX_STEP = 4; // max +/- change in fill % per tick
+export const STATUS_CHANGE_CHANCE = 0.12; // per bin, per tick
 
-function nudgeFillLevel(fillLevel) {
-  const delta = Math.round((Math.random() - 0.45) * MAX_STEP * 2);
-  return Math.max(5, Math.min(99, fillLevel + delta));
+// normal -> almost full -> overflow -> (collected) normal
+const NEXT_STATUS = {
+  [BIN_STATUS.NORMAL]: BIN_STATUS.ALMOST_FULL,
+  [BIN_STATUS.ALMOST_FULL]: BIN_STATUS.OVERFLOW,
+  [BIN_STATUS.OVERFLOW]: BIN_STATUS.NORMAL,
+};
+
+/**
+ * The simulated next status for a bin. `roll` is a random number in [0, 1):
+ * below STATUS_CHANGE_CHANCE the bin moves one step, otherwise it stays put.
+ * An unknown status is treated as normal.
+ */
+export function nextBinStatus(status, roll = Math.random()) {
+  const current = status in NEXT_STATUS ? status : BIN_STATUS.NORMAL;
+  return roll < STATUS_CHANGE_CHANCE ? NEXT_STATUS[current] : current;
+}
+
+/**
+ * One simulation tick over a list of bins. A bin whose status an official or
+ * worker set (`statusSource: "manual"`) is never changed; every other bin
+ * rolls the dice. Unchanged bins keep their object identity.
+ */
+export function simulateTick(bins, random = Math.random) {
+  return bins.map((bin) => {
+    if (bin.statusSource === "manual") return bin;
+    const status = nextBinStatus(bin.status, random());
+    return status === bin.status ? bin : { ...bin, status, lastUpdated: "Just now" };
+  });
 }
 
 /**
  * Generic version of the ticker: takes ANY array of bin-shaped objects
- * (anything with a numeric `fillLevel`) and gently drifts their fill
- * levels/status/history over time. Used both for the built-in seed
- * bins and for bins fetched live from OpenStreetMap.
+ * (anything with a `status`) and occasionally moves their status over
+ * time. Used both for the saved bins and for bins fetched live from
+ * OpenStreetMap.
  */
-export function useTickingFillLevels(sourceBins) {
+export function useTickingBinStatus(sourceBins) {
   const [liveBins, setLiveBins] = useState(sourceBins);
 
   // Re-seed whenever a fresh source array comes in (e.g. a new
@@ -42,19 +70,7 @@ export function useTickingFillLevels(sourceBins) {
     if (!SIMULATE_LIVE_DATA) return undefined;
 
     const timer = setInterval(() => {
-      setLiveBins((current) =>
-        current.map((bin) => {
-          if (typeof bin.fillLevel !== "number") return bin;
-          const fillLevel = nudgeFillLevel(bin.fillLevel);
-          return {
-            ...bin,
-            fillLevel,
-            status: statusFromFillLevel(fillLevel),
-            lastUpdated: "Just now",
-            history: bin.history ? [...bin.history.slice(1), fillLevel] : bin.history,
-          };
-        })
-      );
+      setLiveBins((current) => simulateTick(current));
     }, UPDATE_INTERVAL_MS);
 
     return () => clearInterval(timer);
@@ -76,5 +92,5 @@ export function useLiveBins() {
     };
   }, []);
 
-  return useTickingFillLevels(sourceBins);
+  return useTickingBinStatus(sourceBins);
 }

@@ -13,7 +13,7 @@ EcoSetu is our attempt at closing that loop. It's a single web app with three lo
 ### Citizen
 
 - Browse a live map of dustbins and public toilets, with filters for category and status
-- See real OpenStreetMap-mapped bins and toilets near you, alongside a demo seed set, through the free Overpass API (no Google Maps billing, no API key)
+- Search for any place in India on the map (OpenStreetMap Nominatim, only when you press Search, at most one request a second, results cached)
 - "Use My Location" to center the map, and a one-tap "Navigate" link that opens Google Maps directions
 - Report an issue with a required live camera photo (no gallery upload, so the photo has to be taken on the spot), a description, and a location picked from a searchable India-wide picker (every state, district, and city, plus GPS)
 - Track your own complaints by status: Submitted, Assigned, In Progress, Resolved
@@ -46,10 +46,10 @@ EcoSetu is our attempt at closing that loop. It's a single web app with three lo
 - React Router v7 for client-side routing and role-based route guards
 - Tailwind CSS v4 for styling
 - Leaflet and React-Leaflet for the interactive map, using free OpenStreetMap tiles
-- The Overpass API for live OpenStreetMap point data (real bins and toilets that have been mapped by the OSM community)
+- OpenStreetMap Nominatim for place search and street addresses (through the API, which keeps to its usage policy: see `server/src/geocode.js`)
 - The browser's localStorage as the data layer for this prototype (complaints, facilities, workers, auth state, preferences)
 
-No backend, no database, no real SMS or push service, and no payment integration are used. Everything the app needs to run lives in the browser or comes from the free OpenStreetMap APIs.
+By default (no `VITE_USE_API`) the app needs no backend: everything lives in the browser or comes from the free OpenStreetMap APIs. With `VITE_USE_API=true` it signs in and reads and writes through the EcoSetu API in `server/` (MongoDB Atlas, Firebase phone login, private Vercel Blob for photos) — see `server/README.md`.
 
 ## Getting started
 
@@ -105,7 +105,7 @@ src/
   data/             seed data: bins, toilets, workers, complaints, India's states/districts/cities, Eco Guide content
   hooks/            useComplaints, useLiveBins, useCity, useGovProfile, and the rest of the state-reading hooks
   pages/            citizen screens, plus pages/government and pages/worker for those roles
-  services/         the data layer: complaintService, facilityService, workerService, osmService, and so on
+  services/         the data layer: complaintService, facilityService, workerService, geocode, and so on
   utils/            small helpers for notifications and dashboard stats
 ```
 
@@ -115,7 +115,7 @@ Each `services/*.js` file is the single place that reads and writes its slice of
 
 This is a prototype, and we want to be upfront about what's real and what's simulated.
 
-- **Real:** the map tiles (OpenStreetMap), and the bin/toilet points pulled live from the Overpass API. Those are actual points the OSM community has mapped, not invented by us.
+- **Real:** the map tiles and place search (OpenStreetMap). The bins and toilets are the COER University demo set plus whatever officials add; none are pulled from Overpass.
 - **Simulated:** bin and toilet fill levels tick up and down on a timer to feel like a live IoT feed. There is no sensor behind them.
 - **Local only:** every complaint, facility request, worker record, and user preference lives in your browser's localStorage. Nothing is sent to a server, because there is no server. Clearing your browser's site data resets everything back to the seed state.
 - **Login:** an open demo login. Optionally type your name, then tap Citizen, Sanitation Worker, or Government Official to go straight to that role's dashboard. There's no password or OTP. The session (`{ id, name, role, loginAt }`) is kept in localStorage until you log out, and each role signs in as a fixed demo user, so the seeded complaints, tasks, and facility requests show up.

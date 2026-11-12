@@ -101,7 +101,7 @@ if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}` || proce
     process.exit(1);
   });
   try {
-    const repo = createRepository(conn.db, conn.client);
+    const repo = createRepository(conn.db, conn.client, null, { phoneHashSecret: config.phoneHashSecret });
     await seedIfEmpty(repo, { demo: config.seedDemoData });
     const { imported, problems } = await importRows(repo, parseCsv(fs.readFileSync(file, "utf8")), {
       replaceDemo: flags.includes("--replace-demo"),

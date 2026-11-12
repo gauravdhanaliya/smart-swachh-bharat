@@ -1,45 +1,47 @@
-import { CAMPUS, DEMO_BUILDINGS, DEMO_REQUESTS } from "./seed-data.js";
+import { CAMPUS, DEMO_BINS, DEMO_BUILDINGS, DEMO_REQUESTS, DEMO_TOILETS, DEMO_USERS, DEMO_WORKERS } from "./seed-data.js";
 
 /**
- * Seeds an empty database. Always inserts the verified campus reference;
- * demo buildings and requests only when `demo` is true. Safe to
- * call on every start — it does nothing once locations exist.
+ * Seeds the database. Idempotent: every seed record has a fixed id and is
+ * inserted only if missing, so running this twice (or on every start) never
+ * duplicates anything and never overwrites a record that was edited since.
+ *
+ * Always: the verified campus reference. With `demo`: demo buildings, bins,
+ * toilets, facility requests and the three demo-login users.
+ * Returns { inserted: { locations, requests, users } }.
  */
-export async function seedIfEmpty(repo, { demo = true } = {}) {
-  if ((await repo.countLocations()) > 0) return { seeded: false };
+export async function seedAll(repo, { demo = true } = {}) {
+  const inserted = { locations: 0, requests: 0, users: 0 };
+  const count = async (key, wasInserted) => {
+    if (await wasInserted) inserted[key] += 1;
+  };
 
-  await repo.transaction(async (tx) => {
-    await tx.insertLocation({ ...CAMPUS, createdBy: "system" });
-    if (!demo) return;
+  await count("locations", repo.insertLocationIfMissing({ ...CAMPUS, id: "CP-001", createdBy: "system" }));
+  if (!demo) return { inserted };
 
-    for (const loc of DEMO_BUILDINGS) {
-      await tx.insertLocation({ ...loc, createdBy: "system" });
-    }
-
-    for (const r of DEMO_REQUESTS) {
-      await tx.insertRequest({
+  for (const loc of [...DEMO_BUILDINGS, ...DEMO_BINS, ...DEMO_TOILETS]) {
+    await count("locations", repo.insertLocationIfMissing({ ...loc, createdBy: "system" }));
+  }
+  for (const r of DEMO_REQUESTS) {
+    await count(
+      "requests",
+      repo.insertRequestIfMissing({
         ...r,
         requestedByUser: "demo-seed",
         reviewedBy: r.status === "PENDING" ? null : "system",
         isDemo: true,
         updatedAt: r.createdAt,
-      });
-      if (r.status === "APPROVED") {
-        await tx.publishRequest(
-          {
-            id: r.id,
-            facilityType: r.facilityType,
-            suggestedName: r.suggestedName,
-            address: r.address,
-            latitude: r.latitude,
-            longitude: r.longitude,
-            reason: r.reason,
-            isDemo: true,
-          },
-          "system"
-        );
-      }
-    }
-  });
-  return { seeded: true };
+      })
+    );
+  }
+  for (const u of DEMO_USERS) {
+    await count("users", repo.insertDemoUserIfMissing(u));
+  }
+  for (const w of DEMO_WORKERS) await repo.insertWorkerIfMissing(w);
+  return { inserted };
+}
+
+/** Same as seedAll; reports whether anything was inserted. Safe to call on every start. */
+export async function seedIfEmpty(repo, options) {
+  const { inserted } = await seedAll(repo, options);
+  return { seeded: inserted.locations + inserted.requests + inserted.users > 0 };
 }

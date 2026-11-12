@@ -4,7 +4,9 @@ import CitizenShell from "../components/CitizenShell";
 import StatusBadge from "../components/StatusBadge";
 import PriorityBadge from "../components/PriorityBadge";
 import ComplaintTimeline from "../components/ComplaintTimeline";
-import { useComplaint } from "../hooks/useComplaints";
+import { useComplaint, useComplaintsStatus } from "../hooks/useComplaints";
+import ProtectedImage from "../components/ProtectedImage";
+import { facilityLabel } from "../utils/facility";
 
 function formatDateTime(iso) {
   return new Date(iso).toLocaleString("en-IN", {
@@ -21,9 +23,20 @@ export default function ComplaintTracking() {
   const navigate = useNavigate();
   const location = useLocation();
   const complaint = useComplaint(id);
+  const loadStatus = useComplaintsStatus();
   const [showSuccessBanner, setShowSuccessBanner] = useState(
     Boolean(location.state?.justSubmitted)
   );
+
+  if (!complaint && !loadStatus.loaded && !loadStatus.error) {
+    return (
+      <CitizenShell>
+        <p role="status" className="px-5 py-10 text-center text-sm text-slate-500">
+          Loading…
+        </p>
+      </CitizenShell>
+    );
+  }
 
   if (!complaint) {
     return (
@@ -31,7 +44,7 @@ export default function ComplaintTracking() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-emerald-950">Complaint not found</p>
           <p className="text-sm text-emerald-800/60">
-            It may have been deleted, or the app's data was reset.
+            This complaint may have been removed from the demo data set.
           </p>
           <button
             type="button"
@@ -62,6 +75,11 @@ export default function ComplaintTracking() {
       </div>
 
       <div className="flex flex-col gap-4 px-5 pb-8">
+        {location.state?.photoWarning && (
+          <p role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+            {location.state.photoWarning}
+          </p>
+        )}
         {showSuccessBanner && (
           <div className="flex items-start gap-3 rounded-2xl bg-emerald-700 p-4 text-white shadow-sm">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
@@ -107,7 +125,7 @@ export default function ComplaintTracking() {
           <p className="mb-3 text-sm font-semibold text-emerald-950">Issue Details</p>
           <div className="flex items-start gap-3">
             {complaint.photo ? (
-              <img
+              <ProtectedImage
                 src={complaint.photo}
                 alt="Reported issue"
                 className="h-14 w-14 shrink-0 rounded-xl object-cover"
@@ -119,6 +137,7 @@ export default function ComplaintTracking() {
             )}
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-emerald-950">{complaint.issueType}</p>
+              {facilityLabel(complaint) && <p className="text-sm font-medium text-emerald-800">{facilityLabel(complaint)}</p>}
               <p className="text-sm text-emerald-800/60">{complaint.location.address}</p>
               <div className="mt-1.5 flex items-center gap-2">
                 <PriorityBadge priority={complaint.priority} />

@@ -100,7 +100,7 @@ flowchart TB
       S1[complaintService.js]
       S2[facilityService.js]
       S3[facilityRequestService.js]
-      S4[osmService.js — address lookup]
+      S4[geocode.js — place search and addresses]
     end
 
     subgraph Store["localStorage (today) → real DB (tomorrow)"]

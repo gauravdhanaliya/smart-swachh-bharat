@@ -2,6 +2,8 @@
 // building shapes the screens already use. No React, no browser APIs — so
 // it can be unit-tested directly (tests/locationAdapters.test.js).
 
+import { normalizeBinStatus } from "../../server/src/constants.js";
+
 export const BUILDING_TYPE_LABELS = {
   academic_building: "Academic building",
   department_building: "Department building",
@@ -75,17 +77,23 @@ function common(l, nowMs) {
     createdAt: l.createdAt,
     updatedAt: l.updatedAt,
     createdBy: l.createdBy,
+    // From GET /api/locations/map: only what the map needs; screens that show
+    // more fetch the full record.
+    slim: Boolean(l.slim),
   };
 }
 
+// A bin is described by its status (normal / almost_full / overflow) — there
+// is no fill percentage. normalizeBinStatus also covers records from older
+// builds that only stored a percentage.
 export function locationToBin(l, nowMs) {
-  const fill = Number.isFinite(l.details?.fillLevel) ? l.details.fillLevel : 0;
   return {
     ...common(l, nowMs),
+    status: normalizeBinStatus(l),
+    // "manual" once a person set the status; the demo ticker leaves those alone.
+    statusSource: l.statusSource === "manual" ? "manual" : "simulated",
     category: "bin",
     type: l.details?.wasteType ?? "Mixed Waste",
-    fillLevel: fill,
-    history: l.details?.history ?? [0, 0, 0, 0, 0, fill],
   };
 }
 
@@ -93,6 +101,7 @@ export function locationToToilet(l, nowMs) {
   return {
     ...common(l, nowMs),
     category: "toilet",
+    ratingAverage: l.ratingAverage ?? null,
     openingHours: l.details?.openingHours ?? "Not specified",
     cleanliness: l.details?.cleanliness ?? 3,
     distance: "",
@@ -124,7 +133,7 @@ export function splitLocations(locations, nowMs = Date.now()) {
 }
 
 /** The reverse direction: a UI form → the API payload. */
-export function binToPayload({ name, address, latitude, longitude, type, fillLevel, description }) {
+export function binToPayload({ name, address, latitude, longitude, type, status, description }) {
   return {
     name,
     type: "dustbin",
@@ -132,7 +141,8 @@ export function binToPayload({ name, address, latitude, longitude, type, fillLev
     longitude,
     address,
     description,
-    details: { wasteType: type, fillLevel },
+    ...(status ? { status } : {}),
+    details: { wasteType: type },
   };
 }
 

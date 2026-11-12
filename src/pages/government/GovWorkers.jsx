@@ -19,19 +19,30 @@ export default function GovWorkers() {
   const { profile } = useGovProfile();
   const [adding, setAdding] = useState(false);
   const [removeTarget, setRemoveTarget] = useState(null);
+  const [error, setError] = useState("");
 
+  // Through the API these are Promises that can be refused; show why.
   const handleAddConfirm = (draft) => {
-    addWorker(draft);
+    setError("");
+    Promise.resolve(addWorker(draft)).catch((err) => setError(err?.message || "The worker couldn't be added."));
     setAdding(false);
   };
 
   const handleRemoveConfirm = (reason) => {
-    removeWorker(removeTarget, { reason, removedBy: profile.name });
+    setError("");
+    Promise.resolve(removeWorker(removeTarget, { reason, removedBy: profile.name })).catch((err) =>
+      setError(err?.message || "The worker couldn't be removed.")
+    );
     setRemoveTarget(null);
   };
 
   return (
     <GovShell title="Workers" subtitle="Sanitation field staff directory">
+      {error && (
+        <p role="alert" className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </p>
+      )}
       <div className="mb-4 flex justify-end">
         <button
           type="button"

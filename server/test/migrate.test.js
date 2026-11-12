@@ -1,11 +1,10 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { startTestServer, TEST_ENV } from "./helpers.js";
+import { runScript, startTestServer } from "./helpers.js";
 
 let t;
 let dir;
@@ -38,6 +37,8 @@ function buildLegacyDb(target) {
     "PENDING", "", "worker:9000000002", "w1", "Vikash", null, 0, ts, ts
   );
   db.prepare("INSERT INTO users VALUES (?,?,?,?,?,?)").run("uid-1", "9000000003", "worker", "Asha", "w2", ts);
+  // the worker who raised FR-2026-009, stored the old way as "worker:<phone>"
+  db.prepare("INSERT INTO users VALUES (?,?,?,?,?,?)").run("uid-2", "9000000002", "worker", "Vikash", "w1", ts);
   db.close();
 }
 
@@ -53,29 +54,34 @@ after(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-const run = (...args) =>
-  execFileSync(process.execPath, ["server/scripts/migrate-sqlite-to-mongo.js", file, ...args], {
-    env: { ...process.env, ...TEST_ENV, MONGODB_URI: t.config.mongoUri, MONGODB_DB_NAME: "ecosetu_test" },
-    encoding: "utf8",
-  });
+const run = async (...args) => {
+  const r = await runScript(t, "migrate-sqlite-to-mongo", [file, ...args]);
+  assert.equal(r.status, 0, r.out);
+  return r.stdout;
+};
 
 test("copies SQLite data into MongoDB, keeping the API shape, and is safe to rerun", async () => {
-  assert.match(run("--dry-run"), /dry run/);
+  assert.match(await run("--dry-run"), /dry run/);
   assert.equal(await t.db.collection("locations").countDocuments(), 0, "a dry run writes nothing");
 
-  const first = run();
+  const first = await run();
   assert.match(first, /locations: 2 copied, 0 already there/);
 
-  assert.deepEqual((await t.repo.listLocations()).map((l) => [l.id, l.name, l.details.fillLevel]), [["DB-007", "Old Bin", 10]]);
+  assert.deepEqual((await t.repo.listLocations()).map((l) => [l.id, l.name, l.status, l.details]), [["DB-007", "Old Bin", "normal", { wasteType: "Dry Waste" }]]);
   assert.equal((await t.repo.listRemoved())[0].removalReason, "closed down");
   const req = await t.repo.getRequest("FR-2026-009");
   assert.deepEqual(req.location, { address: "Gate road", latitude: 29.88, longitude: 77.95 });
   assert.equal(req.requestedByWorkerName, "Vikash");
-  assert.deepEqual(await t.repo.getUserByUid("uid-1"), { uid: "uid-1", phone: "9000000003", role: "worker", name: "Asha", workerId: "w2" });
+  const rawReq = await t.db.collection("facility_requests").findOne({ _id: "FR-2026-009" });
+  assert.equal(rawReq.requestedByUser, "uid-2", "the owner is stored as a uid, not as role:phone");
+  assert.deepEqual(await t.repo.getUserByUid("uid-1"), { uid: "uid-1", role: "worker", name: "Asha", workerId: "w2", phoneMasked: "+91 90XXXXXX03", isDemo: false, sessionsRevokedAt: null });
+  const stored = await t.db.collection("users").findOne({ uid: "uid-1" });
+  assert.equal(stored.phone, undefined, "the plain number is not copied");
+  assert.match(stored.phoneHash, /^[0-9a-f]{64}$/);
 
   // second run: nothing duplicated, nothing overwritten
   await t.repo.grantRole({ phone: "9000000003", role: "official" });
-  const second = run();
+  const second = await run();
   assert.match(second, /locations: 0 copied, 2 already there/);
   assert.equal(await t.db.collection("locations").countDocuments(), 2);
   assert.equal((await t.repo.getUserByUid("uid-1")).role, "official", "rerunning must not undo later changes");

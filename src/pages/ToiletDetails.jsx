@@ -2,37 +2,38 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CitizenShell from "../components/CitizenShell";
 import StatusBadge from "../components/StatusBadge";
 import { useLiveToilets } from "../hooks/useLiveToilets";
+import { useLocationDetail } from "../hooks/useLocationDetail";
+import { locationToToilet } from "../services/locationAdapters";
+import { useAuth } from "../context/AuthContext";
+import ToiletRatingPanel from "../components/ToiletRatingPanel";
+import { OpenReportsNote, ReportFacilitySheet, useReportSheet } from "../components/FacilityReportControls";
 
 export default function ToiletDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const toilets = useLiveToilets();
+  const { role } = useAuth();
+  const report = useReportSheet();
 
   // Toilets pulled live from OpenStreetMap aren't in the local seed
   // dataset, so MapScreen passes the full toilet along via router
   // state when the citizen taps "View Details". Fall back to that
   // when the id isn't one of the built-in demo toilets.
   const stateToilet = routerLocation.state?.toilet;
-  const toilet = stateToilet && stateToilet.id === id ? stateToilet : toilets.find((t) => t.id === id);
+  const live = stateToilet && stateToilet.id === id ? stateToilet : toilets.find((t) => t.id === id);
+  const { record: toilet, loading } = useLocationDetail(id, live, locationToToilet);
 
-  // Step 4 → Step 3 handoff: send the citizen into the existing
-  // complaint form with "Public Toilet Issue" and this toilet's
-  // location pre-filled, instead of a separate report flow.
-  const handleReportIssue = () => {
-    navigate("/citizen/report", {
-      state: {
-        issueType: "Public Toilet Issue",
-        location: {
-          address: toilet.address,
-          latitude: toilet.latitude,
-          longitude: toilet.longitude,
-          facilityId: toilet.id,
-          facilityType: "Public Toilet",
-        },
-      },
-    });
-  };
+
+  if (!toilet && loading) {
+    return (
+      <CitizenShell>
+        <p role="status" className="px-5 py-10 text-center text-sm text-slate-500">
+          Loading…
+        </p>
+      </CitizenShell>
+    );
+  }
 
   if (!toilet) {
     return (
@@ -40,8 +41,8 @@ export default function ToiletDetails() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <p className="text-lg font-semibold text-emerald-950">Toilet not found</p>
           <p className="text-sm text-emerald-800/60">
-            It may have been removed by an official, or the app's data was reset. Try opening it
-            again from the map.
+            This isn't in the demo data set, and live OpenStreetMap pins aren't kept after a page
+            refresh — try opening it again from the map.
           </p>
           <button
             type="button"
@@ -90,14 +91,6 @@ export default function ToiletDetails() {
                 🌐 Live · OpenStreetMap
               </span>
             )}
-            {toilet.cleanliness != null ? (
-              <span className="flex items-center gap-1 text-sm text-emerald-800/70">
-                <StarRating value={toilet.cleanliness} />
-                <span className="ml-1">{toilet.cleanliness}/5 Cleanliness</span>
-              </span>
-            ) : (
-              <span className="text-sm text-emerald-800/50">Not rated on OpenStreetMap</span>
-            )}
           </div>
 
           <div className="mt-4 flex items-start gap-2.5 border-t border-emerald-50 pt-4 text-sm">
@@ -114,6 +107,7 @@ export default function ToiletDetails() {
               {toilet.locationLabel && (
                 <p className="text-xs text-emerald-800/40">
                   {toilet.locationLabel}
+                  {toilet.source !== "osm" && " · prototype data"}
                 </p>
               )}
             </div>
@@ -142,6 +136,11 @@ export default function ToiletDetails() {
           </div>
         </div>
 
+        <OpenReportsNote facilityId={toilet.id} />
+
+        {/* Ratings from citizens; only citizens get the form. */}
+        <ToiletRatingPanel toiletId={toilet.id} canRate={role === "citizen"} />
+
         <div className="mt-4 flex gap-3">
           <a
             href={`https://www.google.com/maps/dir/?api=1&destination=${toilet.latitude},${toilet.longitude}`}
@@ -156,32 +155,22 @@ export default function ToiletDetails() {
           </a>
           <button
             type="button"
-            onClick={handleReportIssue}
+            onClick={report.show}
             className="flex flex-1 items-center justify-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 9v4M12 17h.01M10.3 4.3L2.7 18.7A1 1 0 003.6 20h16.8a1 1 0 00.9-1.3L13.7 4.3a1 1 0 00-1.7 0z" />
             </svg>
-            Report Issue
+            Report an issue
           </button>
         </div>
+        <ReportFacilitySheet
+          open={report.open}
+          onClose={report.close}
+          facility={{ id: toilet.id, type: "toilet", name: toilet.name, address: toilet.address, latitude: toilet.latitude, longitude: toilet.longitude }}
+        />
       </div>
     </CitizenShell>
   );
 }
 
-function StarRating({ value }) {
-  return (
-    <span className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <svg
-          key={i}
-          viewBox="0 0 20 20"
-          className={`h-3.5 w-3.5 ${i < value ? "fill-orange-400" : "fill-emerald-100"}`}
-        >
-          <path d="M10 1.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L10 14.9l-5.2 2.7 1-5.8L1.5 7.7l5.9-.9L10 1.5z" />
-        </svg>
-      ))}
-    </span>
-  );
-}

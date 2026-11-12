@@ -5,6 +5,9 @@ import { googleMapsSearchUrl } from "../components/SimpleMap";
 import FacilityMap from "../components/FacilityMap";
 import LocationCard from "../components/LocationCard";
 import SearchBar from "../components/SearchBar";
+import { searchPlaces } from "../services/geocode";
+import RatingBadge from "../components/RatingBadge";
+import { useRatingSummaries } from "../hooks/useRatingSummaries";
 import MapFilters from "../components/MapFilters";
 import StatusFilterTabs from "../components/StatusFilterTabs";
 import StatusBadge from "../components/StatusBadge";
@@ -18,8 +21,7 @@ import { useLiveBuildings } from "../hooks/useLiveBuildings";
 import { useSyncStatus } from "../hooks/useSyncStatus";
 import { TOILET_STATUS } from "../data/toilets";
 import { BIN_STATUS } from "../data/bins";
-import { useCity } from "../hooks/useCity";
-import { inCity } from "../data/cities";
+import { FACILITY_PICK_LOCATIONS } from "../data/facilityRequests";
 import IndiaLocationPicker from "../components/IndiaLocationPicker";
 import { TAP_LINK } from "../components/buttonStyles";
 
@@ -40,8 +42,13 @@ import { TAP_LINK } from "../components/buttonStyles";
 // disturbing the demo latitude/longitude used here. Not implemented in
 // this step.
 
-// The map opens on the citizen's chosen city (from their profile, or the
-// Home city picker) until they pick an area or use GPS.
+// DEFAULT MAP CENTER — was hardcoded to Lucknow; changed to Meerut since
+// that's where the IIMT-University-area demo/test facilities actually
+// are (see FACILITY_PICK_LOCATIONS in data/facilityRequests.js), so the
+// map opens centered on the same area those facilities are added to.
+const DEFAULT_CENTER = { latitude: 29.8905551, longitude: 77.9601633 }; // COER University campus
+const DEFAULT_CENTER_LABEL = "COER University";
+const CAMPUS_ZOOM = 17;
 const CITY_ZOOM = 13;
 const SELECTED_ZOOM = 16;
 
@@ -87,7 +94,7 @@ const TOILET_STATUS_FILTERS = [
   { value: TOILET_STATUS.MAINTENANCE.toLowerCase(), label: "Maintenance" },
 ];
 
-function NearbyRow({ kind, item, onSelect }) {
+function NearbyRow({ kind, item, onSelect, rating }) {
   const isBin = kind === "bin";
   const isBuilding = kind === "building";
 
@@ -118,11 +125,16 @@ function NearbyRow({ kind, item, onSelect }) {
         <span className="flex items-center justify-between gap-2">
           {/* USABILITY AUDIT FIX (issues 3 & 4 — "text is truncated"): a
               single-line `truncate` could clip the whole facility name
-              (e.g. "Dustbin near the main gate") when the status
+              (e.g. "Dustbin near COER University gate") when the status
               badge claimed most of the row's width. Wrapping to 2 lines
               keeps the full name readable; `title` covers hover/AT. */}
           <span className="line-clamp-2 text-sm font-semibold text-emerald-950" title={item.name}>
             {item.name}
+            {item.isDemo && (
+              <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[9px] font-bold text-amber-800">
+                DEMO
+              </span>
+            )}
           </span>
           <StatusBadge status={item.status} className="shrink-0" />
         </span>
@@ -135,6 +147,7 @@ function NearbyRow({ kind, item, onSelect }) {
             </>
           )}
         </span>
+        {kind === "toilet" && <RatingBadge summary={rating} className="mt-1" />}
       </span>
     </button>
   );
@@ -148,9 +161,6 @@ export default function MapScreen() {
   const toilets = useLiveToilets();
   const buildings = useLiveBuildings();
   const sync = useSyncStatus();
-  const { city } = useCity();
-  const cityPresets = [{ address: city.state ? `${city.name}, ${city.state}` : city.name, latitude: city.latitude, longitude: city.longitude }];
-  const cityHasFacilities = [...bins, ...toilets].some((f) => inCity(f, city));
   const [view, setView] = useState("map"); // "map" | "list"
   const [radiusTouched, setRadiusTouched] = useState(false);
   const {
@@ -173,6 +183,8 @@ export default function MapScreen() {
   const [binStatusFilter, setBinStatusFilter] = useState("all");
   const [toiletStatusFilter, setToiletStatusFilter] = useState("all");
   const [query, setQuery] = useState("");
+  // Places from OpenStreetMap: looked up only when Search / Enter is pressed.
+  const [places, setPlaces] = useState({ status: "idle", query: "", results: [], error: "" });
   const [radiusM, setRadiusM] = useState(DEFAULT_RADIUS_M);
   const [selected, setSelected] = useState(null); // { kind: "bin"|"toilet"|"me", ... }
   // USABILITY AUDIT FIX (issue 6 — "wall of content"): both lists used to
@@ -243,8 +255,8 @@ export default function MapScreen() {
   const origin = useMemo(() => {
     if (selected?.kind === "me") return { latitude: selected.latitude, longitude: selected.longitude };
     if (position) return { latitude: position.lat, longitude: position.lng };
-    return { latitude: city.latitude, longitude: city.longitude };
-  }, [selected, position, city.latitude, city.longitude]);
+    return { latitude: DEFAULT_CENTER.latitude, longitude: DEFAULT_CENTER.longitude };
+  }, [selected, position]);
 
   const withDistance = (items) =>
     items
@@ -284,7 +296,7 @@ export default function MapScreen() {
   const inRangeToilets = rankedToilets.filter(inRange);
 
   // Nothing within the chosen distance (typically: "Use My Location" from
-  // far from every facility). Rather than an empty map, fall back to
+  // somewhere that isn't Roorkee). Rather than an empty map, fall back to
   // the nearest facilities and say so.
   const outOfRange =
     inRangeBins.length + inRangeToilets.length === 0 &&
@@ -294,6 +306,8 @@ export default function MapScreen() {
   const nearestFacility = outOfRange
     ? [...rankedBins, ...rankedToilets].sort((a, b) => a.distanceMeters - b.distanceMeters)[0]
     : null;
+
+  const toiletRatings = useRatingSummaries(visibleToilets.map((t) => t.id));
 
   const visibleBuildings = useMemo(
     () => (filter === "all" || filter === "buildings" ? withDistance(buildings) : []),
@@ -351,6 +365,30 @@ export default function MapScreen() {
     setQuery("");
   };
 
+  // Typing filters the bins and toilets above and never goes online.
+  const handleQueryChange = (value) => {
+    setQuery(value);
+    setPlaces((p) => (p.status === "idle" ? p : { status: "idle", query: "", results: [], error: "" }));
+  };
+
+  const handleSearchPlaces = async (value) => {
+    const words = value.trim();
+    if (words.length < 2 || places.status === "loading") return;
+    setPlaces({ status: "loading", query: words, results: [], error: "" });
+    try {
+      const results = await searchPlaces(words);
+      setPlaces((p) => (p.query === words ? { status: "done", query: words, results, error: "" } : p));
+    } catch (err) {
+      setPlaces((p) => (p.query === words ? { status: "error", query: words, results: [], error: err.message } : p));
+    }
+  };
+
+  const handlePickPlace = (place) => {
+    setPlaces({ status: "idle", query: "", results: [], error: "" });
+    setQuery("");
+    handlePickArea({ latitude: place.latitude, longitude: place.longitude, address: place.label, city: place.wide });
+  };
+
   const handleViewDetails = (id) => {
     if (selected?.kind === "bin") {
       navigate(`/citizen/bin/${id}`, { state: { bin: selected } });
@@ -372,7 +410,7 @@ export default function MapScreen() {
                 ? CITY_ZOOM
                 : radiusTouched
                   ? RADIUS_ZOOM[radiusM] ?? CITY_ZOOM
-                  : CITY_ZOOM,
+                  : CAMPUS_ZOOM,
           };
 
   return (
@@ -405,9 +443,43 @@ export default function MapScreen() {
         <div className="flex flex-col gap-3">
           <SearchBar
             value={query}
-            onChange={setQuery}
-            placeholder="Search bin, toilet, area or address..."
+            onChange={handleQueryChange}
+            onSubmit={handleSearchPlaces}
+            submitting={places.status === "loading"}
+            label="Search bins, toilets and places"
+            placeholder="Bin, toilet, area or place…"
           />
+
+          {places.status === "error" && (
+            <p role="alert" className="rounded-2xl bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900 shadow-sm">
+              {places.error}
+            </p>
+          )}
+          {places.status === "done" && places.results.length === 0 && (
+            <p role="status" className="rounded-2xl bg-white px-4 py-2.5 text-xs text-emerald-800/70 shadow-sm">
+              No places found for “{places.query}”.
+            </p>
+          )}
+          {places.results.length > 0 && (
+            <div className="rounded-2xl bg-white p-1.5 shadow-lg">
+              <p className="px-3 pt-1.5 pb-1 text-[11px] font-semibold tracking-wide text-emerald-800/60 uppercase">Places</p>
+              {places.results.map((place) => (
+                <button
+                  key={`${place.latitude},${place.longitude},${place.label}`}
+                  type="button"
+                  onClick={() => handlePickPlace(place)}
+                  className="flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-emerald-50 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 22s7-6.1 7-12a7 7 0 10-14 0c0 5.9 7 12 7 12z" />
+                    <circle cx="12" cy="10" r="2.5" />
+                  </svg>
+                  <span className="min-w-0 text-sm text-emerald-950 [overflow-wrap:anywhere]">{place.label}</span>
+                </button>
+              ))}
+              <p className="px-3 pt-1 pb-1.5 text-[10px] text-emerald-800/50">Search by OpenStreetMap Nominatim</p>
+            </div>
+          )}
 
           {searchResults.length > 0 && (
             <div className="max-h-56 overflow-y-auto rounded-2xl bg-white p-1.5 shadow-lg">
@@ -546,8 +618,8 @@ export default function MapScreen() {
                 id="map-area"
                 value={null}
                 onChange={(loc) => loc && handlePickArea(loc)}
-                presets={cityPresets}
-                presetsLabel="Your city"
+                presets={FACILITY_PICK_LOCATIONS}
+                presetsLabel="Known areas"
                 allowLocality={false}
                 allowGps={false}
               />
@@ -557,6 +629,8 @@ export default function MapScreen() {
           {view === "map" && (
             <>
           <FacilityMap
+            ratings={toiletRatings}
+            onReport={(kind, item) => navigate(`/citizen/${kind}/${item.id}?report=1`, { state: { [kind]: item } })}
             bins={visibleBins}
             toilets={visibleToilets}
             center={{ latitude: mapCenter.latitude, longitude: mapCenter.longitude }}
@@ -621,21 +695,16 @@ export default function MapScreen() {
             />
           )}
 
-          {!selected && sync.loaded && !cityHasFacilities && (
-            <p className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-medium text-emerald-900 shadow-sm">
-              No bins or toilets in this city yet.
-            </p>
-          )}
-          {!selected && (!sync.loaded || cityHasFacilities) && (
+          {!selected && (
             <p className="rounded-2xl bg-white px-4 py-3 text-xs text-emerald-800/60 shadow-sm">
-              Showing {city.name}. Search, or pick a bin/toilet from the list below, to see its exact
+              Showing {DEFAULT_CENTER_LABEL}. Search, or pick a bin/toilet from the list below, to see its exact
               location and open it in Google Maps.
             </p>
           )}
 
           {(filter === "all" || filter === "buildings") && visibleBuildings.length > 0 && (
             <div>
-              <h2 className="mb-2 text-sm font-semibold text-emerald-950">Buildings</h2>
+              <h2 className="mb-2 text-sm font-semibold text-emerald-950">Campus Buildings</h2>
               <div className="flex flex-col gap-2">
                 {(view === "list" || filter === "buildings" ? visibleBuildings : visibleBuildings.slice(0, LIST_PREVIEW_COUNT)).map((b) => (
                   <NearbyRow
@@ -662,7 +731,7 @@ export default function MapScreen() {
               <h2 className="mb-2 text-sm font-semibold text-emerald-950">Nearby Dustbins</h2>
               <div className="flex flex-col gap-2">
                 {visibleBins.length === 0 && (
-                  <p className="text-xs text-emerald-800/50">{!sync.loaded ? "Loading bins…" : cityHasFacilities ? "No bins within this distance — try a larger range." : "No bins in this city yet."}</p>
+                  <p className="text-xs text-emerald-800/50">{sync.loaded ? "No bins within this distance — try a larger range." : "Loading bins…"}</p>
                 )}
                 {(showAllBins || view === "list" ? visibleBins : visibleBins.slice(0, LIST_PREVIEW_COUNT)).map((bin) => (
                   <NearbyRow
@@ -693,7 +762,7 @@ export default function MapScreen() {
               <h2 className="mb-2 text-sm font-semibold text-emerald-950">Nearby Public Toilets</h2>
               <div className="flex flex-col gap-2">
                 {visibleToilets.length === 0 && (
-                  <p className="text-xs text-emerald-800/50">{!sync.loaded ? "Loading toilets…" : cityHasFacilities ? "No toilets within this distance — try a larger range." : "No toilets in this city yet."}</p>
+                  <p className="text-xs text-emerald-800/50">{sync.loaded ? "No toilets within this distance — try a larger range." : "Loading toilets…"}</p>
                 )}
                 {(showAllToilets || view === "list" ? visibleToilets : visibleToilets.slice(0, LIST_PREVIEW_COUNT)).map(
                   (toilet) => (
@@ -701,6 +770,7 @@ export default function MapScreen() {
                       key={toilet.id}
                       kind="toilet"
                       item={toilet}
+                      rating={toiletRatings.get(toilet.id)}
                       onSelect={() => {
                         setSelected({ kind: "toilet", ...toilet });
                         setView("map");

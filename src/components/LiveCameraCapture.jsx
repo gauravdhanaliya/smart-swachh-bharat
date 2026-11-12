@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { compressImage } from "../utils/imageCompression";
 
 /**
  * Live-camera-only photo capture. Deliberately has no <input type="file">
@@ -14,8 +15,6 @@ import { useEffect, useRef, useState } from "react";
  */
 export default function LiveCameraCapture({ photo, onCapture, onRetake }) {
   const [streaming, setStreaming] = useState(false);
-  // True once the video has real frames; before that a capture would be empty.
-  const [ready, setReady] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const videoRef = useRef(null);
@@ -52,7 +51,6 @@ export default function LiveCameraCapture({ photo, onCapture, onRetake }) {
         audio: false,
       });
       streamRef.current = stream;
-      setReady(false);
       setStreaming(true);
     } catch (err) {
       if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
@@ -67,14 +65,17 @@ export default function LiveCameraCapture({ photo, onCapture, onRetake }) {
     }
   };
 
-  const capture = () => {
+  const capture = async () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    // Scaled and encoded to under 1 MB straight from the video frame.
+    let dataUrl;
+    try {
+      ({ dataUrl } = await compressImage(video));
+    } catch (err) {
+      setError(err.message);
+      return;
+    }
     stopStream();
     setStreaming(false);
     onCapture(dataUrl);
@@ -112,7 +113,6 @@ export default function LiveCameraCapture({ photo, onCapture, onRetake }) {
         <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-emerald-100 bg-black">
           <video
             ref={videoRef}
-            onLoadedMetadata={(e) => setReady(e.currentTarget.videoWidth > 0)}
             playsInline
             muted
             className="h-full w-full object-cover"
@@ -129,10 +129,9 @@ export default function LiveCameraCapture({ photo, onCapture, onRetake }) {
           <button
             type="button"
             onClick={capture}
-            disabled={!ready}
-            className="flex-1 rounded-full bg-emerald-700 py-2 text-xs font-semibold text-white disabled:bg-emerald-300"
+            className="flex-1 rounded-full bg-emerald-700 py-2 text-xs font-semibold text-white"
           >
-            {ready ? "Capture" : "Starting camera…"}
+            Capture
           </button>
         </div>
       </div>

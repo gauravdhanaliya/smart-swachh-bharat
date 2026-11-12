@@ -13,10 +13,11 @@ import {
 import {
   FACILITY_TYPE,
   FACILITY_TYPES,
+  FACILITY_PICK_LOCATIONS,
+  CAMPUS_CENTER,
 } from "../../data/facilityRequests";
-import { useProfile } from "../../hooks/useProfile";
-import { cityCenter, cityPresets } from "../../services/profileService";
 import { BUILDING_TYPES, BUILDING_TYPE_LABELS } from "../../services/locationAdapters";
+import { BIN_STATUS, BIN_STATUS_LABELS, normalizeBinStatus } from "../../data/bins";
 
 const BUILDING = "Building";
 const ALL_TYPES = [...FACILITY_TYPES, { id: BUILDING, label: "Building", icon: "🏫" }];
@@ -42,7 +43,6 @@ function findForEdit(id) {
 
 export default function GovAddFacility() {
   const navigate = useNavigate();
-  const officialProfile = useProfile("official");
   const [searchParams] = useSearchParams();
 
   // ?edit=<id> turns this page into the Edit form for an existing location.
@@ -62,7 +62,7 @@ export default function GovAddFacility() {
 
   // Dustbin-only
   const [binType, setBinType] = useState(item?.type && BIN_TYPES.includes(item.type) ? item.type : BIN_TYPES[2]);
-  const [fillLevel, setFillLevel] = useState(String(item?.fillLevel ?? 0));
+  const [binStatus, setBinStatus] = useState(normalizeBinStatus(item));
 
   // Toilet-only
   const [openingHours, setOpeningHours] = useState(item?.openingHours ?? "6:00 AM – 10:00 PM");
@@ -107,12 +107,6 @@ export default function GovAddFacility() {
     if (!addressText.trim()) next.address = "Add a short address / location description.";
     if (!hasCoords) next.location = "Tap the map or enter coordinates below.";
     else if (!inRange) next.location = "Latitude must be -90 to 90 and longitude -180 to 180.";
-    if (facilityType === FACILITY_TYPE.DUSTBIN) {
-      const level = Number(fillLevel);
-      if (fillLevel !== "" && (Number.isNaN(level) || level < 0 || level > 100)) {
-        next.fillLevel = "Fill level must be between 0 and 100.";
-      }
-    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -132,7 +126,7 @@ export default function GovAddFacility() {
         latitude: Number(latitude),
         longitude: Number(longitude),
         ...(facilityType === FACILITY_TYPE.DUSTBIN
-          ? { type: binType, fillLevel: Number(fillLevel) || 0 }
+          ? { type: binType, status: binStatus }
           : facilityType === FACILITY_TYPE.TOILET
             ? { openingHours: openingHours.trim(), facilities, status: editing ? toiletStatus : undefined }
             : { buildingType }),
@@ -156,7 +150,7 @@ export default function GovAddFacility() {
     setPickedLocation(null);
     setLatitude("");
     setLongitude("");
-    setFillLevel("0");
+    setBinStatus(BIN_STATUS.NORMAL);
     setErrors({});
   };
 
@@ -276,19 +270,22 @@ export default function GovAddFacility() {
                 ))}
               </div>
 
-              <label className="mt-4 block text-sm font-semibold text-slate-900" htmlFor="facility-fill">
-                Initial Fill Level (%)
+              <label className="mt-4 block text-sm font-semibold text-slate-900" htmlFor="bin-status">
+                Status
               </label>
-              <input
-                id="facility-fill"
-                type="number"
-                min="0"
-                max="100"
-                value={fillLevel}
-                onChange={(e) => setFillLevel(e.target.value)}
-                className="mt-1.5 w-32 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
-              />
-              {errors.fillLevel && <p className="mt-1 text-xs font-medium text-red-600">{errors.fillLevel}</p>}
+              <select
+                id="bin-status"
+                value={binStatus}
+                onChange={(e) => setBinStatus(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
+              >
+                {Object.values(BIN_STATUS).map((st) => (
+                  <option key={st} value={st}>
+                    {BIN_STATUS_LABELS[st]}
+                  </option>
+                ))}
+              </select>
+              {errors.status && <p className="mt-1 text-xs font-medium text-red-600">{errors.status}</p>}
             </div>
           ) : facilityType === BUILDING ? (
             <div className="mt-4">
@@ -369,7 +366,7 @@ export default function GovAddFacility() {
           </p>
           <PickLocationMap
             value={pinned}
-            center={cityCenter(officialProfile)}
+            center={CAMPUS_CENTER}
             onPick={({ latitude: la, longitude: lo }) => {
               setLatitude(String(la));
               setLongitude(String(lo));
@@ -386,8 +383,8 @@ export default function GovAddFacility() {
               theme="sky"
               value={pickedLocation}
               onChange={handlePickLocation}
-              presets={cityPresets(officialProfile)}
-              presetsLabel="Your city"
+              presets={FACILITY_PICK_LOCATIONS}
+              presetsLabel="Known areas"
             />
           </div>
 
@@ -399,7 +396,7 @@ export default function GovAddFacility() {
             type="text"
             value={addressText}
             onChange={(e) => setAddressText(e.target.value)}
-            placeholder="e.g. Near the bus stand, Civil Lines"
+            placeholder="e.g. COER University, Roorkee"
             className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
           />
           {errors.address && <p className="mt-1 text-xs font-medium text-red-600">{errors.address}</p>}
@@ -418,7 +415,7 @@ export default function GovAddFacility() {
                   setLatitude(e.target.value);
                   if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                 }}
-                placeholder="e.g. 28.6139"
+                placeholder="29.8905551"
                 className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
               />
             </div>
@@ -435,7 +432,7 @@ export default function GovAddFacility() {
                   setLongitude(e.target.value);
                   if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                 }}
-                placeholder="e.g. 77.2090"
+                placeholder="77.9601633"
                 className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
               />
             </div>

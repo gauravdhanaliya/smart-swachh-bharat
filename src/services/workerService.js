@@ -1,19 +1,58 @@
 // Government "Workers" directory — Add Worker / Remove Worker.
 //
-// Two sources combine into the one list getAllWorkers() every screen reads
-// from (Workers page, complaint assignment, the worker's own header):
-//   1. the sanitation worker who signs in on this device, from their saved
-//      profile (services/profileService.js) — id "w1", so tasks assigned to
-//      them show up when they log in
+// Mirrors the services/facilityService.js pattern exactly:
+//   1. the existing demo staff       (src/data/workers.js, WORKERS)
 //   2. Government-added workers      (this file, localStorage)
-// No workers ship with the app. Removal is a tombstone, so it stays
-// reversible and keeps an audit trail of who was taken off and why.
+// combine into the one list getAllWorkers() every screen reads from.
+// Removal is a tombstone (like facility removal), not a mutation of the
+// demo array, so it stays reversible and keeps an audit trail of who
+// was taken off the roster and why.
+//
+// Deliberately NOT wired into the Worker-side demo login switcher
+// (hooks/useWorkerSession.js) or the complaint assignment dropdown —
+// those still read the original static WORKERS list. This directory is
+// the Government Official's view of staff; unifying the two would be a
+// separate step if ever needed.
 
-import { getProfile, subscribe as subscribeProfiles } from "./profileService";
-import { DEMO_USERS } from "./authSession";
+import { WORKERS } from "../data/workers";
+import { apiEnabled } from "./apiConfig";
+import { api, apiAll } from "./api";
+
+// Through the API (officials only): GET/POST /api/workers, DELETE
+// /api/workers/:id, POST /api/workers/:id/restore — cached in memory and
+// refreshed after every change. A phone number comes back only masked.
+const remote = { active: [], removed: [], loaded: false };
+
+const fromApi = (w) => ({ ...w, phone: w.phoneMasked ?? "" });
+const removalRecord = (w) => ({
+  id: w.id,
+  displayId: w.displayId,
+  name: w.name,
+  area: w.area,
+  source: w.source,
+  reason: w.removalReason,
+  removedBy: w.removedBy,
+  removedAt: w.removedAt,
+});
+
+/** Fetch the directory again (API mode). */
+export async function refreshWorkers() {
+  if (!apiEnabled()) return getAllWorkers();
+  const [active, removed] = await Promise.all([
+    apiAll("/workers", "items", { conditional: true }),
+    apiAll("/workers?removed=true", "items", { conditional: true }),
+  ]);
+  Object.assign(remote, { active: active.map(fromApi), removed: removed.map(removalRecord), loaded: true });
+  notify();
+  return remote.active;
+}
+
+export function resetWorkerCache() {
+  Object.assign(remote, { active: [], removed: [], loaded: false });
+}
 
 export const WORKER_SOURCE = {
-  REGISTERED: "REGISTERED",
+  DEMO: "DEMO",
   GOVERNMENT: "GOVERNMENT",
 };
 
@@ -107,35 +146,18 @@ function nextWorkerIds(existingDisplayIds) {
   };
 }
 
-/** The worker who signs in on this device, built from their profile (null until it's saved). */
-export function getRegisteredWorker() {
-  const p = getProfile("worker");
-  if (!p) return null;
-  return {
-    id: DEMO_USERS.worker.id,
-    displayId: p.employeeId || "W001",
-    name: p.fullName,
-    role: "Sanitation Worker",
-    area: p.zone,
-    city: p.city?.name ?? "",
-    status: "Available",
-    phone: p.mobile ? `+91 ${p.mobile}` : "",
-    source: WORKER_SOURCE.REGISTERED,
-  };
-}
-
 /**
- * GET /api/workers — the registered worker + Government-added staff, minus
- * anyone removed.
+ * GET /api/workers — demo staff + Government-added staff, minus anyone
+ * removed. This — not data/workers.js directly — is what the
+ * Government "Workers" screen reads from.
  */
 export function getAllWorkers() {
+  if (apiEnabled()) return remote.active;
   const removed = removedIdSet();
-  const registered = getRegisteredWorker();
-  return [...(registered ? [registered] : []), ...readAddedWorkers()].filter((w) => !removed.has(w.id));
-}
-
-export function getWorkerById(id) {
-  return getAllWorkers().find((w) => w.id === id) ?? null;
+  return [
+    ...WORKERS.map((w) => ({ ...w, source: w.source ?? WORKER_SOURCE.DEMO })),
+    ...readAddedWorkers(),
+  ].filter((w) => !removed.has(w.id));
 }
 
 /**
@@ -144,6 +166,14 @@ export function getWorkerById(id) {
  *   { name, role?, area, phone?, status? }
  */
 export function addWorker(data) {
+  if (apiEnabled()) {
+    const body = { name: data.name, area: data.area };
+    for (const key of ["role", "phone", "status"]) if (data[key]) body[key] = data[key];
+    return api("/workers", { method: "POST", body }).then(async ({ worker }) => {
+      await refreshWorkers();
+      return fromApi(worker);
+    });
+  }
   const all = getAllWorkers();
   const { id, displayId } = nextWorkerIds(all.map((w) => w.displayId));
 
@@ -172,6 +202,13 @@ export function addWorker(data) {
 export function removeWorker(worker, options = {}) {
   const id = typeof worker === "string" ? worker : worker?.id;
   if (!id) return null;
+  if (apiEnabled()) {
+    const reason = (options.reason || "").trim() || undefined;
+    return api(`/workers/${encodeURIComponent(id)}`, { method: "DELETE", body: reason ? { reason } : {} }).then(async ({ worker: w }) => {
+      await refreshWorkers();
+      return removalRecord(w);
+    });
+  }
 
   const current = readRemovedWorkers();
   if (current.some((r) => r.id === id)) return null;
@@ -181,9 +218,9 @@ export function removeWorker(worker, options = {}) {
     displayId: (typeof worker === "object" && worker?.displayId) || id,
     name: (typeof worker === "object" && worker?.name) || id,
     area: (typeof worker === "object" && worker?.area) || "",
-    source: (typeof worker === "object" && worker?.source) || WORKER_SOURCE.GOVERNMENT,
+    source: (typeof worker === "object" && worker?.source) || WORKER_SOURCE.DEMO,
     reason: (options.reason || "").trim() || "No reason recorded",
-    removedBy: options.removedBy || "Government Official",
+    removedBy: options.removedBy || "District Officer",
     removedAt: isoNow(),
   };
 
@@ -193,6 +230,12 @@ export function removeWorker(worker, options = {}) {
 
 /** Undo a removal — the worker reappears on the directory immediately. */
 export function restoreWorker(id) {
+  if (apiEnabled()) {
+    return api(`/workers/${encodeURIComponent(id)}/restore`, { method: "POST" }).then(async () => {
+      await refreshWorkers();
+      return true;
+    });
+  }
   const current = readRemovedWorkers();
   const next = current.filter((r) => r.id !== id);
   if (next.length === current.length) return false;
@@ -202,18 +245,24 @@ export function restoreWorker(id) {
 
 /** Everyone Government has taken off the roster, newest first. */
 export function getRemovedWorkers() {
+  if (apiEnabled()) return remote.removed;
   return readRemovedWorkers()
     .slice()
     .sort((a, b) => String(b.removedAt).localeCompare(String(a.removedAt)));
 }
 
-/** Subscribes to any change (Government add/remove, the worker's profile, cross-tab). */
+/** Subscribes to any change (Government add/remove, cross-tab). */
 export function subscribe(callback) {
   listeners.add(callback);
-  const offProfiles = subscribeProfiles(callback);
-  return () => {
-    listeners.delete(callback);
-    offProfiles();
-  };
+  if (apiEnabled() && !remote.loaded) refreshWorkers().catch(() => {});
+  return () => listeners.delete(callback);
 }
 
+/** Demo/dev helper — wipes Government-added workers and un-removes
+ * anyone removed during the session, so a fresh demo run starts from
+ * the same seed roster every time. */
+export function resetDemoData() {
+  writeRemovedWorkers([]);
+  writeAddedWorkers([]);
+  return [];
+}

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import StatusBadge from "./StatusBadge";
 import PriorityBadge from "./PriorityBadge";
+import { facilityLabel } from "../utils/facility";
 
 function formatDateTime(iso) {
   return new Date(iso).toLocaleString("en-IN", {
@@ -48,6 +49,7 @@ export default function GovComplaintsList({ complaints, emptyMessage = "No compl
             <span className="text-sm font-semibold text-sky-700">#{c.id}</span>
             <span className="col-span-2 text-sm font-medium text-slate-900 lg:col-span-1">
               {c.issueType}
+              {facilityLabel(c) && <span className="block text-xs font-medium text-sky-700">{facilityLabel(c)}</span>}
             </span>
             <span className="col-span-2 text-sm text-slate-600 lg:col-span-1">
               {c.location.address}

@@ -1,24 +1,22 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { useProfile } from "../hooks/useProfile";
+import SessionLoading from "./SessionLoading";
+import { ROLE_HOME } from "../services/authSession";
+import ConsentGate from "./ConsentGate";
 
 /**
- * Keeps a citizen from landing on Government/Worker screens (and vice
- * versa) through normal navigation, and sends a signed-in user who hasn't
- * filled in their profile yet to the setup screen first. The role comes
- * from the local session (services/authSession.js) — a guard, not security.
+ * Keeps each role on its own screens. A signed-out visitor goes to the login
+ * page; a signed-in user on another role's page goes to their own home. In API
+ * mode the role comes from the server, and nothing is decided until the
+ * session has been restored (a loading screen, never a blank one). Then the
+ * account must have agreed to the current privacy notice (ConsentGate).
  */
 export default function RequireRole({ role, children }) {
-  const { role: currentRole, isAuthenticated } = useAuth();
-  const profile = useProfile(role);
+  const { role: currentRole, isAuthenticated, status } = useAuth();
 
-  if (!isAuthenticated || currentRole !== role) {
-    return <Navigate to="/login" replace />;
-  }
+  if (status === "loading") return <SessionLoading />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (currentRole !== role) return <Navigate to={ROLE_HOME[currentRole] ?? "/login"} replace />;
 
-  if (!profile) {
-    return <Navigate to="/profile/setup" replace />;
-  }
-
-  return children;
+  return <ConsentGate>{children}</ConsentGate>;
 }

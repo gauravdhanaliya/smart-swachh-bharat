@@ -37,16 +37,16 @@ const FAQS = [
     a: "The map only shows facilities that have been added for your selected city. If you switch to a city that hasn't been mapped yet, it will honestly show nothing rather than made-up pins.",
   },
   {
-    q: "What does the fill level on a bin mean?",
-    a: "It's how full the bin was when the municipal team last recorded it. From 71% it's marked Almost Full, and from 91% it's Overflow — which raises the priority for collection.",
+    q: "What do the bin statuses mean?",
+    a: "Every bin shows one of three statuses. Normal means it has room. Almost Full means it should be collected soon. Overflow means it needs collection now, and is shown in red on the map so it stands out.",
   },
   {
     q: "Is my phone number shared with anyone?",
-    a: "Your mobile number is optional. If you add it to your profile it is shown with your complaints to the team handling them. Everything stays on your own device — nothing is sent to a server.",
+    a: "Your number is used to sign in and to attach your complaints to your account. In this prototype everything stays on your own device — nothing is sent to a server.",
   },
   {
     q: "Something looks wrong or I'm stuck.",
-    a: "Use Reset all data on your Profile page to clear everything on this device and start again. If that doesn't help, call the helpline above.",
+    a: "Use Reset Demo Data on your profile to put the app back to its starting state. If that doesn't help, reach out using the contacts above.",
   },
 ];
 
@@ -178,13 +178,27 @@ export default function CitizenHelp() {
 
         <SettingsGroup
           title="Talk to someone"
-          description="1969 is the national Swachh Bharat Mission helpline."
+          description="1969 is the national Swachh Bharat Mission helpline. The city control room and email below are placeholders for this prototype."
         >
           <ContactRow
             icon="📞"
             label="Swachh Bharat Mission helpline"
             value="1969 (toll free)"
             href="tel:1969"
+          />
+          <ContactRow
+            icon="🏛️"
+            label="City sanitation control room"
+            value="1800-000-1969"
+            href="tel:18000001969"
+            note="Demo number"
+          />
+          <ContactRow
+            icon="✉️"
+            label="Email support"
+            value="support@ecosetu.example"
+            href="mailto:support@ecosetu.example"
+            note="Demo address"
           />
         </SettingsGroup>
 
@@ -231,7 +245,7 @@ export default function CitizenHelp() {
               view of bins, public toilets and complaints.
             </p>
             <p className="mt-2 text-xs leading-relaxed text-emerald-800/75">
-              All data lives on this device only — nothing is sent
+              This is a demonstration build. All data lives on this device only — nothing is sent
               to a government system, and the officially supported channel for real complaints is
               the Swachhata app from the Ministry of Housing and Urban Affairs.
             </p>

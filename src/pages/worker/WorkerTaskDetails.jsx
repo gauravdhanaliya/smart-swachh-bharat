@@ -1,11 +1,14 @@
 import { useRef, useState } from "react";
+import { facilityLabel } from "../../utils/facility";
 import { useNavigate, useParams } from "react-router-dom";
 import WorkerShell from "../../components/WorkerShell";
 import StatusBadge from "../../components/StatusBadge";
 import PriorityBadge from "../../components/PriorityBadge";
 import ComplaintTimeline from "../../components/ComplaintTimeline";
-import { useComplaint } from "../../hooks/useComplaints";
+import { useComplaint, useComplaintsStatus } from "../../hooks/useComplaints";
+import ProtectedImage from "../../components/ProtectedImage";
 import { updateComplaintStatus } from "../../services/complaintService";
+import { compressImage } from "../../utils/imageCompression";
 import {
   STATUS,
   ALLOWED_PHOTO_TYPES,
@@ -28,20 +31,33 @@ export default function WorkerTaskDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const complaint = useComplaint(id);
+  const loadStatus = useComplaintsStatus();
+  const [actionError, setActionError] = useState("");
   const fileInputRef = useRef(null);
 
   const [note, setNote] = useState("");
   const [noteError, setNoteError] = useState("");
   const [photo, setPhoto] = useState(null); // { dataUrl, name }
   const [photoError, setPhotoError] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  if (!complaint && !loadStatus.loaded && !loadStatus.error) {
+    return (
+      <WorkerShell title="Task Details">
+        <p role="status" className="px-5 py-10 text-center text-sm text-slate-500">
+          Loading…
+        </p>
+      </WorkerShell>
+    );
+  }
 
   if (!complaint) {
     return (
       <WorkerShell title="Task Details" showBack onBack={() => navigate("/worker/tasks")}>
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
           <p className="font-semibold text-slate-900">Task not found</p>
-          <p className="text-sm text-slate-500">It may have been deleted, or the app's data was reset.</p>
+          <p className="text-sm text-slate-500">It may have been removed from the demo data set.</p>
         </div>
       </WorkerShell>
     );
@@ -59,41 +75,49 @@ export default function WorkerTaskDetails() {
       return;
     }
     if (file.size > MAX_RESOLUTION_PHOTO_SIZE_BYTES) {
-      setPhotoError("Image is too large. Max size is 5 MB.");
+      setPhotoError("Image is too large. Max size is 10 MB.");
       return;
     }
-
-    const reader = new FileReader();
-    reader.onload = () => setPhoto({ dataUrl: reader.result, name: file.name });
-    reader.onerror = () => setPhotoError("Couldn't read that image. Please try another one.");
-    reader.readAsDataURL(file);
+    // Shrunk on the device to under 1 MB: the API refuses anything larger.
+    setPhotoBusy(true);
+    compressImage(file)
+      .then(({ dataUrl }) => setPhoto({ dataUrl, name: file.name }))
+      .catch((err) => setPhotoError(err.message))
+      .finally(() => setPhotoBusy(false));
   };
 
-  const handleStartWork = () => {
+  const handleStartWork = async () => {
+    setActionError("");
     setBusy(true);
     try {
-      updateComplaintStatus(complaint.id, STATUS.IN_PROGRESS, {
+      await updateComplaintStatus(complaint.id, STATUS.IN_PROGRESS, {
         startedAt: new Date().toISOString(),
       });
+    } catch (err) {
+      setActionError(err?.message || "Couldn't start this task. Please try again.");
     } finally {
       setBusy(false);
     }
   };
 
-  const handleMarkResolved = () => {
+  const handleMarkResolved = async () => {
     const trimmed = note.trim();
-    if (trimmed && trimmed.length < RESOLUTION_NOTE_MIN_LENGTH) {
-      setNoteError(`Add a little more detail (at least ${RESOLUTION_NOTE_MIN_LENGTH} characters), or leave it blank.`);
+    // The server needs a short note on every resolved complaint.
+    if (trimmed.length < RESOLUTION_NOTE_MIN_LENGTH) {
+      setNoteError(`Add a short note on what was done (at least ${RESOLUTION_NOTE_MIN_LENGTH} characters).`);
       return;
     }
     setNoteError("");
+    setActionError("");
     setBusy(true);
     try {
-      updateComplaintStatus(complaint.id, STATUS.RESOLVED, {
+      await updateComplaintStatus(complaint.id, STATUS.RESOLVED, {
         resolvedAt: new Date().toISOString(),
         resolutionNote: trimmed,
         resolutionPhoto: photo?.dataUrl ?? null,
       });
+    } catch (err) {
+      setActionError(err?.message || "Couldn't mark this resolved. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -109,6 +133,7 @@ export default function WorkerTaskDetails() {
             <div>
               <p className="text-xs font-medium text-slate-500">#{complaint.id}</p>
               <p className="text-lg font-bold text-slate-900">{complaint.issueType}</p>
+              {facilityLabel(complaint) && <p className="text-sm font-medium text-orange-800">{facilityLabel(complaint)}</p>}
             </div>
             <div className="flex flex-col items-end gap-1.5">
               <PriorityBadge priority={complaint.priority} />
@@ -117,11 +142,16 @@ export default function WorkerTaskDetails() {
           </div>
 
           {complaint.photo && (
-            <img
+            <ProtectedImage
               src={complaint.photo}
               alt="Reported issue"
               className="mt-3 h-40 w-full rounded-xl object-cover"
             />
+          )}
+          {actionError && (
+            <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+              {actionError}
+            </p>
           )}
 
           <p className="mt-3 text-sm text-slate-700">{complaint.description}</p>
@@ -221,7 +251,9 @@ export default function WorkerTaskDetails() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50"
-                  aria-label="Add photo"
+                  aria-label={photoBusy ? "Preparing photo" : "Add photo"}
+                  aria-busy={photoBusy}
+                  disabled={photoBusy}
                 >
                   <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
@@ -257,7 +289,7 @@ export default function WorkerTaskDetails() {
               <p className="mt-1 text-sm text-emerald-800/80">{complaint.resolutionNote}</p>
             )}
             {complaint.resolutionPhoto && (
-              <img
+              <ProtectedImage
                 src={complaint.resolutionPhoto}
                 alt="Completion"
                 className="mt-2 h-32 w-full rounded-xl object-cover"

@@ -43,11 +43,11 @@ describe("splitLocations", () => {
     assert.equal(bins[0].longitude, 77.9601633);
   });
 
-  test("bins expose fill level, waste type and status", () => {
-    assert.equal(bins[0].fillLevel, 78);
+  test("bins expose waste type and status, and no fill percentage", () => {
     assert.equal(bins[0].type, "Dry Waste");
     assert.equal(bins[0].status, "almost_full");
-    assert.equal(bins[0].history.length, 6);
+    assert.ok(!("fillLevel" in bins[0]));
+    assert.ok(!("history" in bins[0]));
   });
 
   test("demo data stays flagged DEMO and is labelled as simulated", () => {
@@ -76,8 +76,10 @@ describe("splitLocations", () => {
 describe("single-record mapping", () => {
   test("missing details fall back to safe defaults", () => {
     const bin = locationToBin({ ...LOCATIONS[0], details: {} }, NOW);
-    assert.equal(bin.fillLevel, 0);
+    assert.equal(bin.status, "almost_full");
     assert.equal(bin.type, "Mixed Waste");
+    assert.equal(locationToBin({ ...LOCATIONS[0], status: undefined, details: { fillLevel: 95 } }, NOW).status, "overflow");
+    assert.equal(locationToBin({ ...LOCATIONS[0], status: undefined, details: {} }, NOW).status, "normal");
     const toilet = locationToToilet({ ...LOCATIONS[1], details: {} }, NOW);
     assert.deepEqual(toilet.facilities, ["Men", "Women"]);
     assert.equal(toilet.distance, "");
@@ -95,9 +97,10 @@ describe("relativeTime", () => {
 
 describe("form → API payloads", () => {
   test("bin payload", () => {
-    const p = binToPayload({ name: "N", address: "A", latitude: 1, longitude: 2, type: "Wet Waste", fillLevel: 30, description: "" });
+    const p = binToPayload({ name: "N", address: "A", latitude: 1, longitude: 2, type: "Wet Waste", status: "overflow", fillLevel: 30, description: "" });
     assert.equal(p.type, "dustbin");
-    assert.deepEqual(p.details, { wasteType: "Wet Waste", fillLevel: 30 });
+    assert.deepEqual(p.details, { wasteType: "Wet Waste" });
+    assert.equal(p.status, "overflow");
   });
 
   test("toilet payload only sends a status when one is given", () => {

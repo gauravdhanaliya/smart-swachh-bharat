@@ -1,24 +1,30 @@
 // Local, in-browser stand-in for the EcoSetu API (server/).
 //
-// The web app runs with no backend (Vercel serves only the static app), so
+// The demo build runs with no backend (Vercel serves only the static app), so
 // `api(path, opts)` answers the same paths with the same response shapes as
-// server/src/app.js — and reuses the server's own validation and constants —
-// but keeps the records in this browser's localStorage. The services above
-// it (locationStore, facilityService, facilityRequestService) don't know the
-// difference. Role checks use the local session. It starts empty: bins,
-// toilets and buildings come only from officials and approved requests.
+// server/src/app.js — and reuses the server's own validation, constants and
+// seed data — but keeps the records in this browser's localStorage. The
+// services above it (locationStore, facilityService, facilityRequestService)
+// don't know the difference. Role checks use the local demo session.
 
-import { ValidationError, cleanText, validateLocation, validateRequest } from "../../server/src/validate.js";
-import { ADMIN_ROLES, REQUEST_FACILITY_TYPES, REQUEST_STATUS } from "../../server/src/constants.js";
-import { readSession } from "./authSession";
+import { ValidationError, cleanText, pageOf, parsePage, validateLocation, validateRequest } from "../../server/src/validate.js";
+import { validateConsent, validateDataDeletion, validateRating } from "../../server/src/validate-civic.js";
+import { isLowRated, summarizeRatings } from "../utils/ratings";
+import { GEO_BUSY_MESSAGE } from "../../server/src/geo-shared.js";
+import { ADMIN_ROLES, DEFAULT_CONSENT_VERSION, ROLES, REQUEST_FACILITY_TYPES, REQUEST_STATUS, migrateBinLocation } from "../../server/src/constants.js";
+import { CAMPUS, DEMO_BINS, DEMO_BUILDINGS, DEMO_REQUESTS, DEMO_TOILETS } from "../../server/src/seed-data.js";
+import { DEMO_IDS, LOGIN_METHOD, readSession } from "./authSession";
+import { apiEnabled } from "./apiConfig";
+import { getSessionClient } from "./session";
 
 const STORAGE_KEY = "ssb_local_api_v1";
 
 export class ApiError extends Error {
-  constructor(message, { status = 0, fields = null } = {}) {
+  constructor(message, { status = 0, fields = null, existingId = null } = {}) {
     super(message);
     this.status = status;
     this.fields = fields;
+    this.existingId = existingId;
   }
 }
 
@@ -51,6 +57,7 @@ function insertLocation(db, loc) {
     description: loc.description ?? "",
     address: loc.address ?? "",
     status: loc.status,
+    ...(loc.type === "dustbin" ? { statusSource: loc.statusSource ?? "simulated" } : {}),
     details: loc.details ?? {},
     source: loc.source,
     requestId: loc.requestId ?? null,
@@ -66,7 +73,7 @@ function insertLocation(db, loc) {
 }
 
 function insertRequest(db, r) {
-  const id = r.id ?? nextId(`FR-${new Date().getFullYear()}-`, db.requests);
+  const id = r.id ?? nextId("FR-2026-", db.requests);
   const ts = r.createdAt ?? now();
   db.requests.push({
     id,
@@ -97,7 +104,7 @@ function publishRequest(db, req, approver) {
   const type = REQUEST_FACILITY_TYPES[req.facilityType];
   const details =
     type === "dustbin"
-      ? { wasteType: "Mixed Waste", fillLevel: 0 }
+      ? { wasteType: "Mixed Waste" }
       : { openingHours: "Not specified yet", cleanliness: 3, facilities: ["Men", "Women"] };
   return insertLocation(db, {
     name: req.suggestedName,
@@ -115,30 +122,50 @@ function publishRequest(db, req, approver) {
   });
 }
 
-// A fresh store is empty: nothing is seeded.
+// Same seed as server/src/seed.js.
 function seed() {
-  return { locations: [], requests: [] };
+  const db = { locations: [], requests: [] };
+  insertLocation(db, { ...CAMPUS, createdBy: "system" });
+  for (const loc of [...DEMO_BUILDINGS, ...DEMO_BINS, ...DEMO_TOILETS]) insertLocation(db, { ...loc, createdBy: "system" });
+  for (const r of DEMO_REQUESTS) {
+    insertRequest(db, {
+      ...r,
+      requestedByUser: "demo-seed",
+      reviewedBy: r.status === "PENDING" ? null : "system",
+      isDemo: true,
+      updatedAt: r.createdAt,
+    });
+    if (r.status === REQUEST_STATUS.APPROVED) publishRequest(db, { ...r, isDemo: true }, "system");
+  }
+  return db;
 }
 
-// Last state this tab saw — used only while storage can't be read at all.
-// Empty storage means the data was cleared, so it starts over empty.
+// Bins saved by older builds had a fill percentage; bring them up to date
+// (status only) the first time they're loaded, and save the result.
+function migrateStored(db) {
+  const locations = db.locations.filter((l) => l && typeof l === "object").map(migrateBinLocation);
+  const changed = locations.length !== db.locations.length || locations.some((l, i) => l !== db.locations[i]);
+  if (!changed) return db;
+  const next = { ...db, locations };
+  save(next);
+  return next;
+}
+
+// Last state this tab saw — used if storage is blocked or full.
 let memory = null;
 
 function load() {
-  let raw = null;
   try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch {
-    if (memory) return clone(memory);
-  }
-  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
     const db = raw ? JSON.parse(raw) : null;
-    if (Array.isArray(db?.locations) && Array.isArray(db?.requests)) return db;
+    if (Array.isArray(db?.locations) && Array.isArray(db?.requests)) return migrateStored(db);
   } catch {
-    // malformed — start over below
+    // malformed or blocked storage — fall through
   }
-  // Nothing stored: start empty, and write only once something is added.
-  return seed();
+  if (memory) return clone(memory);
+  const db = seed();
+  save(db); // persist right away so seeded timestamps stay stable
+  return db;
 }
 
 // If a request's photo pushes storage over quota, keep the request without it.
@@ -210,7 +237,200 @@ function requireRole(...roles) {
 
 const live = (db, id) => db.locations.find((l) => l.id === id && !l.deletedAt) ?? null;
 
+// Browser-only build: Nominatim is called from the browser. It can't set a
+// User-Agent, so the request carries the site's origin as the Referer (which
+// the policy accepts) — never "no-referrer". services/geocode.js spaces the
+// calls a second apart and caches them.
+const NOMINATIM = "https://nominatim.openstreetmap.org";
+async function nominatim(path, params) {
+  const url = new URL(path, NOMINATIM);
+  for (const [k, v] of Object.entries({ format: "jsonv2", "accept-language": "en", ...params })) url.searchParams.set(k, String(v));
+  let res;
+  try {
+    res = await fetch(url.toString(), { headers: { Accept: "application/json" }, referrerPolicy: "strict-origin-when-cross-origin" });
+  } catch {
+    throw new ApiError("Place search isn't available right now. Please try again later.", { status: 502 });
+  }
+  if (res.status === 429 || res.status === 503) throw new ApiError(GEO_BUSY_MESSAGE, { status: 429 });
+  if (!res.ok) throw new ApiError("Place search isn't available right now. Please try again later.", { status: 502 });
+  return res.json();
+}
+const WIDE_TYPES = new Set(["country", "state", "state_district", "region", "county", "district", "city", "town", "municipality", "village", "suburb", "city_district"]);
+
+// ---- toilet ratings (as server/src/civic.js) ----------------------------
+
+const ratingsOf = (db, toiletId) => (db.ratings ?? []).filter((r) => r.toiletId === toiletId);
+const ratingSummary = (db, toiletId) => ({ toiletId, ...summarizeRatings(ratingsOf(db, toiletId)) });
+const liveToilet = (db, id) => {
+  const loc = live(db, id);
+  if (!loc || loc.type !== "public_toilet") throw new ApiError("Toilet not found.", { status: 404 });
+  return loc;
+};
+const ratingDto = (r) =>
+  r ? { toiletId: r.toiletId, stars: r.stars, categories: r.categories ?? {}, comment: r.comment ?? "", createdAt: r.createdAt, updatedAt: r.updatedAt } : null;
+const newestFirst = (a, b) => b.updatedAt.localeCompare(a.updatedAt);
+const queryObject = (query) => Object.fromEntries(query);
+
+// ---- consent (as server/src/routes-civic.js), one record per account ------
+
+const CONSENT_KEY = "ssb_consent_v1";
+function readConsents() {
+  try {
+    const all = JSON.parse(localStorage.getItem(CONSENT_KEY));
+    return all && typeof all === "object" && !Array.isArray(all) ? all : {};
+  } catch {
+    return {};
+  }
+}
+function writeConsents(all) {
+  try {
+    localStorage.setItem(CONSENT_KEY, JSON.stringify(all));
+  } catch {
+    // storage blocked: the consent screen simply shows again next time
+  }
+}
+const consentState = (consent) => ({
+  version: DEFAULT_CONSENT_VERSION,
+  consent: consent ?? null,
+  upToDate: consent?.version === DEFAULT_CONSENT_VERSION,
+});
+
 const routes = [
+  ["GET", /^\/me\/consent$/, () => {
+    const user = requireRole(...ROLES);
+    return consentState(readConsents()[user.id]);
+  }],
+
+  ["PUT", /^\/me\/consent$/, (_db, _m, body) => {
+    const user = requireRole(...ROLES);
+    const consent = validateConsent(body, { phoneUser: user.method === LOGIN_METHOD.OTP });
+    if (consent.version !== DEFAULT_CONSENT_VERSION) {
+      throw new ApiError("The privacy notice has changed. Please read it again.", { status: 409 });
+    }
+    const all = readConsents();
+    all[user.id] = { ...consent, acceptedAt: now() };
+    writeConsents(all);
+    return consentState(all[user.id]);
+  }],
+
+  ["DELETE", /^\/me\/consent$/, () => {
+    const user = requireRole(...ROLES);
+    const all = readConsents();
+    delete all[user.id];
+    writeConsents(all);
+    return { signedOut: true };
+  }],
+
+  ["POST", /^\/me\/consent\/reset-demo$/, () => {
+    const user = requireRole(...ROLES);
+    if (user.method !== LOGIN_METHOD.DEMO) throw new ApiError("Only the shared demo accounts can do this.", { status: 403 });
+    const all = readConsents();
+    let reset = 0;
+    for (const id of DEMO_IDS) {
+      if (all[id]) {
+        delete all[id];
+        reset += 1;
+      }
+    }
+    writeConsents(all);
+    return { reset };
+  }],
+
+  // Complaints live in their own store: services/consentService.js anonymises them.
+  ["DELETE", /^\/me\/data$/, (db, _m, body) => {
+    const user = requireRole(...ROLES);
+    validateDataDeletion(body);
+    if (user.method === LOGIN_METHOD.DEMO) throw new ApiError("The shared demo accounts can't be deleted.", { status: 403 });
+    const before = (db.ratings ?? []).length;
+    db.ratings = (db.ratings ?? []).filter((r) => r.userId !== user.id);
+    save(db);
+    const consents = readConsents();
+    const hadConsent = Boolean(consents[user.id]);
+    delete consents[user.id];
+    writeConsents(consents);
+    return { deleted: { account: 1, ratings: before - db.ratings.length, consent: hadConsent ? 1 : 0, photos: 0 }, anonymised: {} };
+  }],
+
+  ["GET", /^\/toilets\/ratings\/summary$/, (db, _m, _b, query) => {
+    const ids = (query.get("ids") ?? "").split(",").filter(Boolean);
+    if (!ids.length || ids.length > 100) throw new ValidationError({ ids: "Send 1 to 100 toilet ids, comma-separated." });
+    return { items: [...new Set(ids)].map((id) => ratingSummary(db, id)).filter((s) => s.count > 0) };
+  }],
+
+  ["GET", /^\/toilets\/ratings\/low$/, (db, _m, _b, query) => {
+    requireRole(...ADMIN_ROLES);
+    const paging = parsePage(queryObject(query));
+    const low = db.locations
+      .filter((l) => l.type === "public_toilet" && !l.deletedAt)
+      .map((l) => ({ toiletId: l.id, name: l.name, ...ratingSummary(db, l.id) }))
+      .filter(isLowRated)
+      .sort((a, b) => a.average - b.average || a.toiletId.localeCompare(b.toiletId))
+      .map(({ toiletId, name, average, count }) => ({ toiletId, name, average, count }));
+    return pageOf(paging, low.length, low.slice(paging.skip, paging.skip + paging.limit));
+  }],
+
+  ["PUT", /^\/toilets\/([^/]+)\/rating$/, (db, [id], body) => {
+    const user = requireRole("citizen");
+    const rating = validateRating(body);
+    liveToilet(db, id);
+    db.ratings ??= [];
+    const ts = now();
+    const existing = db.ratings.find((r) => r.toiletId === id && r.userId === user.id);
+    const doc = existing ?? { toiletId: id, userId: user.id, createdAt: ts };
+    Object.assign(doc, { stars: rating.stars, categories: rating.categories, comment: rating.comment, updatedAt: ts });
+    if (!existing) db.ratings.push(doc);
+    save(db);
+    return { rating: ratingDto(doc), summary: ratingSummary(db, id) };
+  }],
+
+  ["GET", /^\/toilets\/([^/]+)\/rating\/me$/, (db, [id]) => {
+    const user = requireRole(...ROLES);
+    return { rating: ratingDto(ratingsOf(db, id).find((r) => r.userId === user.id)) };
+  }],
+
+  ["GET", /^\/toilets\/([^/]+)\/ratings$/, (db, [id], _b, query) => {
+    liveToilet(db, id);
+    const paging = parsePage(queryObject(query));
+    // Newest first; for the same moment, the one saved last first (the API breaks ties by _id).
+    const all = ratingsOf(db, id)
+      .map((r, i) => [r, i])
+      .sort(([a, i], [b, j]) => newestFirst(a, b) || j - i)
+      .map(([r]) => r);
+    const items = all
+      .slice(paging.skip, paging.skip + paging.limit)
+      .map((r) => ({ stars: r.stars, categories: r.categories ?? {}, comment: r.comment ?? "", updatedAt: r.updatedAt }));
+    return pageOf(paging, all.length, items);
+  }],
+
+  ["GET", /^\/toilets\/([^/]+)\/ratings\/summary$/, (db, [id]) => {
+    liveToilet(db, id);
+    return ratingSummary(db, id);
+  }],
+
+  ["GET", /^\/geo\/search$/, async (_db, _m, _b, query) => {
+    requireRole(...ROLES);
+    const q = (query.get("q") ?? "").trim().replace(/\s+/g, " ");
+    if (q.length < 2 || q.length > 100) throw new ValidationError({ q: "Type 2 to 100 characters to search." });
+    const rows = await nominatim("/search", { q, countrycodes: "in", limit: 5 });
+    return {
+      results: (Array.isArray(rows) ? rows : [])
+        .map((r) => ({ label: String(r.display_name ?? ""), latitude: Number(r.lat), longitude: Number(r.lon), wide: WIDE_TYPES.has(r.addresstype ?? r.type) }))
+        .filter((r) => r.label && Number.isFinite(r.latitude) && Number.isFinite(r.longitude))
+        .slice(0, 5),
+    };
+  }],
+
+  ["GET", /^\/geo\/reverse$/, async (_db, _m, _b, query) => {
+    requireRole(...ROLES);
+    const lat = Number(query.get("lat"));
+    const lon = Number(query.get("lon"));
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+      throw new ValidationError({ lat: "Unknown position." });
+    }
+    const row = await nominatim("/reverse", { lat, lon, zoom: 18 });
+    return { address: typeof row?.display_name === "string" ? row.display_name : null };
+  }],
+
   ["GET", /^\/locations$/, (db) => ({
     locations: db.locations
       .filter((l) => !l.deletedAt)
@@ -316,15 +536,49 @@ const routes = [
   }],
 ];
 
-/** Same contract as the old HTTP client: resolves with the response body or rejects with an ApiError. */
-export async function api(path, { method = "GET", body } = {}) {
-  const pathname = path.split("?")[0];
+/**
+ * Every service calls this. With VITE_USE_API=true it calls the EcoSetu API as
+ * the signed-in user (services/session.js: token, refresh, retries); otherwise
+ * the in-browser stand-in below answers the same paths. Either way it resolves
+ * with the response body or rejects with an error carrying status, message
+ * and per-field errors.
+ */
+export async function api(path, options = {}) {
+  if (apiEnabled()) return getSessionClient().request(`/api${path}`, options);
+  return localApi(path, options);
+}
+
+/**
+ * Walks every page of a paged list (pages of 100, at most 50 pages). With
+ * `conditional`, each page is a conditional request; if no page changed, the
+ * previous result array itself is returned, so callers can tell nothing did.
+ */
+const lastAll = new Map();
+export async function apiAll(path, key, { conditional = false } = {}) {
+  const pages = [];
+  for (let page = 1; page <= 50; page++) {
+    const sep = path.includes("?") ? "&" : "?";
+    const res = await api(`${path}${sep}page=${page}&limit=100`, { conditional });
+    pages.push(res);
+    if (!res.hasMore) break;
+  }
+  const previous = lastAll.get(path);
+  if (conditional && previous && previous.pages.length === pages.length && previous.pages.every((p, i) => p === pages[i])) {
+    return previous.items;
+  }
+  const items = pages.flatMap((p) => p[key] ?? []);
+  if (conditional) lastAll.set(path, { pages, items });
+  return items;
+}
+
+async function localApi(path, { method = "GET", body } = {}) {
+  const [pathname, search = ""] = path.split("?");
   for (const [verb, pattern, handler] of routes) {
     if (verb !== method) continue;
     const match = pattern.exec(pathname);
     if (!match) continue;
     try {
-      return handler(load(), match.slice(1).map(decodeURIComponent), body);
+      return await handler(load(), match.slice(1).map(decodeURIComponent), body, new URLSearchParams(search));
     } catch (err) {
       if (err instanceof ValidationError) {
         throw new ApiError("Please fix the highlighted fields.", { status: 400, fields: err.errors });

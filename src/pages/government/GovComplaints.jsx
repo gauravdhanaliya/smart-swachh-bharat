@@ -3,15 +3,17 @@ import GovShell from "../../components/GovShell";
 import GovComplaintsList from "../../components/GovComplaintsList";
 import StatusFilterTabs from "../../components/StatusFilterTabs";
 import { GovNavIcons } from "../../components/GovNavIcons";
-import { useComplaints } from "../../hooks/useComplaints";
-import { useFacilityRequests } from "../../hooks/useFacilityRequests";
+import { useComplaints, useComplaintsStatus } from "../../hooks/useComplaints";
+import ListLoadStatus from "../../components/ListLoadStatus";
 import { STATUS } from "../../data/complaints";
+import { FACILITY_FILTERS, matchesFacilityFilter } from "../../utils/facility";
 
 export default function GovComplaints() {
   const complaints = useComplaints();
-  const facilityRequests = useFacilityRequests();
+  const loadStatus = useComplaintsStatus();
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [facility, setFacility] = useState("all");
 
   const filterOptions = useMemo(
     () => [
@@ -47,13 +49,15 @@ export default function GovComplaints() {
       const matchesQuery =
         !q ||
         c.id.toLowerCase().includes(q) ||
-        c.location.address.toLowerCase().includes(q);
-      return matchesStatus && matchesQuery;
+        c.location.address.toLowerCase().includes(q) ||
+        (c.facilityId ?? "").toLowerCase().includes(q);
+      return matchesStatus && matchesQuery && matchesFacilityFilter(c, facility);
     });
-  }, [complaints, filter, query]);
+  }, [complaints, filter, query, facility]);
 
   return (
     <GovShell title="Complaints" subtitle="Manage citizen complaints across the city">
+      <ListLoadStatus status={loadStatus} what="complaints" />
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-xs">
@@ -70,16 +74,24 @@ export default function GovComplaints() {
           </div>
           <StatusFilterTabs options={filterOptions} value={filter} onChange={setFilter} />
         </div>
+        <label className="flex items-center gap-2 self-start text-sm text-slate-600">
+          <span>Facility</span>
+          <select
+            value={facility}
+            onChange={(e) => setFacility(e.target.value)}
+            className="min-h-10 rounded-full border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:ring-2 focus:ring-sky-400 focus:outline-none"
+          >
+            {FACILITY_FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <GovComplaintsList
           complaints={filtered}
-          emptyMessage={
-            complaints.length > 0
-              ? "No complaints match your search/filter."
-              : facilityRequests.length === 0
-                ? "No complaints or facility requests yet."
-                : "No complaints yet."
-          }
+          emptyMessage="No complaints match your search/filter."
         />
       </div>
     </GovShell>

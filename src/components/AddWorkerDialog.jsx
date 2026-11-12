@@ -92,7 +92,7 @@ export default function AddWorkerDialog({ onCancel, onConfirm }) {
               type="text"
               value={draft.area}
               onChange={(e) => setDraft((d) => ({ ...d, area: e.target.value }))}
-              placeholder="e.g. Ward 4, Market Road"
+              placeholder="e.g. COER Main Gate"
               className={field}
             />
           </div>

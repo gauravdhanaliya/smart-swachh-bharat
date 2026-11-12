@@ -5,6 +5,7 @@ import StatusBadge from "../../components/StatusBadge";
 import PriorityBadge from "../../components/PriorityBadge";
 import SimpleMap from "../../components/SimpleMap";
 import { useFacilityRequest } from "../../hooks/useFacilityRequests";
+import ProtectedImage from "../../components/ProtectedImage";
 import { REQUEST_STATUS } from "../../data/facilityRequests";
 
 function formatDateTime(iso) {
@@ -31,7 +32,7 @@ export default function WorkerFacilityRequestDetails() {
       <WorkerShell title="Request Details" showBack onBack={() => navigate("/worker/facility-requests")}>
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-10 text-center">
           <p className="font-semibold text-slate-900">Request not found</p>
-          <p className="text-sm text-slate-500">It may have been deleted, or the app's data was reset.</p>
+          <p className="text-sm text-slate-500">This request may have been removed from the demo data set.</p>
           <button
             type="button"
             onClick={() => navigate("/worker/facility-requests")}
@@ -79,13 +80,18 @@ export default function WorkerFacilityRequestDetails() {
             <StatusBadge status={request.status} />
           </div>
           <p className="mt-1 text-sm text-slate-500">Submitted {formatDateTime(request.createdAt)}</p>
+          {request.isDemo && (
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600">
+              Prototype demo data
+            </p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
           <p className="mb-3 text-sm font-semibold text-slate-900">Facility Details</p>
           <div className="flex items-start gap-3">
             {request.photo ? (
-              <img src={request.photo} alt="Requested facility location" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
+              <ProtectedImage src={request.photo} alt="Requested facility location" className="h-14 w-14 shrink-0 rounded-xl object-cover" />
             ) : (
               <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-2xl">
                 {request.facilityType === "Public Toilet" ? "🚻" : "🗑️"}

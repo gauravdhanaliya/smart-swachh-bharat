@@ -10,6 +10,7 @@
 // never pick a role: everyone starts as a citizen and an admin grants worker /
 // government with `npm run grant-role`. Hiding a button in the UI grants nothing.
 
+import crypto from "node:crypto";
 import { ROLES } from "./constants.js";
 import { verifyAccessToken } from "./tokens.js";
 
@@ -25,15 +26,17 @@ export function authenticate({ config, repo }) {
     const match = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
     if (match) {
       try {
-        const claims = await verifyAccessToken(match[1], config.jwtSecret);
+        const claims = await verifyAccessToken(match[1], config.jwtSecret, config.tokenEnv);
         const user = claims ? await repo.getUserByUid(claims.uid) : null;
-        if (user && user.role === claims.role && ROLES.includes(user.role)) {
+        // A token from before "sign out everywhere" (consent withdrawn) no longer counts.
+        const revoked = user?.sessionsRevokedAt && claims.iat * 1000 <= Date.parse(user.sessionsRevokedAt);
+        if (user && !revoked && user.role === claims.role && ROLES.includes(user.role)) {
           req.user = {
             uid: user.uid,
-            sub: `${user.role}:${user.phone}`,
             role: user.role,
             name: user.name || user.role,
-            mobile: user.phone,
+            phoneMasked: user.phoneMasked,
+            isDemo: user.isDemo,
             ...(user.workerId ? { wid: user.workerId } : {}),
           };
         }
@@ -56,48 +59,73 @@ export function requireRole(...roles) {
   };
 }
 
-// Simple in-memory limiter for failed logins (per IP).
-export function createLoginLimiter({ max = 10, windowMs = 10 * 60 * 1000 } = {}) {
-  const hits = new Map();
+// ---- rate limiting ---------------------------------------------------
+//
+// Counters live in MongoDB (auth_rate_limits, expired by a TTL index), not in
+// memory: on Vercel each warm instance has its own memory, so an in-memory
+// limit would be multiplied by however many instances happen to be running.
+
+/**
+ * The caller's IP. On Vercel every request reaches Express from 127.0.0.1;
+ * Vercel puts the real client address in X-Real-IP and overwrites any value
+ * the caller sent (checked on a test deployment), so it can be trusted there.
+ * Elsewhere the socket address is used and headers are ignored.
+ */
+export function clientIp(req, config) {
+  if (config.behindVercel) {
+    const real = req.headers["x-real-ip"];
+    if (typeof real === "string" && real) return real.slice(0, 64);
+  }
+  return req.ip ?? req.socket?.remoteAddress ?? "unknown";
+}
+
+/** Failed-login counter (per IP): blocked() once `max` failures happen within the window. */
+export function createLoginLimiter({ repo, config }) {
+  const { max, windowMs } = config.loginFailLimit;
+  const key = (ip) => `loginfail:${ip}`;
   return {
-    blocked(ip) {
-      const entry = hits.get(ip);
-      if (!entry) return false;
-      if (Date.now() - entry.first > windowMs) {
-        hits.delete(ip);
-        return false;
-      }
-      return entry.count >= max;
+    async blocked(ip) {
+      return (await repo.peekRateLimit(key(ip), windowMs)) >= max;
     },
-    fail(ip) {
-      const entry = hits.get(ip);
-      if (!entry || Date.now() - entry.first > windowMs) hits.set(ip, { first: Date.now(), count: 1 });
-      else entry.count += 1;
+    async fail(ip) {
+      await repo.hitRateLimit(key(ip), windowMs);
     },
-    reset(ip) {
-      hits.delete(ip);
+    async reset(ip) {
+      await repo.clearRateLimit(key(ip));
     },
   };
 }
 
-/** Fixed-window request limiter (per IP) for a group of routes. */
-export function rateLimit({ max, windowMs }) {
-  const windows = new Map();
-  return (req, res, next) => {
-    const ip = req.ip ?? "unknown";
-    const t = Date.now();
-    let w = windows.get(ip);
-    if (!w || t - w.start > windowMs) {
-      w = { start: t, count: 0 };
-      windows.set(ip, w);
-      if (windows.size > 10_000) for (const [k, v] of windows) if (t - v.start > windowMs) windows.delete(k);
+/**
+ * Who a request is counted against, most specific first: a signed-in user's
+ * id, else the session behind a refresh cookie, else the IP. Counting
+ * signed-in traffic per user matters on shared networks — a college or a
+ * hackathon hall can put hundreds of people behind one public IP.
+ */
+export function rateLimitKey(req, config) {
+  if (req.user?.uid) return `user:${req.user.uid}`;
+  const cookie = readCookie(req, REFRESH_COOKIE);
+  if (cookie) return `session:${crypto.createHash("sha256").update(cookie).digest("hex").slice(0, 24)}`;
+  return `ip:${clientIp(req, config)}`;
+}
+
+/**
+ * Fixed-window request limiter for a group of routes. `perIp` forces the IP
+ * as the key (sign-in and demo login, where nobody is signed in yet).
+ */
+export function rateLimit({ max, windowMs, repo, config, name, perIp = false }) {
+  return async (req, res, next) => {
+    try {
+      const who = perIp ? `ip:${clientIp(req, config)}` : rateLimitKey(req, config);
+      const { count, resetAt } = await repo.hitRateLimit(`${name}:${who}`, windowMs);
+      if (count > max) {
+        res.setHeader("Retry-After", String(Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000))));
+        return res.status(429).json({ error: "Too many requests. Please slow down and try again shortly." });
+      }
+      next();
+    } catch (err) {
+      next(err);
     }
-    w.count += 1;
-    if (w.count > max) {
-      res.setHeader("Retry-After", String(Math.ceil((w.start + windowMs - t) / 1000)));
-      return res.status(429).json({ error: "Too many requests. Please slow down and try again shortly." });
-    }
-    next();
   };
 }
 
@@ -120,7 +148,7 @@ export function readCookie(req, name) {
   return "";
 }
 
-function isCrossSite(req) {
+export function isCrossSite(req) {
   const origin = req.headers.origin;
   if (!origin) return false;
   try {

@@ -51,9 +51,102 @@ export const REQUEST_STATUS = {
 export const REQUEST_FACILITY_TYPES = { Dustbin: "dustbin", "Public Toilet": "public_toilet" };
 export const REQUEST_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
-export const FILL_THRESHOLDS = { ALMOST_FULL: 71, OVERFLOW: 91 };
-export function statusFromFillLevel(fill) {
-  if (fill >= FILL_THRESHOLDS.OVERFLOW) return "overflow";
-  if (fill >= FILL_THRESHOLDS.ALMOST_FULL) return "almost_full";
+// ---- bins: categorical status only ------------------------------------
+// A bin has a status (normal / almost_full / overflow) and no fill
+// percentage. The thresholds below exist only to read records saved by older
+// builds, which stored `details.fillLevel` (0-100) and derived the status.
+
+export const BIN_STATUSES = STATUS_BY_TYPE.dustbin;
+const LEGACY_FILL = { ALMOST_FULL: 71, OVERFLOW: 91 };
+
+/** The status of a bin record: its own if valid, else derived from a legacy percentage, else normal. */
+export function normalizeBinStatus(record) {
+  if (BIN_STATUSES.includes(record?.status)) return record.status;
+  const fill = record?.details?.fillLevel;
+  if (typeof fill === "number" && Number.isFinite(fill)) {
+    if (fill >= LEGACY_FILL.OVERFLOW) return "overflow";
+    if (fill >= LEGACY_FILL.ALMOST_FULL) return "almost_full";
+  }
   return "normal";
 }
+
+/**
+ * Brings an old dustbin record up to date: a valid status, and no
+ * `fillLevel` / `history` in its details. Returns the same object when
+ * there is nothing to change; never mutates its argument.
+ */
+export function migrateBinLocation(location) {
+  if (location?.type !== "dustbin") return location;
+  const details = location.details && typeof location.details === "object" ? location.details : null;
+  const hasLegacy = details !== null && ("fillLevel" in details || "history" in details);
+  const status = normalizeBinStatus(location);
+  if (details !== null && !hasLegacy && status === location.status) return location;
+  const { fillLevel: _fill, history: _history, ...rest } = details ?? {};
+  return { ...location, status, details: rest };
+}
+
+// ---- complaints ---------------------------------------------------------
+
+export const COMPLAINT_STATUS = {
+  SUBMITTED: "SUBMITTED",
+  ASSIGNED: "ASSIGNED",
+  IN_PROGRESS: "IN_PROGRESS",
+  RESOLVED: "RESOLVED",
+};
+
+// The work a worker may do, by current status. Assigning is separate
+// (officials, from SUBMITTED or ASSIGNED only); RESOLVED is final.
+export const WORKER_TRANSITIONS = {
+  ASSIGNED: ["IN_PROGRESS"],
+  IN_PROGRESS: ["RESOLVED"],
+};
+export const ASSIGNABLE_STATUSES = ["SUBMITTED", "ASSIGNED"];
+
+// General reports (no facility): issue type -> priority. Same list as the app.
+export const GENERAL_ISSUE_TYPES = {
+  "Overflowing Bin": "HIGH",
+  "Not Collected": "MEDIUM",
+  "Wrong Waste in Bin": "LOW",
+  "Damaged Bin": "MEDIUM",
+  "Dirty Area": "MEDIUM",
+  "Public Toilet Issue": "HIGH",
+};
+
+// Reports about one bin or toilet: category -> priority, per facility type.
+export const FACILITY_CATEGORIES = {
+  bin: {
+    Overflowing: "HIGH",
+    Damaged: "MEDIUM",
+    "Not collected": "MEDIUM",
+    "Bad smell": "MEDIUM",
+    Missing: "MEDIUM",
+    Other: "MEDIUM",
+  },
+  toilet: {
+    Dirty: "HIGH",
+    "No water": "HIGH",
+    "Broken fixtures": "MEDIUM",
+    "Locked/closed": "MEDIUM",
+    "No lighting": "MEDIUM",
+    "Safety concern": "HIGH",
+    Other: "MEDIUM",
+  },
+};
+export const FACILITY_LOCATION_TYPE = { bin: "dustbin", toilet: "public_toilet" };
+// Toilet rating categories (each optional, 1 to 5) and the consent items.
+// Shared by the API and the web app.
+export const RATING_CATEGORIES = ["cleanliness", "water", "lighting", "safety", "accessibility"];
+export const CONSENT_ITEMS = ["phoneForLogin", "locationWhenReporting", "photosAttached", "readNotice"];
+// The privacy-notice version when ECOSETU_CONSENT_VERSION isn't set (and in
+// the browser-only build). Raise it when the notice changes.
+export const DEFAULT_CONSENT_VERSION = 1;
+
+// Shown when a complaint was filed but its photo couldn't be stored.
+export const PHOTO_NOT_SAVED = "Photo could not be saved, your complaint was submitted without it.";
+
+export const FACILITY_ISSUE_TYPE = { bin: "Bin Issue", toilet: "Public Toilet Issue" };
+
+export const WORKER_ID_PATTERN = /^[A-Za-z0-9_-]{1,24}$/;
+
+// What a deleted user's name becomes on records kept for the municipality.
+export const DELETED_USER_NAME = "Deleted user";

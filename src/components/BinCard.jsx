@@ -1,11 +1,5 @@
 import StatusBadge from "./StatusBadge";
 
-const FILL_BAR_COLOR = {
-  normal: "bg-emerald-500",
-  almost_full: "bg-orange-500",
-  overflow: "bg-red-500",
-};
-
 export default function BinCard({ bin, onClick, compact = false }) {
   return (
     <button
@@ -28,19 +22,6 @@ export default function BinCard({ bin, onClick, compact = false }) {
             </span>
           </span>
           <StatusBadge status={bin.status} className="shrink-0" />
-        </span>
-
-        <span className="mt-2 block">
-          <span className="flex items-center justify-between text-xs text-emerald-800/70">
-            <span>Fill Level</span>
-            <span className="font-semibold">{bin.fillLevel}%</span>
-          </span>
-          <span className="mt-1 block h-1.5 w-full overflow-hidden rounded-full bg-emerald-50">
-            <span
-              className={`block h-full rounded-full ${FILL_BAR_COLOR[bin.status]}`}
-              style={{ width: `${bin.fillLevel}%` }}
-            />
-          </span>
         </span>
 
         {!compact && (

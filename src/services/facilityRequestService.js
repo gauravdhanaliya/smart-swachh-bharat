@@ -12,7 +12,7 @@
 
 import { api } from "./api";
 import { REQUEST_STATUS } from "../data/facilityRequests";
-import { getRequestsSnapshot, refreshFresh, subscribe as subscribeStore } from "./locationStore";
+import { getRequestsSnapshot, refreshFresh, requestFromApi, subscribe as subscribeStore } from "./locationStore";
 
 const byNewest = (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 
@@ -47,7 +47,7 @@ export async function createFacilityRequest(data) {
     },
   });
   await refreshFresh();
-  return request;
+  return requestFromApi(request);
 }
 
 /** PATCH /api/facility-requests/:id/status. Rejects if the role isn't allowed. */
@@ -59,7 +59,7 @@ export async function updateFacilityRequestStatus(id, status, extra = {}) {
     body,
   });
   await refreshFresh(); // an approval also adds a location, so refresh both lists
-  return result.request;
+  return requestFromApi(result.request);
 }
 
 export function subscribe(callback) {

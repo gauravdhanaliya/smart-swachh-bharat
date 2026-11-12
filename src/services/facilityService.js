@@ -65,7 +65,7 @@ export function subscribe(callback) {
 /**
  * POST /api/locations. `data` is the shape GovAddFacility builds:
  *   { facilityType: "Dustbin" | "Public Toilet" | "Building", buildingType?, name, address,
- *     latitude, longitude, type?, fillLevel?, openingHours?, facilities?, description? }
+ *     latitude, longitude, type?, status?, openingHours?, facilities?, description? }
  * Resolves with the created facility in the same shape the screens use.
  */
 export async function addGovernmentFacility(data) {

@@ -3,19 +3,14 @@
 import { loadConfig } from "../src/config.js";
 import { connectDatabase, createRepository } from "../src/db.js";
 
-/** Accepts "9876543210", "+91 98765 43210", "09876543210"…; returns the 10 digits or null. */
-export function normalisePhone(input) {
-  const digits = String(input ?? "").replace(/\D/g, "");
-  const ten = digits.length > 10 ? digits.slice(-10) : digits;
-  return /^[6-9]\d{9}$/.test(ten) ? ten : null;
-}
+export { normalisePhone } from "../src/phone.js";
 
 /** Full phone numbers are never printed: 98••••••10 */
 export function maskPhone(phone) {
   return `${phone.slice(0, 2)}••••••${phone.slice(-2)}`;
 }
 
-/** Connects with the same .env settings as the server, runs fn(repo), always closes. */
+/** Connects with the same .env settings as the server, runs fn(repo, config, db), always closes. */
 export async function withRepo(fn) {
   let config;
   try {
@@ -29,7 +24,7 @@ export async function withRepo(fn) {
     process.exit(1);
   });
   try {
-    return await fn(createRepository(conn.db, conn.client));
+    return await fn(createRepository(conn.db, conn.client, null, { phoneHashSecret: config.phoneHashSecret }), config, conn.db);
   } finally {
     await conn.close();
   }

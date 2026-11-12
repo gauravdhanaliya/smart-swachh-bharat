@@ -1,36 +1,54 @@
 // Application JWTs, issued by this server after Firebase has verified the
 // phone number. Two kinds, signed with two different secrets:
 //
-//   access  — 15 min, payload { uid, role } only, sent as "Authorization: Bearer"
-//   refresh — 7 days, payload { uid, jti }, kept in an httpOnly cookie, stored
+//   access  — 15 min, payload { sub: <user id>, role } only, sent as
+//             "Authorization: Bearer"
+//   refresh — 7 days, payload { sub, jti }, kept in an httpOnly cookie, stored
 //             hashed in MongoDB, rotated on every use and revoked on logout.
 //
 // Built on `jose` (already used to verify Firebase tokens), HS256 only.
+//
+// The audience names the environment that issued the token — access
+// "ecosetu-production" / "ecosetu-preview" / "ecosetu-development", refresh the
+// same plus "-refresh" — and each environment accepts only its own. Different
+// secrets per environment already keep a preview's tokens out of production;
+// this still holds if a secret is ever shared by mistake.
 
 import crypto from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 
 const ISSUER = "ecosetu-api";
-const ACCESS_AUDIENCE = "ecosetu-access";
-const REFRESH_AUDIENCE = "ecosetu-refresh";
+export const TOKEN_ENVS = ["production", "preview", "development"];
+
+function audienceFor(env, kind) {
+  if (!TOKEN_ENVS.includes(env)) throw new Error(`Token environment must be one of ${TOKEN_ENVS.join(", ")} (got ${env}).`);
+  return kind === "refresh" ? `ecosetu-${env}-refresh` : `ecosetu-${env}`;
+}
 
 const key = (secret) => new TextEncoder().encode(secret);
 
-export function signAccessToken({ uid, role }, secret, ttlSeconds) {
-  return new SignJWT({ uid, role })
+// `iat` keeps milliseconds (a JWT NumericDate may be fractional), so a token
+// issued after a "sign out everywhere" is never mistaken for one from before it.
+export async function signAccessToken({ uid, role }, secret, ttlSeconds, env) {
+  const audience = audienceFor(env, "access");
+  const iat = Date.now() / 1000;
+  return new SignJWT({ role })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(uid)
     .setIssuer(ISSUER)
-    .setAudience(ACCESS_AUDIENCE)
-    .setIssuedAt()
-    .setExpirationTime(`${ttlSeconds}s`)
+    .setAudience(audience)
+    .setIssuedAt(iat)
+    .setExpirationTime(iat + ttlSeconds)
     .sign(key(secret));
 }
 
-export function signRefreshToken({ uid }, secret, ttlSeconds) {
-  return new SignJWT({ uid })
+export async function signRefreshToken({ uid }, secret, ttlSeconds, env) {
+  const audience = audienceFor(env, "refresh");
+  return new SignJWT({})
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(uid)
     .setIssuer(ISSUER)
-    .setAudience(REFRESH_AUDIENCE)
+    .setAudience(audience)
     .setJti(crypto.randomUUID())
     .setIssuedAt()
     .setExpirationTime(`${ttlSeconds}s`)
@@ -45,20 +63,24 @@ async function verify(token, secret, audience) {
       issuer: ISSUER,
       audience,
     });
-    return typeof payload.uid === "string" && payload.uid ? payload : null;
+    // `uid` is the user id the rest of the server reads; on the wire it is `sub`.
+    return typeof payload.sub === "string" && payload.sub ? { ...payload, uid: payload.sub } : null;
   } catch {
     return null;
   }
 }
 
-/** Returns the payload { uid, role, … } or null for any invalid/expired token. */
-export async function verifyAccessToken(token, secret) {
-  const payload = await verify(token, secret, ACCESS_AUDIENCE);
+/**
+ * Returns the payload { sub, uid (= sub), role, … } or null for any invalid or
+ * expired token, or one issued for another environment.
+ */
+export async function verifyAccessToken(token, secret, env) {
+  const payload = await verify(token, secret, audienceFor(env, "access"));
   return payload && typeof payload.role === "string" ? payload : null;
 }
 
-export function verifyRefreshToken(token, secret) {
-  return verify(token, secret, REFRESH_AUDIENCE);
+export async function verifyRefreshToken(token, secret, env) {
+  return verify(token, secret, audienceFor(env, "refresh"));
 }
 
 /** Refresh tokens are stored as SHA-256 hashes, never in the clear. */

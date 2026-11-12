@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
-import { useProfile } from "../hooks/useProfile";
-import { cityCenter, cityPresets } from "../services/profileService";
+import { CAMPUS_CENTER, FACILITY_PICK_LOCATIONS } from "../data/facilityRequests";
 import IndiaLocationPicker from "./IndiaLocationPicker";
 import GpsConsentNotice, { GpsAlert } from "./GpsConsentNotice";
 import { useGpsConsent } from "../hooks/useGpsConsent";
 import { gpsBlocker, gpsErrorMessage, lowAccuracyMessage } from "../utils/gps";
+import { reverseGeocode } from "../services/geocode";
+import { createAddressLookup } from "../utils/addressLookup";
 
 // "Where is the problem?" for complaints. The preferred location is the
 // citizen's live GPS position, so a report is tied to where the person
@@ -31,13 +32,9 @@ const GPS_OPTIONS = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
 const REFINE_MS = 10000; // keep listening this long for a sharper fix
 const GOOD_ENOUGH_M = 15;
 
-async function reverseGeocode(latitude, longitude, signal) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&accept-language=en&lat=${latitude}&lon=${longitude}`;
-  const res = await fetch(url, { signal, headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("lookup failed");
-  const data = await res.json();
-  return data.display_name ?? null;
-}
+// Street address for the pin: looked up once the GPS position settles, and
+// again only if the user drags the pin more than 25 m (utils/addressLookup.js),
+// through services/geocode.js (Nominatim via the API, cached).
 
 const coordsLabel = (lat, lng) => `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 
@@ -56,16 +53,17 @@ function Follow({ point }) {
  * - extra: fields merged into the value (e.g. the bin/toilet this report is about)
  */
 export default function ComplaintLocationPicker({ value, onChange, extra }) {
-  const profile = useProfile("citizen");
   const [status, setStatus] = useState("idle"); // idle | locating | error
   const [errorText, setErrorText] = useState("");
   const [mode, setMode] = useState("gps"); // gps | manual
   const [lookingUp, setLookingUp] = useState(false);
   const watchRef = useRef(null);
   const stopTimerRef = useRef(null);
-  const lookupRef = useRef(null);
   const bestRef = useRef(null);
-  const addressFor = useRef({ key: "", text: "" });
+  const pinRef = useRef(null); // { latitude, longitude, accuracy, adjusted }
+  const addressRef = useRef(null); // the looked-up street address, if any
+  const lookupToken = useRef(0);
+  const controllerRef = useRef(null);
   const onChangeRef = useRef(onChange);
   const extraRef = useRef(extra);
   useEffect(() => {
@@ -79,41 +77,50 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
     clearTimeout(stopTimerRef.current);
   }, []);
 
-  const publish = useCallback((latitude, longitude, accuracy, address) => {
+  // The pin's current place, with the address once it is known (coordinates until then).
+  const publish = useCallback(() => {
+    const pin = pinRef.current;
+    if (!pin) return;
     onChangeRef.current({
       ...(extraRef.current ?? {}),
-      address,
-      latitude,
-      longitude,
-      accuracy,
+      address: addressRef.current ?? coordsLabel(pin.latitude, pin.longitude),
+      latitude: pin.latitude,
+      longitude: pin.longitude,
+      accuracy: pin.accuracy,
+      ...(pin.adjusted ? { adjusted: true } : {}),
       source: "gps",
     });
   }, []);
 
-  const resolveAddress = useCallback(
-    async (latitude, longitude, accuracy) => {
-      const key = `${latitude},${longitude}`;
-      // Show the pin straight away with coordinates, then swap in the address.
-      publish(latitude, longitude, accuracy, addressFor.current.key === key ? addressFor.current.text : coordsLabel(latitude, longitude));
-      if (addressFor.current.key === key) return;
-      lookupRef.current?.abort();
-      const controller = new AbortController();
-      lookupRef.current = controller;
+  const lookUpAddress = useCallback(
+    async (latitude, longitude) => {
+      const token = ++lookupToken.current;
       setLookingUp(true);
       try {
-        const text = await reverseGeocode(latitude, longitude, controller.signal);
+        const text = await reverseGeocode(latitude, longitude);
+        if (token !== lookupToken.current) return; // a newer lookup replaced this one
         if (text) {
-          addressFor.current = { key, text };
-          publish(latitude, longitude, accuracy, text);
+          addressRef.current = text;
+          publish();
         }
       } catch {
-        // offline or rate limited — the coordinates stay as the address
+        // offline or busy: the coordinates stay as the address
       } finally {
-        if (lookupRef.current === controller) setLookingUp(false);
+        if (token === lookupToken.current) setLookingUp(false);
       }
     },
     [publish]
   );
+
+  // One address lookup per picker session (see utils/addressLookup.js).
+  const newSession = useCallback(() => {
+    controllerRef.current?.stop();
+    lookupToken.current += 1;
+    addressRef.current = null;
+    pinRef.current = null;
+    setLookingUp(false);
+    controllerRef.current = createAddressLookup({ lookup: (lat, lng) => lookUpAddress(lat, lng) });
+  }, [lookUpAddress]);
 
   const locate = useCallback(() => {
     const blocker = gpsBlocker();
@@ -123,6 +130,7 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
       return;
     }
     stopWatch();
+    newSession();
     bestRef.current = null;
     setErrorText("");
     setStatus("locating");
@@ -133,11 +141,11 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
       if (bestRef.current && accuracy >= bestRef.current) return;
       bestRef.current = accuracy;
       setStatus("idle");
-      resolveAddress(
-        Number(pos.coords.latitude.toFixed(6)),
-        Number(pos.coords.longitude.toFixed(6)),
-        accuracy
-      );
+      const latitude = Number(pos.coords.latitude.toFixed(6));
+      const longitude = Number(pos.coords.longitude.toFixed(6));
+      pinRef.current = { latitude, longitude, accuracy };
+      publish();
+      controllerRef.current?.fix(latitude, longitude, accuracy);
       if (accuracy <= GOOD_ENOUGH_M) stopWatch();
     };
     const onFail = (err) => {
@@ -149,13 +157,28 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
 
     watchRef.current = navigator.geolocation.watchPosition(onFix, onFail, GPS_OPTIONS);
     stopTimerRef.current = setTimeout(stopWatch, REFINE_MS);
-  }, [resolveAddress, stopWatch]);
+  }, [newSession, publish, stopWatch]);
+
+  // The user dragged the pin: GPS stops moving it, and the address is looked
+  // up again only if it moved more than 25 m.
+  const movePin = useCallback(
+    (lat, lng) => {
+      stopWatch();
+      const latitude = Number(lat.toFixed(6));
+      const longitude = Number(lng.toFixed(6));
+      pinRef.current = { ...(pinRef.current ?? {}), latitude, longitude, adjusted: true };
+      publish();
+      controllerRef.current?.movePin(latitude, longitude);
+    },
+    [publish, stopWatch]
+  );
 
   // Nothing starts the GPS on its own; just clean up if the screen closes.
   useEffect(
     () => () => {
       stopWatch();
-      lookupRef.current?.abort();
+      controllerRef.current?.stop();
+      lookupToken.current += 1;
     },
     [stopWatch]
   );
@@ -166,7 +189,8 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
 
   const switchToManual = () => {
     stopWatch();
-    lookupRef.current?.abort();
+    controllerRef.current?.stop();
+    lookupToken.current += 1;
     setLookingUp(false);
     setStatus("idle");
     setErrorText("");
@@ -180,7 +204,7 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
   };
 
   const pinned = value ? { latitude: value.latitude, longitude: value.longitude } : null;
-  const start = pinned ?? cityCenter(profile);
+  const start = pinned ?? CAMPUS_CENTER;
 
   const accuracyWarning = value?.source === "gps" ? lowAccuracyMessage(value.accuracy) : null;
 
@@ -191,8 +215,8 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
           id="complaint-location"
           value={value?.source === "manual" ? value : null}
           onChange={(loc) => onChange(loc ? { ...(extra ?? {}), ...loc, source: "manual" } : null)}
-          presets={cityPresets(profile)}
-          presetsLabel="Your city"
+          presets={FACILITY_PICK_LOCATIONS}
+          presetsLabel="Known areas"
           allowGps={false}
         />
         <button type="button" onClick={switchToGps} className="self-start text-xs font-semibold text-emerald-700 underline">
@@ -229,7 +253,21 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
               interactive={false}
             />
           )}
-          {pinned && <Marker position={[pinned.latitude, pinned.longitude]} icon={pinIcon} interactive={false} />}
+          {pinned && (
+            <Marker
+              position={[pinned.latitude, pinned.longitude]}
+              icon={pinIcon}
+              draggable
+              keyboard
+              title="Drag to adjust the location"
+              eventHandlers={{
+                dragend: (e) => {
+                  const p = e.target.getLatLng();
+                  movePin(p.lat, p.lng);
+                },
+              }}
+            />
+          )}
         </MapContainer>
 
         <button
@@ -300,8 +338,14 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
           </p>
           {value && (
             <p className="text-[11px] text-emerald-800/60">
-              {coordsLabel(value.latitude, value.longitude)} · ±{value.accuracy} m
+              {coordsLabel(value.latitude, value.longitude)}
+              {value.adjusted ? " · moved by you" : value.accuracy != null ? ` · ±${value.accuracy} m` : ""}
               {lookingUp ? " · finding address…" : ""}
+            </p>
+          )}
+          {value && (
+            <p className="text-[11px] text-emerald-800/60">
+              Not quite right? Drag the pin to the exact spot.
             </p>
           )}
         </div>

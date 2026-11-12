@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Circle, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
+import FacilityPopupContent from "./FacilityPopupContent";
 
 // FIX — bins/toilets stopped appearing as pins on the map when a
 // previous pass swapped react-leaflet for a plain OpenStreetMap iframe
@@ -134,29 +135,11 @@ function clusterIcon({ count, severity, compact }) {
   });
 }
 
-const STATUS_LABELS = {
-  normal: "Normal",
-  almost_full: "Almost full",
-  overflow: "Overflow",
-};
-
-const KIND_LABELS = { bin: "Dustbin", toilet: "Public toilet" };
-
-// Click popup: name, type, coordinates, status — and a DEMO tag for any
-// simulated location so it is never mistaken for a verified one.
-function InfoPopup({ item, kind }) {
-  const typeLabel = item.typeLabel ?? KIND_LABELS[kind] ?? "Location";
-  const status = STATUS_LABELS[item.status] ?? item.status;
+// Click popup (content in FacilityPopupContent, so it can be tested without Leaflet).
+function InfoPopup({ item, kind, rating, onReport }) {
   return (
     <Popup>
-      <div style={{ minWidth: 170, fontSize: 12, lineHeight: 1.45 }}>
-        <div style={{ fontWeight: 700, fontSize: 13 }}>{item.name}</div>
-        <div>{typeLabel}</div>
-        <div>
-          {Number(item.latitude).toFixed(6)}, {Number(item.longitude).toFixed(6)}
-        </div>
-        {status && <div>Status: {status}</div>}
-      </div>
+      <FacilityPopupContent item={item} kind={kind} rating={rating} onReport={onReport} />
     </Popup>
   );
 }
@@ -213,6 +196,8 @@ function FacilityPoints({
   selectedId,
   onSelectBin,
   onSelectToilet,
+  ratings,
+  onReport,
 }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
@@ -303,7 +288,7 @@ function FacilityPoints({
                 {item.name}
               </Tooltip>
             )}
-            {interactive && !compact && <InfoPopup item={item} kind={kind} />}
+            {interactive && !compact && <InfoPopup item={item} kind={kind} rating={ratings?.get?.(item.id)} onReport={onReport} />}
           </Marker>
         );
       })}
@@ -382,6 +367,8 @@ export default function FacilityMap({
   compact = false,
   cluster = true,
   className = "",
+  ratings = null, // Map of toiletId -> rating summary, shown in toilet popups
+  onReport = null, // (kind, item) => void: adds "Report an issue" to bin/toilet popups
 }) {
   const selectedKey = selectedKind && selectedId ? `${selectedKind}-${selectedId}` : null;
 
@@ -465,6 +452,8 @@ export default function FacilityMap({
           selectedId={selectedId}
           onSelectBin={onSelectBin}
           onSelectToilet={onSelectToilet}
+          ratings={ratings}
+          onReport={onReport}
         />
         {genericMarkers}
         {radiusCircle && (

@@ -7,12 +7,13 @@ import GpsConsentNotice, { GpsAlert } from "../../components/GpsConsentNotice";
 import { useGpsConsent } from "../../hooks/useGpsConsent";
 import { gpsBlocker, gpsErrorMessage, lowAccuracyMessage } from "../../utils/gps";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
-import { useProfile } from "../../hooks/useProfile";
-import { cityCenter, cityPresets } from "../../services/profileService";
 import { createFacilityRequest } from "../../services/facilityRequestService";
+import { compressImage } from "../../utils/imageCompression";
 import {
   FACILITY_TYPES,
   FACILITY_PRIORITIES,
+  FACILITY_PICK_LOCATIONS,
+  CAMPUS_CENTER,
   REASON_MAX_LENGTH,
   DESCRIPTION_MAX_LENGTH,
   MAX_PHOTO_SIZE_BYTES,
@@ -28,7 +29,6 @@ const LOCATION_MODES = [
 export default function WorkerRequestFacility() {
   const navigate = useNavigate();
   const { worker } = useWorkerSession();
-  const workerProfile = useProfile("worker");
   const fileInputRef = useRef(null);
 
   const [facilityType, setFacilityType] = useState(null);
@@ -38,6 +38,7 @@ export default function WorkerRequestFacility() {
   const [priority, setPriority] = useState("MEDIUM");
   const [photo, setPhoto] = useState(null); // { dataUrl, name }
   const [photoError, setPhotoError] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   const [locationMode, setLocationMode] = useState("gps");
   const [gpsStatus, setGpsStatus] = useState("idle"); // idle | locating | done | error
@@ -110,13 +111,15 @@ export default function WorkerRequestFacility() {
       return;
     }
     if (file.size > MAX_PHOTO_SIZE_BYTES) {
-      setPhotoError("Image is too large. Max size is 3 MB.");
+      setPhotoError("Image is too large. Max size is 10 MB.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setPhoto({ dataUrl: reader.result, name: file.name });
-    reader.onerror = () => setPhotoError("Couldn't read that image. Please try another one.");
-    reader.readAsDataURL(file);
+    // Shrunk on the device to under 1 MB: the API refuses anything larger.
+    setPhotoBusy(true);
+    compressImage(file)
+      .then(({ dataUrl }) => setPhoto({ dataUrl, name: file.name }))
+      .catch((err) => setPhotoError(err.message))
+      .finally(() => setPhotoBusy(false));
   };
 
   const validate = () => {
@@ -290,13 +293,13 @@ export default function WorkerRequestFacility() {
                 theme="orange"
                 value={pickedLocation}
                 onChange={handlePickMapLocation}
-                presets={cityPresets(workerProfile)}
-                presetsLabel="Your city"
+                presets={FACILITY_PICK_LOCATIONS}
+                presetsLabel="Known areas"
               />
               <p className="mt-3 text-xs font-medium text-slate-500">Or tap the map to drop a pin</p>
               <PickLocationMap
                 value={hasCoords ? { latitude: Number(latitude), longitude: Number(longitude) } : null}
-                center={cityCenter(workerProfile)}
+                center={CAMPUS_CENTER}
                 onPick={({ latitude: la, longitude: lo }) => {
                   setLatitude(String(la));
                   setLongitude(String(lo));
@@ -368,7 +371,7 @@ export default function WorkerRequestFacility() {
               setAddressText(e.target.value);
               if (errors.address) setErrors((er) => ({ ...er, address: undefined }));
             }}
-            placeholder="e.g. Near the main market gate"
+            placeholder="e.g. Near COER University main gate"
             className="w-full rounded-2xl border border-orange-100 bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none"
           />
           {errors.address && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.address}</p>}
@@ -444,8 +447,10 @@ export default function WorkerRequestFacility() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50"
-              aria-label="Add photo"
+              disabled={photoBusy}
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 disabled:opacity-60"
+              aria-label={photoBusy ? "Preparing photo" : "Add photo"}
+              aria-busy={photoBusy}
             >
               <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />

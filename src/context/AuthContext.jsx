@@ -1,55 +1,159 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
+  LOGIN_METHOD,
   clearLegacySessions,
   clearSession,
   isSessionKey,
   readSession,
+  startOtpSession,
   startSession,
 } from "../services/authSession";
-import { resetStore } from "../services/locationStore";
-import { clearAllData } from "../services/dataReset";
-import { notifyProfilesChanged } from "../services/profileService";
-import { notifyComplaintsChanged } from "../services/complaintService";
+import { signOutUser } from "../services/authService";
+import { selectWorker } from "../hooks/useWorkerSession";
+import { resetStore as resetLocations } from "../services/locationStore";
+import { resetComplaintCache } from "../services/complaintService";
+import { resetGovProfileCache } from "../services/govProfileService";
+import { resetWorkerCache } from "../services/workerService";
+import { reset as resetNotifications } from "../services/notificationRemote";
+import { clearConsentCache } from "../services/consentService";
+
+// One user's cached data must never show to the next one.
+const resetStore = () => {
+  resetLocations();
+  resetComplaintCache();
+  resetGovProfileCache();
+  resetWorkerCache();
+  resetNotifications();
+  clearConsentCache();
+};
+import { apiEnabled } from "../services/apiConfig";
+import { SESSION_EXPIRED_MESSAGE, getSessionClient } from "../services/session";
 
 const AuthContext = createContext(null);
 
-// The signed-in demo user ({ id, name, role, loginAt }) from services/authSession.js.
+// The API's user ({ uid, role, name, phone, isDemo, wid }) in the shape the
+// screens already use ({ id, name, role, method, phone?, workerId }).
+function toAppUser(u) {
+  if (!u) return null;
+  return {
+    id: u.uid,
+    name: u.name || u.role,
+    role: u.role,
+    method: u.isDemo ? LOGIN_METHOD.DEMO : LOGIN_METHOD.OTP,
+    ...(u.phone ? { phone: u.phone } : {}),
+    workerId: u.wid ?? null,
+  };
+}
+
+/**
+ * The signed-in user.
+ *
+ * Browser-local mode (default): the session in services/authSession.js.
+ * API mode (VITE_USE_API=true): the session from services/session.js — the
+ * access token in memory only, restored from the refresh cookie on page load
+ * (`status` is "loading" until then), and the role always from the server.
+ * A session that ends on its own (a refused refresh) sets `notice`, which the
+ * login page shows.
+ */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(readSession);
+  const [useApi] = useState(apiEnabled);
+  const [user, setUser] = useState(() => (useApi ? null : readSession()));
+  const [status, setStatus] = useState(useApi ? "loading" : "ready");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     clearLegacySessions();
   }, []);
 
-  // Signing in or out in another tab applies here too.
+  // Browser-local mode: signing in or out in another tab applies here too.
   useEffect(() => {
+    if (useApi) return undefined;
     const onStorage = (e) => {
       if (e.key === null || isSessionKey(e.key)) setUser(readSession());
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }, [useApi]);
 
-  /** Signs in as `role` straight away. Returns the new session. */
+  // API mode: follow the session client, and restore the session once on load.
+  // restore() is memoised, so StrictMode running this effect twice still sends
+  // a single /refresh.
+  useEffect(() => {
+    if (!useApi) return undefined;
+    const client = getSessionClient();
+    let live = true;
+    const off = client.onChange(({ user: next, reason }) => {
+      const appUser = toAppUser(next);
+      if (appUser?.role === "worker" && appUser.workerId) selectWorker(appUser.workerId);
+      if (!appUser) resetStore();
+      setUser(appUser);
+      if (reason === "expired") setNotice(SESSION_EXPIRED_MESSAGE);
+    });
+    client
+      .restore()
+      .then((session) => {
+        if (live && session) setUser(toAppUser(session.user));
+      })
+      .catch((err) => {
+        if (live) setNotice(err.message);
+      })
+      .finally(() => {
+        if (live) setStatus("ready");
+      });
+    return () => {
+      live = false;
+      off();
+    };
+  }, [useApi]);
+
+  /** Demo login. Returns the new user (a Promise in API mode). */
   const login = (role, name) => {
+    setNotice("");
+    if (useApi) {
+      // The server signs in as its seeded demo user for this role; nothing else is sent.
+      return getSessionClient()
+        .loginDemo(role)
+        .then(({ user: u }) => {
+          const appUser = toAppUser(u);
+          resetStore();
+          setUser(appUser);
+          return appUser;
+        });
+    }
     const session = startSession(role, name);
+    if (role === "worker") selectWorker(session.id);
     resetStore();
     setUser(session);
     return session;
   };
 
-  const resetAuth = () => {
-    clearSession();
+  /** Phone login, after Firebase has verified the OTP. The server (or, locally, the client) makes it a citizen. */
+  const loginWithOtp = ({ uid, phone, idToken }) => {
+    setNotice("");
+    if (useApi) {
+      return getSessionClient()
+        .loginFirebase(idToken)
+        .then(({ user: u }) => {
+          const appUser = toAppUser(u);
+          resetStore();
+          setUser(appUser);
+          return appUser;
+        });
+    }
+    const session = startOtpSession({ uid, phone });
     resetStore();
-    setUser(null);
+    setUser(session);
+    return session;
   };
 
-  /** "Reset all data": wipes every EcoSetu key and profile, then signs out. */
-  const resetAllData = () => {
-    clearAllData();
+  /** Signs out. `notice` is shown on the login page (e.g. after withdrawing consent). */
+  const resetAuth = ({ notice: message = "" } = {}) => {
+    // OTP sessions also hold a Firebase sign-in; signOutUser never rejects.
+    if (user?.method === LOGIN_METHOD.OTP) signOutUser();
+    if (useApi) getSessionClient().logout();
+    else clearSession();
     resetStore();
-    notifyProfilesChanged();
-    notifyComplaintsChanged();
+    setNotice(message);
     setUser(null);
   };
 
@@ -57,9 +161,12 @@ export function AuthProvider({ children }) {
     user,
     role: user?.role ?? null,
     isAuthenticated: Boolean(user),
+    status,
+    notice,
+    usesApi: useApi,
     login,
+    loginWithOtp,
     resetAuth,
-    resetAllData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

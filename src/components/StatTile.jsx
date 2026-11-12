@@ -17,23 +17,19 @@ const INTERACTIVE_CARD =
 const STATIC_CARD =
   "flex items-center gap-2.5 rounded-2xl border border-emerald-100 bg-white p-3 text-left shadow-sm";
 
-// `compact` shrinks padding/icon/text for no-scroll dashboards (see
-// CitizenHome, WorkerDashboard) — same content, tighter footprint.
-export default function StatTile({ icon, label, value, color = "emerald", onClick, compact = false }) {
+export default function StatTile({ icon, label, value, color = "emerald", onClick }) {
   const Comp = onClick ? "button" : "div";
   return (
     <Comp
       onClick={onClick}
       type={onClick ? "button" : undefined}
-      className={`${onClick ? INTERACTIVE_CARD : STATIC_CARD} ${compact ? "!gap-2 !p-2.5" : ""}`}
+      className={onClick ? INTERACTIVE_CARD : STATIC_CARD}
     >
-      <span
-        className={`flex shrink-0 items-center justify-center rounded-full ${ICON_BG[color]} ${compact ? "h-8 w-8 [&_svg]:h-4 [&_svg]:w-4" : "h-9 w-9"}`}
-      >
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${ICON_BG[color]}`}>
         {icon}
       </span>
       <span className="min-w-0 flex-1">
-        <span className={`block font-bold leading-tight text-emerald-950 ${compact ? "text-base" : "text-xl"}`}>{value}</span>
+        <span className="block text-xl font-bold leading-tight text-emerald-950">{value}</span>
         <span className="block text-[11px] leading-tight text-emerald-800/60">{label}</span>
       </span>
       {/* USABILITY AUDIT FIX (round 2, issue 4 — unclear which cards are

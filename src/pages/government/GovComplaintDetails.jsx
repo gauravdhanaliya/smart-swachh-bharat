@@ -1,13 +1,14 @@
 import { useState } from "react";
+import { facilityLabel } from "../../utils/facility";
 import { useNavigate, useParams } from "react-router-dom";
 import GovShell from "../../components/GovShell";
 import StatusBadge from "../../components/StatusBadge";
 import PriorityBadge from "../../components/PriorityBadge";
 import ComplaintTimeline from "../../components/ComplaintTimeline";
-import { useComplaint } from "../../hooks/useComplaints";
+import { useComplaint, useComplaintsStatus } from "../../hooks/useComplaints";
+import ProtectedImage from "../../components/ProtectedImage";
 import { assignComplaint, updateComplaint } from "../../services/complaintService";
-import { STATUS, PRIORITY } from "../../data/complaints";
-import { useWorkers } from "../../hooks/useWorkers";
+import { STATUS, PRIORITY, WORKERS } from "../../data/complaints";
 
 function formatDateTime(iso) {
   return new Date(iso).toLocaleString("en-IN", {
@@ -23,17 +24,27 @@ export default function GovComplaintDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const complaint = useComplaint(id);
-  const { workers } = useWorkers();
+  const loadStatus = useComplaintsStatus();
   const [selectedWorkerId, setSelectedWorkerId] = useState("");
   const [error, setError] = useState("");
   const [assigning, setAssigning] = useState(false);
+
+  if (!complaint && !loadStatus.loaded && !loadStatus.error) {
+    return (
+      <GovShell title="Complaint Details">
+        <p role="status" className="px-5 py-10 text-center text-sm text-slate-500">
+          Loading…
+        </p>
+      </GovShell>
+    );
+  }
 
   if (!complaint) {
     return (
       <GovShell title="Complaint Details">
         <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
           <p className="font-semibold text-slate-900">Complaint not found</p>
-          <p className="text-sm text-slate-500">It may have been deleted, or the app's data was reset.</p>
+          <p className="text-sm text-slate-500">It may have been removed from the demo data set.</p>
           <button
             type="button"
             onClick={() => navigate("/official/complaints")}
@@ -46,27 +57,31 @@ export default function GovComplaintDetails() {
     );
   }
 
-  const handleAssign = () => {
+  const handleAssign = async () => {
     if (!selectedWorkerId) {
       setError("Select a worker to assign.");
       return;
     }
+    setError("");
     setAssigning(true);
-    const worker = workers.find((w) => w.id === selectedWorkerId);
-    if (!worker) {
-      setError("That worker is no longer in the directory.");
-      setAssigning(false);
-      return;
-    }
+    const worker = WORKERS.find((w) => w.id === selectedWorkerId);
     try {
-      assignComplaint(complaint.id, worker.id, worker.name);
+      await assignComplaint(complaint.id, worker.id, worker.name);
+    } catch (err) {
+      // e.g. the API: that worker has no active account, or work already started
+      setError(err?.fields?.workerId || err?.message || "The complaint couldn't be assigned.");
     } finally {
       setAssigning(false);
     }
   };
 
-  const handlePriorityChange = (e) => {
-    updateComplaint(complaint.id, { priority: e.target.value });
+  const handlePriorityChange = async (e) => {
+    setError("");
+    try {
+      await updateComplaint(complaint.id, { priority: e.target.value });
+    } catch (err) {
+      setError(err?.message || "The priority couldn't be changed.");
+    }
   };
 
   const isUnassigned = complaint.status === STATUS.SUBMITTED;
@@ -92,6 +107,7 @@ export default function GovComplaintDetails() {
               <div>
                 <p className="text-xs font-medium text-slate-500">#{complaint.id}</p>
                 <p className="text-xl font-bold text-slate-900">{complaint.issueType}</p>
+                {facilityLabel(complaint) && <p className="text-sm font-medium text-sky-700">{facilityLabel(complaint)}</p>}
               </div>
               <div className="flex items-center gap-2">
                 <PriorityBadge priority={complaint.priority} />
@@ -100,7 +116,7 @@ export default function GovComplaintDetails() {
             </div>
 
             {complaint.photo && (
-              <img
+              <ProtectedImage
                 src={complaint.photo}
                 alt="Reported issue"
                 className="mt-4 h-56 w-full rounded-xl object-cover"
@@ -177,17 +193,12 @@ export default function GovComplaintDetails() {
                 <option value="" disabled>
                   Select a worker…
                 </option>
-                {workers.map((w) => (
+                {WORKERS.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name} — {w.area}
                   </option>
                 ))}
               </select>
-              {workers.length === 0 && (
-                <p className="mt-1.5 text-xs text-slate-500">
-                  No workers yet. A sanitation worker appears here after they sign in and complete their profile, or you can add one on the Workers page.
-                </p>
-              )}
               {error && <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>}
               <button
                 type="button"
@@ -203,7 +214,7 @@ export default function GovComplaintDetails() {
               <p className="mb-1 text-sm font-bold text-slate-900">Assigned To</p>
               <p className="text-sm text-slate-700">{complaint.assignedWorkerName}</p>
               <p className="mt-1 text-xs text-slate-400">
-                The complaint stays with this worker until it is resolved.
+                Reassignment isn't needed for this demo once a worker is on the job.
               </p>
             </div>
           )}

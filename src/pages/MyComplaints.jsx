@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CitizenShell from "../components/CitizenShell";
 import StatusBadge from "../components/StatusBadge";
-import { useComplaints } from "../hooks/useComplaints";
+import { useComplaints, useComplaintsStatus } from "../hooks/useComplaints";
+import ListLoadStatus from "../components/ListLoadStatus";
 import { voteComplaint } from "../services/complaintService";
 import { STATUS } from "../data/complaints";
 
@@ -49,7 +50,13 @@ function VoteButton({ direction, active, count, onClick }) {
 export default function MyComplaints() {
   const navigate = useNavigate();
   const complaints = useComplaints();
+  const loadStatus = useComplaintsStatus();
   const [tab, setTab] = useState("all");
+  const [voteError, setVoteError] = useState("");
+  const vote = (id, direction) =>
+    Promise.resolve(voteComplaint(id, direction))
+      .then(() => setVoteError(""))
+      .catch((err) => setVoteError(err.message || "Your vote couldn't be saved."));
 
   const filtered = useMemo(() => {
     if (tab === "resolved") return complaints.filter((c) => c.status === STATUS.RESOLVED);
@@ -73,6 +80,13 @@ export default function MyComplaints() {
         <h1 className="text-lg font-bold text-emerald-950">My Complaints</h1>
       </div>
 
+      <ListLoadStatus status={loadStatus} what="complaints" />
+      {voteError && (
+        <p role="alert" className="mx-5 mb-2 rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+          {voteError}
+        </p>
+      )}
+
       <div className="flex gap-2 px-5 pb-3">
         {TABS.map((t) => (
           <button
@@ -91,20 +105,7 @@ export default function MyComplaints() {
       </div>
 
       <div className="flex flex-col gap-3 px-5 pb-8">
-        {complaints.length === 0 && (
-          <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-emerald-200 bg-white px-6 py-10 text-center">
-            <p className="text-sm font-medium text-emerald-900">No complaints yet. Report your first issue.</p>
-            <button
-              type="button"
-              onClick={() => navigate("/citizen/report")}
-              className="rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"
-            >
-              Report Issue
-            </button>
-          </div>
-        )}
-
-        {complaints.length > 0 && filtered.length === 0 && (
+        {filtered.length === 0 && (
           <p className="mt-6 text-center text-sm text-emerald-800/60">
             No complaints in this category yet.
           </p>
@@ -134,13 +135,13 @@ export default function MyComplaints() {
                 direction="up"
                 active={c.myVote === "up"}
                 count={c.upvotes ?? 0}
-                onClick={() => voteComplaint(c.id, "up")}
+                onClick={() => vote(c.id, "up")}
               />
               <VoteButton
                 direction="down"
                 active={c.myVote === "down"}
                 count={c.downvotes ?? 0}
-                onClick={() => voteComplaint(c.id, "down")}
+                onClick={() => vote(c.id, "down")}
               />
             </div>
           </div>

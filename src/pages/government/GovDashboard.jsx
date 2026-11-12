@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import GovShell from "../../components/GovShell";
 import GovKpiCard from "../../components/GovKpiCard";
 import GovComplaintsList from "../../components/GovComplaintsList";
-import { useFacilityRequests } from "../../hooks/useFacilityRequests";
 import StatusFilterTabs from "../../components/StatusFilterTabs";
 import FacilityMap from "../../components/FacilityMap";
 import { googleMapsSearchUrl } from "../../components/SimpleMap";
@@ -13,8 +12,8 @@ import { useLiveBins } from "../../hooks/useLiveBins";
 import { useLiveToilets } from "../../hooks/useLiveToilets";
 import { useGovProfile } from "../../hooks/useGovProfile";
 import { getGovJurisdictionCenter } from "../../services/govProfileService";
-import { INDIA_CENTER } from "../../data/facilityRequests";
 import { STATUS } from "../../data/complaints";
+import { BIN_STATUS_LABELS } from "../../data/bins";
 import { computeComplaintStats, computeBinStats } from "../../utils/govStats";
 
 const FILTERS = [
@@ -25,8 +24,9 @@ const FILTERS = [
   { value: STATUS.RESOLVED, label: "Resolved" },
 ];
 
-// The map opens on the official's profile city; INDIA_CENTER is only a
-// fallback before a profile exists.
+// Fallback map center if the officer's chosen district (Profile page)
+// isn't one getGovJurisdictionCenter() has coordinates for.
+const LUCKNOW_CENTER = { latitude: 26.8467, longitude: 80.9462 };
 const CITY_ZOOM = 12;
 const SELECTED_ZOOM = 16;
 
@@ -45,22 +45,17 @@ function LegendDot({ color, label }) {
   );
 }
 
-function FillBar({ color, label, value, total }) {
-  const pct = total === 0 ? 0 : Math.round((value / total) * 100);
+// One row of the bin status overview: how many bins are in this status.
+function StatusCountRow({ color, label, value }) {
   return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="flex items-center gap-1.5 font-medium text-slate-700">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-          {label}
-        </span>
-        <span className="text-slate-400">
-          {value} · {pct}%
-        </span>
-      </div>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-      </div>
+    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm">
+      <span className="flex items-center gap-2 font-medium text-slate-700">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <span>{label}</span>
+      </span>
+      <span className="font-semibold text-slate-900">
+        {value} {value === 1 ? "bin" : "bins"}
+      </span>
     </div>
   );
 }
@@ -68,7 +63,6 @@ function FillBar({ color, label, value, total }) {
 export default function GovDashboard() {
   const navigate = useNavigate();
   const complaints = useComplaints();
-  const facilityRequests = useFacilityRequests();
   const bins = useLiveBins();
   const toilets = useLiveToilets();
   const { profile } = useGovProfile();
@@ -86,9 +80,8 @@ export default function GovDashboard() {
   const recent = filtered.slice(0, 8);
 
   const jurisdictionCenter = useMemo(
-    () => getGovJurisdictionCenter() ?? INDIA_CENTER,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [profile.cityName, profile.state]
+    () => getGovJurisdictionCenter() ?? LUCKNOW_CENTER,
+    [profile.district, profile.state]
   );
   const mapCenter = selected
     ? { latitude: selected.data.latitude, longitude: selected.data.longitude }
@@ -98,7 +91,7 @@ export default function GovDashboard() {
   return (
     <GovShell
       title="Dashboard"
-      subtitle={`Overview of Waste Management & Sanitation Activities${profile.cityName ? ` — ${profile.cityName}` : ""}`}
+      subtitle={`Overview of Waste Management & Sanitation Activities — ${profile.district} District`}
     >
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         <GovKpiCard
@@ -199,26 +192,11 @@ export default function GovDashboard() {
         </div>
 
         <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <h2 className="text-base font-bold text-slate-900">Bin Fill Level Overview</h2>
+          <h2 className="text-base font-bold text-slate-900">Bin Status Overview</h2>
           <div className="flex flex-col gap-3">
-            <FillBar
-              color={BIN_STATUS_STYLE.normal.color}
-              label="Normal (≤ 70%)"
-              value={binStats.normal}
-              total={binStats.total}
-            />
-            <FillBar
-              color={BIN_STATUS_STYLE.almost_full.color}
-              label="Almost Full (71–90%)"
-              value={binStats.almostFull}
-              total={binStats.total}
-            />
-            <FillBar
-              color={BIN_STATUS_STYLE.overflow.color}
-              label="Overflow (> 90%)"
-              value={binStats.overflowing}
-              total={binStats.total}
-            />
+            <StatusCountRow color={BIN_STATUS_STYLE.normal.color} label={BIN_STATUS_LABELS.normal} value={binStats.normal} />
+            <StatusCountRow color={BIN_STATUS_STYLE.almost_full.color} label={BIN_STATUS_LABELS.almost_full} value={binStats.almostFull} />
+            <StatusCountRow color={BIN_STATUS_STYLE.overflow.color} label={BIN_STATUS_LABELS.overflow} value={binStats.overflowing} />
           </div>
           <div className="mt-1 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
             <span>{binStats.total} Total Bins</span>
@@ -239,16 +217,7 @@ export default function GovDashboard() {
           <StatusFilterTabs options={FILTERS} value={filter} onChange={setFilter} />
         </div>
 
-        <GovComplaintsList
-          complaints={recent}
-          emptyMessage={
-            complaints.length === 0 && facilityRequests.length === 0
-              ? "No complaints or facility requests yet."
-              : complaints.length === 0
-                ? "No complaints yet."
-                : "No complaints with this status."
-          }
-        />
+        <GovComplaintsList complaints={recent} />
       </div>
     </GovShell>
   );

@@ -17,6 +17,8 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { loadConfig } from "../src/config.js";
 import { connectDatabase } from "../src/db.js";
+import { migrateBinLocation } from "../src/constants.js";
+import { hashPhone, maskPhone } from "../src/phone.js";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -25,7 +27,7 @@ const file = args.find((a) => !a.startsWith("--")) ?? "server/data/ecosetu.db";
 const tableExists = (db, name) =>
   Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
 
-const location = (r) => ({
+const location = (r) => migrateBinLocation({
   _id: r.id,
   name: r.name,
   type: r.type,
@@ -68,15 +70,34 @@ const request = (r) => ({
   updatedAt: r.updated_at,
 });
 
-const user = (r) => ({
-  uid: r.uid,
-  phone: r.phone,
-  role: r.role,
-  name: r.name,
-  workerId: r.worker_id ?? null,
-  createdAt: r.updated_at,
-  updatedAt: r.updated_at,
-});
+// The phone number is never copied: only its keyed hash and a masked copy.
+const tenDigits = (phone) => {
+  const d = String(phone ?? "").replace(/\D/g, "").slice(-10);
+  return /^\d{10}$/.test(d) ? d : null;
+};
+const user = (secret) => (r) => {
+  const phone = tenDigits(r.phone);
+  return {
+    uid: r.uid,
+    phoneHash: phone ? hashPhone(phone, secret) : null,
+    phoneMasked: phone ? maskPhone(phone) : null,
+    role: r.role,
+    name: String(r.name ?? r.role).slice(0, 80),
+    workerId: r.worker_id ?? null,
+    isDemo: false,
+    createdAt: r.updated_at,
+    updatedAt: r.updated_at,
+  };
+};
+
+// Old builds stored a request's owner as "role:phone"; the owner is now the uid.
+const ownerByPhone = (users) => {
+  const map = new Map(users.map((u) => [tenDigits(u.phone), u.uid]).filter(([p]) => p));
+  return (requestedByUser) => {
+    const m = /^[a-z]+:(\d{10})$/.exec(requestedByUser ?? "");
+    return (m && map.get(m[1])) ?? requestedByUser;
+  };
+};
 
 async function copy(collection, rows, toDoc, keyOf, label, problems) {
   let inserted = 0;
@@ -127,18 +148,20 @@ try {
   console.log(`${dryRun ? "[dry run] " : ""}Migrating ${file} -> MongoDB database "${config.mongoDbName}"`);
   const problems = [];
   const { db } = conn;
+  const sqliteUsers = tableExists(sqlite, "users") ? sqlite.prepare("SELECT * FROM users").all() : [];
+  const ownerOf = ownerByPhone(sqliteUsers);
 
   await copy(db.collection("locations"), sqlite.prepare("SELECT * FROM locations").all(), location, (d) => ({ _id: d._id }), "locations", problems);
   await copy(
     db.collection("facility_requests"),
     sqlite.prepare("SELECT * FROM facility_requests").all(),
-    request,
+    (r) => ({ ...request(r), requestedByUser: ownerOf(r.requested_by_user) }),
     (d) => ({ _id: d._id }),
     "facility_requests",
     problems
   );
   if (tableExists(sqlite, "users")) {
-    await copy(db.collection("users"), sqlite.prepare("SELECT * FROM users").all(), user, (d) => ({ uid: d.uid }), "users", problems);
+    await copy(db.collection("users"), sqliteUsers, user(config.phoneHashSecret), (d) => ({ uid: d.uid }), "users", problems);
   } else {
     console.log("  users: no users table in this SQLite file (nothing to copy)");
   }

@@ -96,6 +96,12 @@ export default function LocationCard({ kind, item, onViewDetails, onRetryLocatio
         <StatusBadge status={item.status} />
       </div>
 
+      {item.isDemo && (
+        <p className="mt-2 rounded-xl bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-800">
+          DEMO — simulated location, not a verified {isBuilding ? "building position" : "facility"}.
+        </p>
+      )}
+
       <div className="mt-2 space-y-1 text-xs text-emerald-800/70">
         <div className="flex items-center justify-between">
           <span>Latitude</span>
@@ -105,10 +111,10 @@ export default function LocationCard({ kind, item, onViewDetails, onRetryLocatio
           <span>Longitude</span>
           <span className="font-semibold">{item.longitude.toFixed(5)}</span>
         </div>
-        {isBin && (
+        {isBin && item.type && (
           <div className="flex items-center justify-between">
-            <span>Fill Level</span>
-            <span className="font-semibold">{item.fillLevel}%</span>
+            <span>Waste Type</span>
+            <span className="font-semibold">{item.type}</span>
           </div>
         )}
         {!isBin && !isBuilding && (
