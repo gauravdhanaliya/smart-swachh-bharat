@@ -31,7 +31,7 @@ import {
 const THEMES = {
   emerald: {
     field:
-      "w-full rounded-2xl border border-emerald-100 bg-white px-3.5 py-2.5 text-sm text-emerald-950 placeholder:text-emerald-800/40 focus:border-emerald-400 focus:outline-none disabled:bg-emerald-50/50 disabled:text-emerald-800/40",
+      "w-full rounded-2xl border border-emerald-100 bg-white px-3.5 py-2.5 text-sm text-emerald-950 placeholder:text-emerald-800/40 focus:border-emerald-400 focus:outline-none disabled:bg-emerald-50/50 disabled:text-disabled-ink",
     label: "text-emerald-800/70",
     chip: "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100 hover:bg-emerald-100",
     action: "text-emerald-700 hover:bg-emerald-50",
@@ -41,7 +41,7 @@ const THEMES = {
   },
   orange: {
     field:
-      "w-full rounded-2xl border border-orange-100 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none disabled:bg-orange-50/50 disabled:text-slate-400",
+      "w-full rounded-2xl border border-orange-100 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none disabled:bg-orange-50/50 disabled:text-disabled-ink",
     label: "text-slate-600",
     chip: "bg-orange-50 text-orange-800 ring-1 ring-orange-100 hover:bg-orange-100",
     action: "text-orange-700 hover:bg-orange-50",
@@ -51,7 +51,7 @@ const THEMES = {
   },
   sky: {
     field:
-      "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400",
+      "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none disabled:bg-slate-50 disabled:text-disabled-ink",
     label: "text-slate-500",
     chip: "bg-sky-50 text-sky-800 ring-1 ring-sky-100 hover:bg-sky-100",
     action: "text-sky-700 hover:bg-sky-50",
@@ -218,7 +218,7 @@ export default function IndiaLocationPicker({
           type="button"
           onClick={gps.request}
           disabled={gpsStatus === "locating" || gps.asking}
-          className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-xs font-semibold disabled:opacity-60 ${t.action}`}
+          className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-xs font-semibold btn-disabled-quiet ${t.action}`}
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="3" />

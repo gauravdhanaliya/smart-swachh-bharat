@@ -183,7 +183,7 @@ function ConsentScreen({ info, onAccepted, onStale }) {
           onClick={agree}
           disabled={!allTicked || saving}
           aria-describedby={`${ids}-hint`}
-          className="mt-5 min-h-12 w-full cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-5 min-h-12 w-full cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:bg-emerald-800 btn-disabled"
         >
           {saving ? "Saving…" : "Agree and continue"}
         </button>

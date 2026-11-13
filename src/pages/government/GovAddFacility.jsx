@@ -221,7 +221,7 @@ export default function GovAddFacility() {
                   facilityType === t.id
                     ? "border-sky-500 bg-sky-50 text-sky-700"
                     : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                } disabled:cursor-not-allowed disabled:opacity-60`}
+                } btn-disabled-quiet`}
               >
                 <span>{t.icon}</span>
                 {t.label}
@@ -469,7 +469,7 @@ export default function GovAddFacility() {
           <button
             type="submit"
             disabled={saving}
-            className="flex-1 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-60"
+            className="flex-1 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 btn-disabled"
           >
             {saving ? "Saving…" : editing ? "Save Changes" : "Save Facility"}
           </button>

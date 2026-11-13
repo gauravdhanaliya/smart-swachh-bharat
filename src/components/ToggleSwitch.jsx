@@ -17,7 +17,7 @@ export default function ToggleSwitch({ checked, onChange, label, description, di
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between gap-3 py-3 text-left disabled:opacity-50"
+      className="flex w-full items-center justify-between gap-3 py-3 text-left btn-disabled-quiet"
     >
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-emerald-950">{label}</span>

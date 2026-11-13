@@ -119,7 +119,7 @@ export default function DemoLoginSheet({ open, onClose, onPick, busyRole = null,
                       onClick={() => onPick(r.id)}
                       disabled={Boolean(busyRole)}
                       aria-busy={busy || undefined}
-                      className="-mx-2 flex min-h-16 w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 active:bg-emerald-100/70 disabled:cursor-wait disabled:opacity-60"
+                      className="-mx-2 flex min-h-16 w-[calc(100%+1rem)] cursor-pointer items-center gap-3 rounded-2xl px-2 py-2 text-left transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 active:bg-emerald-100/70 btn-disabled-quiet disabled:cursor-wait"
                     >
                       <RoleIcon id={r.id} />
                       <span className="min-w-0 flex-1">

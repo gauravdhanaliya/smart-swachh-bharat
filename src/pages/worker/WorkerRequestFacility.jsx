@@ -257,7 +257,7 @@ export default function WorkerRequestFacility() {
                   type="button"
                   onClick={gps.request}
                   disabled={gpsStatus === "locating"}
-                  className="w-full rounded-full bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  className="w-full rounded-full bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white btn-disabled"
                 >
                   {gpsStatus === "locating" ? "Locating…" : "Use Current GPS Location"}
                 </button>
@@ -448,7 +448,7 @@ export default function WorkerRequestFacility() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={photoBusy}
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 disabled:opacity-60"
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 btn-disabled-quiet"
               aria-label={photoBusy ? "Preparing photo" : "Add photo"}
               aria-busy={photoBusy}
             >
@@ -490,7 +490,7 @@ export default function WorkerRequestFacility() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-full bg-orange-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-900/20 transition active:scale-[0.98] hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300"
+          className="w-full rounded-full bg-orange-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-900/20 transition active:scale-[0.98] hover:bg-orange-700 btn-disabled"
         >
           {submitting ? "Submitting…" : "Submit Request"}
         </button>

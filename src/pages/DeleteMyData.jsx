@@ -184,7 +184,7 @@ function Review({ onDeleted }) {
         type="button"
         onClick={remove}
         disabled={!ready || busy}
-        className="mt-5 mb-4 min-h-12 w-full cursor-pointer rounded-full bg-red-600 px-5 text-sm font-semibold text-white shadow-md shadow-red-900/20 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-5 mb-4 min-h-12 w-full cursor-pointer rounded-full bg-red-600 px-5 text-sm font-semibold text-white shadow-md shadow-red-900/20 hover:bg-red-700 btn-disabled"
       >
         {busy ? "Deleting…" : "Delete my data"}
       </button>
@@ -265,7 +265,7 @@ function VerifyPhone({ who, onDeleted, onSkip }) {
           value={phone}
           disabled={sent}
           onChange={(e) => setPhone(digitsOnly(e.target.value, 10))}
-          className="min-w-0 flex-1 bg-transparent px-3 text-base text-emerald-950 outline-none disabled:opacity-60"
+          className="min-w-0 flex-1 bg-transparent px-3 text-base text-emerald-950 outline-none disabled:text-disabled-ink"
         />
       </div>
 
@@ -274,7 +274,7 @@ function VerifyPhone({ who, onDeleted, onSkip }) {
           type="button"
           onClick={send}
           disabled={busy}
-          className="mt-3 min-h-12 w-full cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white disabled:opacity-60"
+          className="mt-3 min-h-12 w-full cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white btn-disabled"
         >
           {busy ? "Sending…" : "Send code"}
         </button>
@@ -296,7 +296,7 @@ function VerifyPhone({ who, onDeleted, onSkip }) {
             type="button"
             onClick={confirm}
             disabled={busy}
-            className="mt-3 min-h-12 w-full cursor-pointer rounded-full bg-red-600 px-5 text-sm font-semibold text-white disabled:opacity-60"
+            className="mt-3 min-h-12 w-full cursor-pointer rounded-full bg-red-600 px-5 text-sm font-semibold text-white btn-disabled"
           >
             {busy ? "Deleting…" : "Confirm and delete sign-in"}
           </button>

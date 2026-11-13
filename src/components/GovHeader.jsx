@@ -1,9 +1,8 @@
 import Emblem from "./Emblem";
 
 /**
- * Government of India / Ministry header.
- * Shown on the splash screen and can be reused wherever the full
- * ministry attribution is required.
+ * Emblem header shown on the splash screen. (No ministry attribution: this
+ * is a hackathon prototype, not a government service.)
  */
 export default function GovHeader({ compact = false }) {
   return (
@@ -15,9 +14,6 @@ export default function GovHeader({ compact = false }) {
         }`}
       >
         Government of India
-      </p>
-      <p className={`text-emerald-900/70 ${compact ? "text-xs" : "text-sm"}`}>
-        Ministry of Housing and Urban Affairs
       </p>
     </div>
   );

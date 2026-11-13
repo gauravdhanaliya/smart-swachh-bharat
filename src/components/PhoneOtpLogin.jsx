@@ -10,7 +10,7 @@ import { step as stepMotion } from "../utils/motion";
 export const RESEND_COOLDOWN_SECONDS = 30;
 
 const TEXT_BUTTON =
-  "inline-flex min-h-11 cursor-pointer items-center rounded-full px-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:text-emerald-800/50 disabled:hover:bg-transparent";
+  "inline-flex min-h-11 cursor-pointer items-center rounded-full px-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 btn-disabled-quiet disabled:hover:bg-transparent";
 
 /**
  * The message slot under a field. The live region is always there, so a

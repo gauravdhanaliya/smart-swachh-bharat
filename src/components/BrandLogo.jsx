@@ -5,7 +5,7 @@
  * the inner auth screens. `subtitle` is an optional small line under the
  * compact wordmark (no ministry attribution: this is not a government service).
  */
-export default function BrandLogo({ size = "lg", subtitle = "Ministry of Housing and Urban Affairs" }) {
+export default function BrandLogo({ size = "lg", subtitle = null }) {
   const isLarge = size === "lg";
 
   return (

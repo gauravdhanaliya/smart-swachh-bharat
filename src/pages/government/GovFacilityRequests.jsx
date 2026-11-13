@@ -78,7 +78,7 @@ function RequestCard({ request, onApprove, onReject, busy }) {
                     setRejectionReason("");
                   }}
                   disabled={busy}
-                  className="flex-1 rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                  className="flex-1 rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 btn-disabled"
                 >
                   Confirm Reject
                 </button>

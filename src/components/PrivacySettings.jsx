@@ -79,7 +79,7 @@ export default function PrivacySettings() {
             type="button"
             onClick={resetConsent}
             disabled={resetState.busy}
-            className={`${LINK_BUTTON} mt-3 border border-amber-300 bg-white text-amber-900 disabled:opacity-60`}
+            className={`${LINK_BUTTON} mt-3 border border-amber-300 bg-white text-amber-900 btn-disabled-quiet`}
           >
             {resetState.busy ? "Resetting…" : "Reset demo consent"}
           </button>

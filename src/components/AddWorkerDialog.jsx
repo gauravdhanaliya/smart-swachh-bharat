@@ -141,7 +141,7 @@ export default function AddWorkerDialog({ onCancel, onConfirm }) {
             <button
               type="submit"
               disabled={!canConfirm}
-              className="flex-1 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:opacity-50"
+              className="flex-1 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 btn-disabled"
             >
               Add worker
             </button>

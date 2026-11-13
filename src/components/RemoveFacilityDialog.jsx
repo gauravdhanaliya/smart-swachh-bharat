@@ -121,7 +121,7 @@ export default function RemoveFacilityDialog({ facility, category, onCancel, onC
             type="button"
             disabled={!canConfirm}
             onClick={() => onConfirm(finalReason)}
-            className="flex-1 rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-50"
+            className="flex-1 rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 btn-disabled"
           >
             Remove
           </button>

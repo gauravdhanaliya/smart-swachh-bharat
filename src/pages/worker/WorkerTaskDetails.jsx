@@ -194,7 +194,7 @@ export default function WorkerTaskDetails() {
             type="button"
             onClick={handleStartWork}
             disabled={busy}
-            className="w-full rounded-full bg-orange-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-900/10 transition active:scale-[0.98] disabled:opacity-60"
+            className="w-full rounded-full bg-orange-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-900/10 transition active:scale-[0.98] btn-disabled"
           >
             {busy ? "Starting…" : "Start Work"}
           </button>
@@ -275,7 +275,7 @@ export default function WorkerTaskDetails() {
               type="button"
               onClick={handleMarkResolved}
               disabled={busy}
-              className="mt-4 w-full rounded-full bg-orange-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-900/10 transition active:scale-[0.98] disabled:opacity-60"
+              className="mt-4 w-full rounded-full bg-orange-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-900/10 transition active:scale-[0.98] btn-disabled"
             >
               {busy ? "Saving…" : "Mark as Resolved"}
             </button>

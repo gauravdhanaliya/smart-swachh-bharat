@@ -15,11 +15,50 @@
   --color-brand-orange-500: #f5920e;
   --color-brand-orange-600: #e07a00;
 
+  /* Disabled controls: grey, so they read as "off", but the label still
+     meets WCAG AA (5.6:1 on the surface, 6.8:1 on white). Checked in
+     src/utils/contrast.test.js. */
+  --color-disabled-surface: #e4ebe7;
+  --color-disabled-ink: #4d5f55;
+
   /* Login page backdrop blobs. Light enough that brand-green-700 text
      stays AA even where a blob is at full strength. */
   --color-backdrop-green: #d7f5e0;
   --color-backdrop-sky: #d9f0fb;
   --color-backdrop-amber: #ffeccf;
+}
+
+/* A filled button (solid background) while disabled. Also wins over the
+   button's hover/active colours, so a disabled button never lights up. */
+@utility btn-disabled {
+  &:disabled,
+  &:disabled:hover,
+  &:disabled:active {
+    opacity: 1;
+    background-color: var(--color-disabled-surface);
+    background-image: none;
+    border-color: transparent;
+    color: var(--color-disabled-ink);
+    box-shadow: none;
+    scale: 1;
+    cursor: not-allowed;
+  }
+}
+
+/* A text, outline or card-style button while disabled: keeps its shape and
+   background, and its text (including coloured spans inside) turns grey. */
+@utility btn-disabled-quiet {
+  &:disabled,
+  &:disabled:hover,
+  &:disabled:active {
+    opacity: 1;
+    color: var(--color-disabled-ink);
+    scale: 1;
+    cursor: not-allowed;
+  }
+  &:disabled :where(span, p, svg) {
+    color: var(--color-disabled-ink);
+  }
 }
 
 html, body, #root {

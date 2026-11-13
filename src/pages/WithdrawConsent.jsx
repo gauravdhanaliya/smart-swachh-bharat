@@ -68,7 +68,7 @@ export default function WithdrawConsent() {
           type="button"
           onClick={withdraw}
           disabled={busy}
-          className="min-h-12 cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 hover:bg-emerald-800 disabled:opacity-60"
+          className="min-h-12 cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 hover:bg-emerald-800 btn-disabled"
         >
           {busy ? "Withdrawing…" : "Withdraw and sign out"}
         </button>

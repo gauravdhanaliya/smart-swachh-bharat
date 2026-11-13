@@ -229,7 +229,7 @@ function QuickActionsSheet({ onNavigate }) {
               autoFocus={index === 0}
               disabled={action.disabled}
               onClick={() => !action.disabled && onNavigate(action.path)}
-              className={`${CARD_BUTTON} disabled:opacity-50 disabled:hover:bg-white`}
+              className={`${CARD_BUTTON} btn-disabled-quiet disabled:hover:bg-white`}
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
                 <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

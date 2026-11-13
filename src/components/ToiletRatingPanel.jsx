@@ -292,7 +292,7 @@ function ToiletRatingForm({ mine, onSave }) {
       <button
         type="submit"
         disabled={phase === "saving"}
-        className="min-h-12 cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:bg-emerald-800 active:scale-[0.98] disabled:cursor-wait disabled:opacity-60"
+        className="min-h-12 cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:bg-emerald-800 active:scale-[0.98] btn-disabled disabled:cursor-wait"
       >
         {phase === "saving" ? "Saving…" : saved ? "Update rating" : "Submit rating"}
       </button>

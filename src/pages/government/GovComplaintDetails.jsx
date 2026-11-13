@@ -215,7 +215,7 @@ export default function GovComplaintDetails() {
                 type="button"
                 onClick={handleAssign}
                 disabled={assigning}
-                className="mt-3 w-full rounded-full bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-sky-900/10 transition active:scale-[0.98] disabled:opacity-60"
+                className="mt-3 w-full rounded-full bg-sky-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-sky-900/10 transition active:scale-[0.98] btn-disabled"
               >
                 {assigning ? "Assigning…" : "Assign Complaint"}
               </button>
