@@ -4,8 +4,8 @@
 // with the code; raise ECOSETU_CONSENT_VERSION when this changes materially.
 
 // ---- fill these in before going live ----------------------------------------
-export const PRIVACY_CONTACT = "[CONTACT — fill in: the name and email of the person responsible for this app's data]";
-export const ATLAS_REGION = "[REGION — fill in: the Atlas cluster's region, e.g. AWS Mumbai (ap-south-1)]";
+export const PRIVACY_CONTACT = "Gaurav Kumar, Team EcoSetu (gauravgk2177@gmail.com)";
+export const ATLAS_REGION = "AWS Mumbai (ap-south-1), India";
 
 /** What the app collects. */
 export const COLLECTED = [
