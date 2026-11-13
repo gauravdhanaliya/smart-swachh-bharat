@@ -54,6 +54,7 @@ export default function ReportIssue() {
       // A Promise through the API; an object in the browser-only build.
       const complaint = await createComplaint({
         citizenName: user.name,
+        citizenId: user.id,
         issueType: issueType.label,
         description: description.trim(),
         location,

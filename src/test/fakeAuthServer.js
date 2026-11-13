@@ -7,6 +7,50 @@
 // Every response is delayed a little, so concurrent requests really overlap.
 // That is what makes a careless client sign itself out, as it would for real.
 
+// ---- simulated time ---------------------------------------------------------
+// Every simulated delay (server latency, a message between tabs) goes through
+// this one queue, which settles them strictly in due-time order (ties in the
+// order they were scheduled), one per macrotask so each one's follow-up work
+// runs before the next. Plain setTimeout can't promise that: Node runs every
+// expired timer of one duration before any of another (all expired 15 ms
+// server responses before an expired 2 ms message), and Windows rounds timers
+// up to ~15.6 ms ticks, so a message due 13 ms before a response could arrive
+// after it. Real tabs never reorder like that; tests that need messages to be
+// late make them late on purpose (createChannelBus({ delayMs })).
+const queue = [];
+let queueSeq = 0;
+let armed = null; // { timer } waiting for the head's due time, or { immediate } about to pump
+
+function pump() {
+  armed = null;
+  if (!queue.length) return;
+  if (queue[0].due > performance.now()) return arm();
+  queue.shift().resolve();
+  armed = { immediate: setImmediate(pump) }; // after the resolved work's microtasks
+}
+
+function arm() {
+  if (armed || !queue.length) return;
+  const wait = queue[0].due - performance.now();
+  armed = wait > 0 ? { timer: setTimeout(pump, wait) } : { immediate: setImmediate(pump) };
+}
+
+/** Resolves after `ms` of simulated latency, in due-time order with every other simulated delay. */
+export function later(ms) {
+  return new Promise((resolve) => {
+    const item = { due: performance.now() + ms, seq: queueSeq++, resolve };
+    let i = queue.length;
+    while (i > 0 && (queue[i - 1].due > item.due || (queue[i - 1].due === item.due && queue[i - 1].seq > item.seq))) i -= 1;
+    queue.splice(i, 0, item);
+    // A new earliest item: a timer set for the old head would fire too late.
+    if (i === 0 && armed?.timer) {
+      clearTimeout(armed.timer);
+      armed = null;
+    }
+    arm();
+  });
+}
+
 const DEMO = {
   citizen: "demo-citizen",
   worker: "demo-worker",
@@ -27,6 +71,11 @@ export function createFakeAuthServer({ latencyMs = 5 } = {}) {
   const calls = [];
   let seq = 0;
   let offline = false;
+  // What actually signs a user out everywhere: a refresh token presented twice.
+  // That can only happen if two refreshes are in flight at once.
+  let refreshesInFlight = 0;
+  let maxConcurrentRefreshes = 0;
+  let reuseDetected = false;
 
   const json = (status, data) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
 
@@ -53,7 +102,20 @@ export function createFakeAuthServer({ latencyMs = 5 } = {}) {
     const cookie = jar.cookie; // attached when the request leaves the browser
     calls.push({ method, path, body, headers });
     if (offline) throw new TypeError("Failed to fetch");
-    await new Promise((r) => setTimeout(r, latencyMs));
+    const isRefresh = method === "POST" && path === "/api/auth/refresh";
+    if (isRefresh) {
+      refreshesInFlight += 1;
+      maxConcurrentRefreshes = Math.max(maxConcurrentRefreshes, refreshesInFlight);
+    }
+    try {
+      await later(latencyMs);
+      return respond({ method, path, headers, body, cookie });
+    } finally {
+      if (isRefresh) refreshesInFlight -= 1;
+    }
+  }
+
+  function respond({ method, path, headers, body, cookie }) {
 
     const bearer = /^Bearer (.+)$/.exec(headers.authorization ?? "")?.[1];
     if (method === "POST" && path === "/api/auth/refresh") {
@@ -64,6 +126,7 @@ export function createFakeAuthServer({ latencyMs = 5 } = {}) {
         return json(401, { error: "Session expired. Please sign in again." });
       }
       if (t.used) {
+        reuseDetected = true;
         revokeAll(t.uid);
         jar.cookie = null;
         return json(401, { error: "Session expired. Please sign in again." });
@@ -106,6 +169,10 @@ export function createFakeAuthServer({ latencyMs = 5 } = {}) {
     jar,
     calls,
     count: (path) => calls.filter((c) => c.path === path).length,
+    /** Most /api/auth/refresh calls ever in flight at once (more than 1 risks a reused cookie). */
+    maxConcurrentRefreshes: () => maxConcurrentRefreshes,
+    /** True once a used refresh token was presented (the server then signs the user out everywhere). */
+    reuseDetected: () => reuseDetected,
     /** A session from an earlier visit: a valid refresh cookie in the jar, nothing in memory. */
     signInEarlier(uid = "demo-citizen") {
       issue(uid);
@@ -157,7 +224,7 @@ export function createChannelBus({ delayMs = 2 } = {}) {
         const copy = structuredClone(data);
         for (const other of channels) {
           if (other === channel || other.name !== name) continue;
-          setTimeout(() => other._deliver(copy), delayMs);
+          later(delayMs).then(() => other._deliver(copy));
         }
       },
       addEventListener(type, fn) {

@@ -15,16 +15,23 @@ function renderAt(path) {
   );
 }
 
+// The notice is its own lazily loaded page: wait for it to arrive.
+async function openNotice() {
+  const view = renderAt("/privacy");
+  await screen.findByRole("heading", { level: 1, name: /privacy notice/i });
+  return view;
+}
+
 const rowFor = (table, name) => within(table).getAllByRole("row").find((r) => within(r).queryByRole("rowheader", { name }));
 
 describe("privacy notice", () => {
-  it("is public: it opens without signing in", () => {
-    renderAt("/privacy");
+  it("is public: it opens without signing in", async () => {
+    await openNotice();
     expect(screen.getByRole("heading", { level: 1, name: /privacy notice/i })).toBeInTheDocument();
   });
 
-  it("has a table of what is collected: data, why, where it is stored, whether it is required", () => {
-    renderAt("/privacy");
+  it("has a table of what is collected: data, why, where it is stored, whether it is required", async () => {
+    await openNotice();
     const table = screen.getByRole("table", { name: /what we collect/i });
     const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent);
     expect(headers).toEqual(["Data", "Why we need it", "Where it is stored", "Required?"]);
@@ -34,8 +41,8 @@ describe("privacy notice", () => {
     expect(rowFor(table, /location/i)).toHaveTextContent(/only when you report, never when the app opens/i);
   });
 
-  it("lists every place data goes, with what, why and how long it is kept", () => {
-    renderAt("/privacy");
+  it("lists every place data goes, with what, why and how long it is kept", async () => {
+    await openNotice();
     const table = screen.getByRole("table", { name: /where your data goes/i });
     expect(within(table).getAllByRole("columnheader").map((h) => h.textContent)).toEqual(["Where", "What", "Why", "How long it is kept"]);
     const firebase = rowFor(table, /firebase authentication/i);
@@ -58,15 +65,15 @@ describe("privacy notice", () => {
     expect(rowFor(table, /google fonts/i)).toBeTruthy();
   });
 
-  it("explains the difference between withdrawing consent and deleting data", () => {
-    renderAt("/privacy");
+  it("explains the difference between withdrawing consent and deleting data", async () => {
+    await openNotice();
     const section = screen.getByRole("region", { name: /withdraw consent or delete your data/i });
     expect(section).toHaveTextContent(/withdraw consent: signs you out.*kept/i);
     expect(section).toHaveTextContent(/delete my data: permanently deletes/i);
   });
 
-  it("explains exactly what deleting your data removes and what it keeps", () => {
-    renderAt("/privacy");
+  it("explains exactly what deleting your data removes and what it keeps", async () => {
+    await openNotice();
     const section = screen.getByRole("region", { name: /deleting your data/i });
     const removed = within(section).getByRole("list", { name: /deleted for good/i });
     for (const item of [/your account/i, /firebase sign-in/i, /photos you attached/i, /toilet ratings/i, /^your notifications$/i, /votes/i, /consent/i]) {
@@ -79,8 +86,8 @@ describe("privacy notice", () => {
     expect(section).toHaveTextContent(/can't be undone/i);
   });
 
-  it("has a contact line", () => {
-    renderAt("/privacy");
+  it("has a contact line", async () => {
+    await openNotice();
     expect(screen.getByRole("region", { name: /contact/i })).toHaveTextContent(PRIVACY_CONTACT);
   });
 

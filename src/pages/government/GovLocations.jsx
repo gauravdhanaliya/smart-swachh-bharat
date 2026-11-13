@@ -6,6 +6,7 @@ import RemoveFacilityDialog from "../../components/RemoveFacilityDialog";
 import RemovedFacilitiesPanel from "../../components/RemovedFacilitiesPanel";
 import { useLiveBuildings } from "../../hooks/useLiveBuildings";
 import { useFacilityRemoval } from "../../hooks/useFacilityRemoval";
+import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { BUILDING_TYPES, BUILDING_TYPE_LABELS } from "../../services/locationAdapters";
 
 const FILTERS = [
@@ -18,6 +19,7 @@ export default function GovLocations() {
   const buildings = useLiveBuildings();
   const [filter, setFilter] = useState("all");
   const removal = useFacilityRemoval("building");
+  const { loaded } = useSyncStatus();
 
   const filtered = useMemo(
     () => (filter === "all" ? buildings : buildings.filter((b) => b.buildingType === filter)),
@@ -55,8 +57,16 @@ export default function GovLocations() {
     >
       <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <p className="text-sm text-slate-500">
-          {buildings.length} locations · {demoCount} are <span className="font-semibold">DEMO</span> (simulated).
-          Replace them with verified coordinates — tap Edit on a card, or see the import steps in server/README.md.
+          {buildings.length === 0 ? (
+            loaded ? "No buildings added yet. Use + Add Building to put gates, hostels, libraries and other landmarks on the map." : "Loading buildings…"
+          ) : demoCount > 0 ? (
+            <>
+              {buildings.length} locations · {demoCount} are <span className="font-semibold">DEMO</span> (simulated).
+              Replace them with verified coordinates — tap Edit on a card, or see the import steps in server/README.md.
+            </>
+          ) : (
+            `${buildings.length} location${buildings.length === 1 ? "" : "s"} on the map. Tap Edit on a card to correct its details or coordinates.`
+          )}
         </p>
         <div className="mt-3">
           <StatusFilterTabs options={FILTERS} value={filter} onChange={setFilter} />

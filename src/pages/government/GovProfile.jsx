@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import PrivacySettings from "../../components/PrivacySettings";
 import GovShell from "../../components/GovShell";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { resetDemoData } from "../../services/complaintService";
@@ -19,6 +20,7 @@ export default function GovProfile() {
   const navigate = useNavigate();
   const { profile, updateProfile } = useGovProfile();
   const [resetDone, setResetDone] = useState(false);
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
 
@@ -243,7 +245,7 @@ export default function GovProfile() {
 
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => setConfirmingLogout(true)}
               className="mt-3 w-full rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition active:scale-[0.98]"
             >
               Logout
@@ -251,6 +253,15 @@ export default function GovProfile() {
           </>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmingLogout}
+        title="Log out of EcoSetu?"
+        message="You can sign back in any time by choosing Government Official on the login page."
+        confirmLabel="Log out"
+        danger
+        onCancel={() => setConfirmingLogout(false)}
+        onConfirm={handleLogout}
+      />
     </GovShell>
   );
 }

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PrivacySettings from "../../components/PrivacySettings";
 import WorkerShell from "../../components/WorkerShell";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import { useAuth } from "../../context/AuthContext";
 import { useComplaints } from "../../hooks/useComplaints";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
@@ -19,6 +21,7 @@ function initials(name) {
 export default function WorkerProfile() {
   const navigate = useNavigate();
   const { user, resetAuth } = useAuth();
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
   const complaints = useComplaints();
   const { worker, setWorkerId } = useWorkerSession();
 
@@ -103,7 +106,7 @@ export default function WorkerProfile() {
 
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setConfirmingLogout(true)}
           className="mt-2 flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-sm"
         >
           <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -113,6 +116,15 @@ export default function WorkerProfile() {
           Logout
         </button>
       </div>
+      <ConfirmDialog
+        open={confirmingLogout}
+        title="Log out of EcoSetu?"
+        message="You can sign back in any time by choosing Sanitation Worker on the login page."
+        confirmLabel="Log out"
+        danger
+        onCancel={() => setConfirmingLogout(false)}
+        onConfirm={handleLogout}
+      />
     </WorkerShell>
   );
 }

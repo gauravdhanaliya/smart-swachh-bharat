@@ -99,6 +99,14 @@ describe("b. restoring on page load happens once", () => {
   });
 });
 
+// What signs a user out everywhere is a refresh cookie presented twice, which
+// needs two refreshes in flight at once. Every multi-tab test checks it.
+function expectNoCookieReuse(server) {
+  expect(server.maxConcurrentRefreshes()).toBeLessThanOrEqual(1);
+  expect(server.reuseDetected()).toBe(false);
+  expect(server.hasLiveSession()).toBe(true);
+}
+
 describe("c. several tabs", () => {
   async function twoTabsRace(options) {
     const server = createFakeAuthServer({ latencyMs: 15 });
@@ -120,7 +128,7 @@ describe("c. several tabs", () => {
     expect(a.ok && b.ok).toBe(true);
     expect(server.count("/api/auth/refresh")).toBe(1);
     expect(tabA.getAccessToken()).toBe(tabB.getAccessToken());
-    expect(server.hasLiveSession()).toBe(true);
+    expectNoCookieReuse(server);
     await expect(tabB.request("/api/data")).resolves.toMatchObject({ ok: true });
   });
 
@@ -130,7 +138,7 @@ describe("c. several tabs", () => {
     expect(a.ok && b.ok).toBe(true);
     expect(server.count("/api/auth/refresh")).toBe(1);
     expect(tabA.getAccessToken()).toBe(tabB.getAccessToken());
-    expect(server.hasLiveSession()).toBe(true);
+    expectNoCookieReuse(server);
   });
 
   // The hardest case: both tabs start refreshing in the same instant, before
@@ -153,7 +161,7 @@ describe("c. several tabs", () => {
     expect(a?.accessToken).toBeTruthy();
     expect(b?.accessToken).toBe(a.accessToken);
     expect(server.count("/api/auth/refresh")).toBe(1);
-    expect(server.hasLiveSession()).toBe(true);
+    expectNoCookieReuse(server);
     await expect(tabA.request("/api/data")).resolves.toMatchObject({ ok: true });
     await expect(tabB.request("/api/data")).resolves.toMatchObject({ ok: true });
   });
@@ -164,7 +172,7 @@ describe("c. several tabs", () => {
     expect(a?.accessToken).toBeTruthy();
     expect(b?.accessToken).toBe(a.accessToken);
     expect(server.count("/api/auth/refresh")).toBe(1);
-    expect(server.hasLiveSession()).toBe(true);
+    expectNoCookieReuse(server);
     await expect(tabA.request("/api/data")).resolves.toMatchObject({ ok: true });
     await expect(tabB.request("/api/data")).resolves.toMatchObject({ ok: true });
   });
@@ -182,7 +190,37 @@ describe("c. several tabs", () => {
     server.expireAccessTokens();
     await tabB.request("/api/data");
     expect(server.count("/api/auth/refresh")).toBe(2);
-    expect(server.hasLiveSession()).toBe(true);
+    expectNoCookieReuse(server);
+  });
+
+  // Browsers don't order a Web Lock grant against BroadcastChannel delivery:
+  // the tab waiting for the lock can get it before hearing that the other tab
+  // refreshed. It then can't know, so it refreshes too. That must stay safe:
+  // the lock keeps the refreshes one after the other (the second sends the
+  // already-rotated cookie), and the late "refreshed" message must not make
+  // a tab swap its newer session for the older one.
+  it("with locks and late messages between tabs: no overlap, no reused cookie, and both tabs end on the newest session", async () => {
+    const locks = createLockManager();
+    const createChannel = createChannelBus({ delayMs: 40 }); // slower than the server (15 ms)
+    const server = createFakeAuthServer({ latencyMs: 15 });
+    const tabA = tab(server, { locks, createChannel });
+    const tabB = tab(server, { locks, createChannel });
+    await tabA.loginDemo("citizen");
+    await new Promise((r) => setTimeout(r, 80)); // the login reaches tab B
+    expect(tabB.getAccessToken()).toBe(tabA.getAccessToken());
+
+    server.expireAccessTokens();
+    const [a, b] = await Promise.all([tabA.request("/api/data"), tabB.request("/api/data")]);
+    expect(a.ok && b.ok).toBe(true);
+    expect(server.count("/api/auth/refresh")).toBe(2); // B couldn't know A had refreshed
+    expectNoCookieReuse(server);
+
+    await new Promise((r) => setTimeout(r, 150)); // every late message has arrived
+    expect(tabA.getAccessToken()).toBe(tabB.getAccessToken());
+    expect(tabA.getAccessToken()).toBe(`at-${server.count("/api/auth/refresh") + 1}`); // the newest one issued
+    await expect(tabA.request("/api/data")).resolves.toMatchObject({ ok: true });
+    await expect(tabB.request("/api/data")).resolves.toMatchObject({ ok: true });
+    expect(server.count("/api/auth/refresh")).toBe(2);
   });
 
   it("logging out in one tab signs the other tab out too", async () => {

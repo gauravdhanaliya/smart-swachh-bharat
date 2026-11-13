@@ -11,6 +11,7 @@ import { ValidationError, cleanText, pageOf, parsePage, validateLocation, valida
 import { validateConsent, validateDataDeletion, validateRating } from "../../server/src/validate-civic.js";
 import { isLowRated, summarizeRatings } from "../utils/ratings";
 import { GEO_BUSY_MESSAGE } from "../../server/src/geo-shared.js";
+import { requestIdPrefix } from "../../server/src/ids.js";
 import { ADMIN_ROLES, DEFAULT_CONSENT_VERSION, ROLES, REQUEST_FACILITY_TYPES, REQUEST_STATUS, migrateBinLocation } from "../../server/src/constants.js";
 import { CAMPUS, DEMO_BINS, DEMO_BUILDINGS, DEMO_REQUESTS, DEMO_TOILETS } from "../../server/src/seed-data.js";
 import { DEMO_IDS, LOGIN_METHOD, readSession } from "./authSession";
@@ -73,7 +74,7 @@ function insertLocation(db, loc) {
 }
 
 function insertRequest(db, r) {
-  const id = r.id ?? nextId("FR-2026-", db.requests);
+  const id = r.id ?? nextId(requestIdPrefix(r.createdAt ?? new Date()), db.requests);
   const ts = r.createdAt ?? now();
   db.requests.push({
     id,
@@ -151,18 +152,25 @@ function migrateStored(db) {
   return next;
 }
 
-// Last state this tab saw — used if storage is blocked or full.
+// Last state this tab saw — used only while storage can't be read at all
+// (blocked). Empty storage means the data was cleared (another tab, the
+// browser's "clear site data"), so it starts over from the demo seed rather
+// than bringing back what this tab remembered.
 let memory = null;
 
 function load() {
+  let raw = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    raw = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    if (memory) return clone(memory);
+  }
+  try {
     const db = raw ? JSON.parse(raw) : null;
     if (Array.isArray(db?.locations) && Array.isArray(db?.requests)) return migrateStored(db);
   } catch {
-    // malformed or blocked storage — fall through
+    // malformed — start over below
   }
-  if (memory) return clone(memory);
   const db = seed();
   save(db); // persist right away so seeded timestamps stay stable
   return db;

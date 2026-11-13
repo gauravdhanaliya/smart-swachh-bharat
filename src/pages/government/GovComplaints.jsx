@@ -91,7 +91,7 @@ export default function GovComplaints() {
 
         <GovComplaintsList
           complaints={filtered}
-          emptyMessage="No complaints match your search/filter."
+          emptyMessage={complaints.length > 0 ? "No complaints match your search/filter." : loadStatus.loaded ? "No complaints yet." : "Loading complaints…"}
         />
       </div>
     </GovShell>

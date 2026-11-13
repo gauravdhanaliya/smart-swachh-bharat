@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useComplaints } from "./useComplaints";
+import { getComplaints, subscribe as subscribeComplaints } from "../services/complaintService";
 import { useCitizenPreferences } from "./useCitizenPreferences";
 import { getCitizenNotifications, timeAgo } from "../utils/citizenNotifications";
 import { apiEnabled } from "../services/apiConfig";
@@ -21,20 +21,35 @@ function allowedBy(preferences, status) {
   return status === "RESOLVED" ? (preferences?.resolutionAlerts ?? true) : (preferences?.complaintUpdates ?? true);
 }
 
+const NO_ITEMS = [];
+
+/**
+ * What `read()` returns from a store, kept up to date through `subscribe`
+ * while `enabled`. A disabled store is never subscribed to (so it never starts
+ * polling or listening) and reads as empty; if `enabled` flips while mounted,
+ * the snapshot is re-read during that render.
+ */
+function useStoreSnapshot(subscribe, read, enabled) {
+  const [snap, setSnap] = useState(() => ({ enabled, data: enabled ? read() : NO_ITEMS }));
+  if (snap.enabled !== enabled) setSnap({ enabled, data: enabled ? read() : NO_ITEMS });
+  useEffect(() => (enabled ? subscribe(() => setSnap({ enabled: true, data: read() })) : undefined), [subscribe, read, enabled]);
+  return snap.enabled === enabled ? snap.data : NO_ITEMS;
+}
+
+const readServerItems = () => remote.getState().items;
+
 /**
  * Through the API: the notifications the server created, read and marked on
  * the server. Unread dots stay for this visit even after "mark all read".
+ * Inert (no polling, nothing listed) while `enabled` is false.
  */
-function useServerNotifications() {
-  const { preferences } = useCitizenPreferences();
-  const [snapshot, setSnapshot] = useState(() => ({ ...remote.getState() }));
+function useServerNotifications(enabled, preferences) {
+  const items = useStoreSnapshot(remote.subscribe, readServerItems, enabled);
   const unreadThisVisit = useRef(new Set());
 
-  useEffect(() => remote.subscribe(() => setSnapshot({ ...remote.getState() })), []);
-
   const notifications = useMemo(() => {
-    for (const n of snapshot.items) if (!n.readAt) unreadThisVisit.current.add(n.id);
-    return snapshot.items
+    for (const n of items) if (!n.readAt) unreadThisVisit.current.add(n.id);
+    return items
       .filter((n) => n.kind !== "complaint" || allowedBy(preferences, n.status))
       .map((n) => ({
         key: n.id,
@@ -46,9 +61,9 @@ function useServerNotifications() {
         time: timeAgo(n.createdAt),
         unread: !n.readAt || unreadThisVisit.current.has(n.id),
       }));
-  }, [snapshot, preferences]);
+  }, [items, preferences]);
 
-  const unreadCount = snapshot.items.filter((n) => !n.readAt && (n.kind !== "complaint" || allowedBy(preferences, n.status))).length;
+  const unreadCount = items.filter((n) => !n.readAt && (n.kind !== "complaint" || allowedBy(preferences, n.status))).length;
   const markAllRead = useCallback(() => {
     remote.markAllRead().catch(() => {
       // offline: they stay unread and are marked next time
@@ -58,10 +73,12 @@ function useServerNotifications() {
   return { notifications, unreadCount, markAllRead };
 }
 
-/** Browser-only build: notices worked out from the complaints on this device. */
-function useLocalNotifications() {
-  const complaints = useComplaints();
-  const { preferences } = useCitizenPreferences();
+/**
+ * Browser-only build: notices worked out from the complaints on this device.
+ * Inert (reads and lists nothing) while `enabled` is false.
+ */
+function useLocalNotifications(enabled, preferences) {
+  const complaints = useStoreSnapshot(subscribeComplaints, getComplaints, enabled);
   // Captured once per mount, so the notifications page can keep showing
   // its unread dots for this visit even after markAllRead() runs.
   const [seenAt] = useState(readSeenAt);
@@ -85,7 +102,15 @@ function useLocalNotifications() {
   return { notifications, unreadCount, markAllRead };
 }
 
-// Which one is fixed for the lifetime of the app (VITE_USE_API is build-time).
+/**
+ * The citizen's notifications, from the server (VITE_USE_API=true) or worked
+ * out locally. Both hooks run on every render, so the hook order never
+ * depends on the mode; only the selected one subscribes to anything.
+ */
 export function useCitizenNotifications() {
-  return apiEnabled() ? useServerNotifications() : useLocalNotifications();
+  const { preferences } = useCitizenPreferences();
+  const useApi = apiEnabled();
+  const server = useServerNotifications(useApi, preferences);
+  const local = useLocalNotifications(!useApi, preferences);
+  return useApi ? server : local;
 }

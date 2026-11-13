@@ -9,7 +9,6 @@
 
 import {
   STATUS,
-  COMPLAINT_ID_PREFIX,
   SEED_COMPLAINTS,
 } from "../data/complaints";
 import { apiEnabled } from "./apiConfig";
@@ -19,6 +18,7 @@ import { readSession } from "./authSession";
 import { validateComplaint } from "../../server/src/validate-civic.js";
 import { ValidationError } from "../../server/src/validate.js";
 import { DELETED_USER_NAME, PHOTO_NOT_SAVED } from "../../server/src/constants.js";
+import { complaintIdPrefix } from "../../server/src/ids.js";
 
 // With VITE_USE_API=true every function below goes to the EcoSetu API
 // (complaintRemote.js); writes then return Promises. Otherwise they work on
@@ -74,14 +74,16 @@ if (typeof window !== "undefined") {
   });
 }
 
-function generateComplaintId(existing) {
+// Same as the server: the year it was created in (India time), numbered within that year.
+function generateComplaintId(existing, at = new Date()) {
+  const prefix = complaintIdPrefix(at);
   const numbers = existing
     .map((c) => c.id)
-    .filter((id) => id.startsWith(COMPLAINT_ID_PREFIX))
-    .map((id) => parseInt(id.slice(COMPLAINT_ID_PREFIX.length), 10))
+    .filter((id) => id.startsWith(prefix))
+    .map((id) => parseInt(id.slice(prefix.length), 10))
     .filter((n) => !Number.isNaN(n));
   const next = (numbers.length ? Math.max(...numbers) : 0) + 1;
-  return `${COMPLAINT_ID_PREFIX}${String(next).padStart(4, "0")}`;
+  return `${prefix}${String(next).padStart(4, "0")}`;
 }
 
 /** Returns all complaints, newest first. */
@@ -106,7 +108,9 @@ export function createComplaint(data) {
   const all = readAll();
   const now = new Date().toISOString();
   const complaint = {
-    id: generateComplaintId(all),
+    id: generateComplaintId(all, now),
+    // Who filed it: "Delete my data" (anonymiseLocalComplaints) finds a citizen's reports by this.
+    citizenId: data.citizenId ?? null,
     citizenName: data.citizenName,
     issueType: data.issueType,
     description: data.description,
@@ -163,7 +167,7 @@ export async function createFacilityComplaint({ facility, category, description,
 
   const now = new Date().toISOString();
   const complaint = {
-    id: generateComplaintId(all),
+    id: generateComplaintId(all, now),
     citizenId: user.id,
     citizenName: user.name,
     issueType: data.issueType,

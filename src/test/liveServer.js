@@ -27,8 +27,21 @@ export async function startLiveServer() {
   const jar = { cookie: null };
   const calls = [];
   let offlinePrefix = null;
+  const inFlight = new Set();
 
-  async function browserFetch(url, init = {}) {
+  // Every request is tracked until its answer (and the cookie it sets) is in,
+  // so a test can wait for stragglers before the next test starts: one left
+  // running holds the previous test's session client, which would refresh
+  // with the next test's cookie from this shared jar and look like reuse.
+  function browserFetch(url, init = {}) {
+    const p = send(url, init);
+    inFlight.add(p);
+    const done = () => inFlight.delete(p);
+    p.then(done, done);
+    return p;
+  }
+
+  async function send(url, init) {
     const target = new URL(String(url), base);
     const method = (init.method ?? "GET").toUpperCase();
     calls.push({ method, path: target.pathname + target.search, headers: { ...(init.headers ?? {}) } });
@@ -56,6 +69,17 @@ export async function startLiveServer() {
     blobDown(down) {
       child.stdin.write(down ? "blob-down\n" : "blob-up\n");
       return new Promise((r) => setTimeout(r, 50));
+    },
+    /**
+     * Resolves once no request is in flight. Re-checks after each round,
+     * because finishing one request can start another (a 401 → /refresh → retry).
+     */
+    async idle() {
+      for (;;) {
+        await Promise.allSettled([...inFlight]);
+        await new Promise((r) => setImmediate(r)); // let follow-up requests start
+        if (inFlight.size === 0) return;
+      }
     },
     /** Forget the browser's cookie (a different browser / signed out). */
     clearCookies() {

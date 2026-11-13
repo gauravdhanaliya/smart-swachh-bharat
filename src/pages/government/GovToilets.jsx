@@ -7,6 +7,7 @@ import RemoveFacilityDialog from "../../components/RemoveFacilityDialog";
 import RemovedFacilitiesPanel from "../../components/RemovedFacilitiesPanel";
 import RatingStars from "../../components/RatingStars";
 import { useLiveToilets } from "../../hooks/useLiveToilets";
+import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { useFacilityRemoval } from "../../hooks/useFacilityRemoval";
 import { useRatingSummaries } from "../../hooks/useRatingSummaries";
 import { LOW_RATED_BELOW, LOW_RATED_MIN_COUNT, formatAverage, isLowRated, ratingCountLabel } from "../../utils/ratings";
@@ -53,6 +54,8 @@ function ToiletRating({ summary }) {
 export default function GovToilets() {
   const navigate = useNavigate();
   const toilets = useLiveToilets();
+  // Only once the list has loaded can "no toilets" mean none were added.
+  const { loaded } = useSyncStatus();
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState("default");
   const removal = useFacilityRemoval("toilet");
@@ -204,11 +207,24 @@ export default function GovToilets() {
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {loaded && toilets.length === 0 && (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+          <p className="text-sm font-semibold text-slate-700">No public toilets added yet.</p>
+          <button
+            type="button"
+            onClick={() => navigate("/official/add-facility?type=Public+Toilet")}
+            className="rounded-full bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+          >
+            Add Facility
+          </button>
+        </div>
+      )}
+
+      {toilets.length > 0 && filtered.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <p className="text-sm font-semibold text-slate-700">No public toilets to show</p>
           <p className="mt-1 text-sm text-slate-500">
-            {filter === "low" ? "No toilet is rated low right now." : "Try a different filter, or add a facility to get started."}
+            {filter === "low" ? "No toilet is rated low right now." : "Try a different filter."}
           </p>
         </div>
       )}

@@ -17,13 +17,14 @@ beforeEach(() => vi.spyOn(console, "error").mockImplementation(() => {}));
 afterEach(() => vi.restoreAllMocks());
 
 describe("app error screen", () => {
-  it("a screen that crashes shows the error page with Reload and a reference", () => {
+  it("a screen that crashes shows the error page with Reload and a reference", async () => {
     render(
       <MemoryRouter initialEntries={["/privacy"]}>
         <App />
       </MemoryRouter>
     );
-    expect(screen.getByRole("heading", { name: /something went wrong/i })).toBeInTheDocument();
+    // The page loads lazily, then crashes while rendering.
+    expect(await screen.findByRole("heading", { name: /something went wrong/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
     expect(screen.getByText(/^EC-[0-9A-F]{4}-[0-9A-F]{4}$/)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain("9876543210");

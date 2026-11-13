@@ -5,6 +5,7 @@
 // skips or repeats a record that shares a timestamp with its neighbour.
 
 import { ObjectId } from "mongodb";
+import { complaintIdPrefix } from "./ids.js";
 import {
   ASSIGNABLE_STATUSES,
   COMPLAINT_STATUS,
@@ -201,7 +202,7 @@ export function createCivicRepository({ db, client, nextId }) {
 
       const ts = now();
       const doc = {
-        _id: await nextId("SSB2026-", "complaints", 4),
+        _id: await nextId(complaintIdPrefix(ts), "complaints", 4),
         citizenId: uid,
         citizenName: name,
         issueType: data.issueType,

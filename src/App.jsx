@@ -1,45 +1,49 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { MotionConfig } from "motion/react";
 import AppErrorBoundary from "./components/AppErrorBoundary";
 import { AuthProvider } from "./context/AuthContext";
 import RequireRole from "./components/RequireRole";
+import SessionLoading from "./components/SessionLoading";
 import Splash from "./pages/Splash";
 import ChooseRole from "./pages/ChooseRole";
-import PrivacyNotice from "./pages/PrivacyNotice";
-import WithdrawConsent from "./pages/WithdrawConsent";
-import DeleteMyData from "./pages/DeleteMyData";
 import CitizenHome from "./pages/CitizenHome";
-import MapScreen from "./pages/MapScreen";
-import BinDetails from "./pages/BinDetails";
-import ToiletDetails from "./pages/ToiletDetails";
-import ReportIssue from "./pages/ReportIssue";
-import MyComplaints from "./pages/MyComplaints";
-import ComplaintTracking from "./pages/ComplaintTracking";
-import Profile from "./pages/Profile";
-import CitizenNotifications from "./pages/CitizenNotifications";
-import CitizenHelp from "./pages/CitizenHelp";
-import CitizenEcoGuide from "./pages/CitizenEcoGuide";
-import GovDashboard from "./pages/government/GovDashboard";
-import GovComplaints from "./pages/government/GovComplaints";
-import GovComplaintDetails from "./pages/government/GovComplaintDetails";
-import GovBins from "./pages/government/GovBins";
-import GovToilets from "./pages/government/GovToilets";
-import GovAddFacility from "./pages/government/GovAddFacility";
-import GovLocations from "./pages/government/GovLocations";
-import GovFacilityRequests from "./pages/government/GovFacilityRequests";
-import GovWorkers from "./pages/government/GovWorkers";
-import GovAnalytics from "./pages/government/GovAnalytics";
-import GovNotifications from "./pages/government/GovNotifications";
-import GovProfile from "./pages/government/GovProfile";
-import WorkerDashboard from "./pages/worker/WorkerDashboard";
-import WorkerTasks from "./pages/worker/WorkerTasks";
-import WorkerTaskDetails from "./pages/worker/WorkerTaskDetails";
-import WorkerMap from "./pages/worker/WorkerMap";
-import WorkerNotifications from "./pages/worker/WorkerNotifications";
-import WorkerProfile from "./pages/worker/WorkerProfile";
-import WorkerRequestFacility from "./pages/worker/WorkerRequestFacility";
-import WorkerFacilityRequests from "./pages/worker/WorkerFacilityRequests";
-import WorkerFacilityRequestDetails from "./pages/worker/WorkerFacilityRequestDetails";
+// Splash, login and the citizen Home are in the main bundle (the first
+// screens most people see); every other page downloads on its first visit.
+const PrivacyNotice = lazy(() => import("./pages/PrivacyNotice"));
+const WithdrawConsent = lazy(() => import("./pages/WithdrawConsent"));
+const DeleteMyData = lazy(() => import("./pages/DeleteMyData"));
+const MapScreen = lazy(() => import("./pages/MapScreen"));
+const BinDetails = lazy(() => import("./pages/BinDetails"));
+const ToiletDetails = lazy(() => import("./pages/ToiletDetails"));
+const ReportIssue = lazy(() => import("./pages/ReportIssue"));
+const MyComplaints = lazy(() => import("./pages/MyComplaints"));
+const ComplaintTracking = lazy(() => import("./pages/ComplaintTracking"));
+const Profile = lazy(() => import("./pages/Profile"));
+const CitizenNotifications = lazy(() => import("./pages/CitizenNotifications"));
+const CitizenHelp = lazy(() => import("./pages/CitizenHelp"));
+const CitizenEcoGuide = lazy(() => import("./pages/CitizenEcoGuide"));
+const GovDashboard = lazy(() => import("./pages/government/GovDashboard"));
+const GovComplaints = lazy(() => import("./pages/government/GovComplaints"));
+const GovComplaintDetails = lazy(() => import("./pages/government/GovComplaintDetails"));
+const GovBins = lazy(() => import("./pages/government/GovBins"));
+const GovToilets = lazy(() => import("./pages/government/GovToilets"));
+const GovAddFacility = lazy(() => import("./pages/government/GovAddFacility"));
+const GovLocations = lazy(() => import("./pages/government/GovLocations"));
+const GovFacilityRequests = lazy(() => import("./pages/government/GovFacilityRequests"));
+const GovWorkers = lazy(() => import("./pages/government/GovWorkers"));
+const GovAnalytics = lazy(() => import("./pages/government/GovAnalytics"));
+const GovNotifications = lazy(() => import("./pages/government/GovNotifications"));
+const GovProfile = lazy(() => import("./pages/government/GovProfile"));
+const WorkerDashboard = lazy(() => import("./pages/worker/WorkerDashboard"));
+const WorkerTasks = lazy(() => import("./pages/worker/WorkerTasks"));
+const WorkerTaskDetails = lazy(() => import("./pages/worker/WorkerTaskDetails"));
+const WorkerMap = lazy(() => import("./pages/worker/WorkerMap"));
+const WorkerNotifications = lazy(() => import("./pages/worker/WorkerNotifications"));
+const WorkerProfile = lazy(() => import("./pages/worker/WorkerProfile"));
+const WorkerRequestFacility = lazy(() => import("./pages/worker/WorkerRequestFacility"));
+const WorkerFacilityRequests = lazy(() => import("./pages/worker/WorkerFacilityRequests"));
+const WorkerFacilityRequestDetails = lazy(() => import("./pages/worker/WorkerFacilityRequestDetails"));
 
 export default function App() {
   return (
@@ -48,6 +52,7 @@ export default function App() {
     <AppErrorBoundary>
     <MotionConfig reducedMotion="user">
     <AuthProvider>
+      <Suspense fallback={<SessionLoading message="Loading…" />}>
       <Routes>
         <Route path="/" element={<Splash />} />
         <Route path="/login" element={<ChooseRole />} />
@@ -324,6 +329,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </AuthProvider>
     </MotionConfig>
     </AppErrorBoundary>

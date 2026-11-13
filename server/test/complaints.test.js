@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { seedAll } from "../src/seed.js";
 import { DEMO_BINS, DEMO_TOILETS } from "../src/seed-data.js";
 import { apiClient, startTestServer } from "./helpers.js";
+import { idYear } from "../src/ids.js";
 
 let t;
 let api;
@@ -46,7 +47,7 @@ describe("creating", () => {
     const res = await create(citizenA, { ...GENERAL, description: "   Garbage piled up beside the road   " });
     assert.equal(res.status, 201, JSON.stringify(res.json));
     const c = res.json.complaint;
-    assert.match(c.id, /^SSB2026-\d{4,}$/);
+    assert.match(c.id, new RegExp(`^SSB${idYear()}-[0-9]{4,}$`));
     assert.equal(c.status, "SUBMITTED");
     assert.equal(c.priority, "MEDIUM");
     assert.equal(c.description, "Garbage piled up beside the road", "trimmed");

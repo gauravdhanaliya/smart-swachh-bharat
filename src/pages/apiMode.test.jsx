@@ -99,7 +99,10 @@ describe.each([
     vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline"))));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Background work this test started (polls, the sign-in refresh) must not
+    // run on into the next test with this test's session client.
+    await live.idle();
     resetSessionClientForTests();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();

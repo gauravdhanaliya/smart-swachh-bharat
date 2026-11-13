@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { BIN_STATUS } from "../data/bins";
 import { getAllBins, subscribe as subscribeFacilities } from "../services/facilityService";
 
@@ -7,7 +7,6 @@ import { getAllBins, subscribe as subscribeFacilities } from "../services/facili
 // static demo seed array, so newly added dustbins show up everywhere
 // useLiveBins() is used (Citizen Map, Citizen Home, Bin Details,
 // Government Bins page).
-const REFRESH_POLL_MS = 8000; // safety-net poll per bug-fix spec §7 (5–10s)
 
 // ---------------------------------------------------------------------
 // DEMO LIVE DATA SIMULATION
@@ -80,17 +79,11 @@ export function useTickingBinStatus(sourceBins) {
 }
 
 export function useLiveBins() {
-  const [sourceBins, setSourceBins] = useState(() => getAllBins());
-
-  useEffect(() => {
-    const refresh = () => setSourceBins(getAllBins());
-    const unsubscribe = subscribeFacilities(refresh);
-    const poll = setInterval(refresh, REFRESH_POLL_MS);
-    return () => {
-      unsubscribe();
-      clearInterval(poll);
-    };
-  }, []);
-
+  // useSyncExternalStore re-reads the store as it subscribes, so an update
+  // that lands between the first render and the subscription (e.g. the
+  // sign-in refresh answering as the first screen mounts) is never missed.
+  // getAllBins() keeps the same array until the store changes. This replaces
+  // the old 8-second safety-net poll, which only papered over that gap.
+  const sourceBins = useSyncExternalStore(subscribeFacilities, getAllBins);
   return useTickingBinStatus(sourceBins);
 }

@@ -24,7 +24,12 @@ export const DISTRICTS = RAW.districts; // [{ id, name, stateId }]
 // Cities in the exact shape data/cities.js (and everything downstream —
 // cityService, useCity, useLiveBins/inCity) already expects: id, name,
 // state, latitude, longitude. `district` and `stateId` are additive.
-export const CITIES = RAW.cities;
+// The census list has a few exact repeats (same name, state and coordinates,
+// e.g. Alappuzha and Amreli); keep the first of each so pickers list a city once.
+export const CITIES = RAW.cities.filter(
+  (c, i, all) =>
+    all.findIndex((o) => o.name === c.name && o.state === c.state && o.latitude === c.latitude && o.longitude === c.longitude) === i
+);
 
 const norm = (s) => (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, " ").trim();
 

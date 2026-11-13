@@ -22,6 +22,8 @@ import { useSyncStatus } from "../hooks/useSyncStatus";
 import { TOILET_STATUS } from "../data/toilets";
 import { BIN_STATUS } from "../data/bins";
 import { FACILITY_PICK_LOCATIONS } from "../data/facilityRequests";
+import { useCity } from "../hooks/useCity";
+import { inCity } from "../data/cities";
 import IndiaLocationPicker from "../components/IndiaLocationPicker";
 import { TAP_LINK } from "../components/buttonStyles";
 
@@ -42,12 +44,13 @@ import { TAP_LINK } from "../components/buttonStyles";
 // disturbing the demo latitude/longitude used here. Not implemented in
 // this step.
 
-// DEFAULT MAP CENTER — was hardcoded to Lucknow; changed to Meerut since
-// that's where the IIMT-University-area demo/test facilities actually
-// are (see FACILITY_PICK_LOCATIONS in data/facilityRequests.js), so the
-// map opens centered on the same area those facilities are added to.
-const DEFAULT_CENTER = { latitude: 29.8905551, longitude: 77.9601633 }; // COER University campus
-const DEFAULT_CENTER_LABEL = "COER University";
+// Until the citizen uses GPS or picks an area, the map follows the city
+// chosen on Home (useCity). In the city that holds the COER University
+// campus (Roorkee, the default) it opens on the campus itself, where the
+// demo bins and toilets are (see FACILITY_PICK_LOCATIONS in
+// data/facilityRequests.js); any other city opens on its centre.
+const CAMPUS_CENTER = { latitude: 29.8905551, longitude: 77.9601633 }; // COER University campus
+const CAMPUS_LABEL = "COER University";
 const CAMPUS_ZOOM = 17;
 const CITY_ZOOM = 13;
 const SELECTED_ZOOM = 16;
@@ -161,6 +164,19 @@ export default function MapScreen() {
   const toilets = useLiveToilets();
   const buildings = useLiveBuildings();
   const sync = useSyncStatus();
+  const { city } = useCity();
+  const campusInCity = inCity(CAMPUS_CENTER, city);
+  const cityView = campusInCity
+    ? { latitude: CAMPUS_CENTER.latitude, longitude: CAMPUS_CENTER.longitude, zoom: CAMPUS_ZOOM, label: CAMPUS_LABEL }
+    : { latitude: city.latitude, longitude: city.longitude, zoom: CITY_ZOOM, label: city.name };
+  const cityHasFacilities = useMemo(() => [...bins, ...toilets].some((f) => inCity(f, city)), [bins, toilets, city]);
+  const cityPresets = useMemo(
+    () => [
+      { address: city.state ? `${city.name}, ${city.state}` : city.name, latitude: city.latitude, longitude: city.longitude },
+      ...(campusInCity ? FACILITY_PICK_LOCATIONS : []),
+    ],
+    [city, campusInCity]
+  );
   const [view, setView] = useState("map"); // "map" | "list"
   const [radiusTouched, setRadiusTouched] = useState(false);
   const {
@@ -251,12 +267,16 @@ export default function MapScreen() {
   };
 
   // Reference point for "nearby": the area the citizen picked / their GPS
-  // fix when there is one, otherwise the default map centre.
+  // fix when there is one, otherwise the chosen city (see cityView).
+  const followingCity = selected?.kind !== "me" && !position;
   const origin = useMemo(() => {
     if (selected?.kind === "me") return { latitude: selected.latitude, longitude: selected.longitude };
     if (position) return { latitude: position.lat, longitude: position.lng };
-    return { latitude: DEFAULT_CENTER.latitude, longitude: DEFAULT_CENTER.longitude };
-  }, [selected, position]);
+    return { latitude: cityView.latitude, longitude: cityView.longitude };
+  }, [selected, position, cityView.latitude, cityView.longitude]);
+  // Following a city where nobody has added any facility: say so, rather than
+  // jumping to the nearest one, which may be hundreds of km away.
+  const emptyCity = followingCity && sync.loaded && !cityHasFacilities;
 
   const withDistance = (items) =>
     items
@@ -299,6 +319,7 @@ export default function MapScreen() {
   // somewhere that isn't Roorkee). Rather than an empty map, fall back to
   // the nearest facilities and say so.
   const outOfRange =
+    !emptyCity &&
     inRangeBins.length + inRangeToilets.length === 0 &&
     rankedBins.length + rankedToilets.length > 0;
   const visibleBins = outOfRange ? rankedBins : inRangeBins;
@@ -410,7 +431,7 @@ export default function MapScreen() {
                 ? CITY_ZOOM
                 : radiusTouched
                   ? RADIUS_ZOOM[radiusM] ?? CITY_ZOOM
-                  : CAMPUS_ZOOM,
+                  : cityView.zoom,
           };
 
   return (
@@ -618,8 +639,8 @@ export default function MapScreen() {
                 id="map-area"
                 value={null}
                 onChange={(loc) => loc && handlePickArea(loc)}
-                presets={FACILITY_PICK_LOCATIONS}
-                presetsLabel="Known areas"
+                presets={cityPresets}
+                presetsLabel="Your city"
                 allowLocality={false}
                 allowGps={false}
               />
@@ -695,10 +716,16 @@ export default function MapScreen() {
             />
           )}
 
-          {!selected && (
+          {!selected && emptyCity && (
+            <p className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-emerald-900 shadow-sm">
+              No bins or toilets are mapped in {city.name} yet. Choose another city on Home, search for a place, or use
+              your location.
+            </p>
+          )}
+          {!selected && !emptyCity && (
             <p className="rounded-2xl bg-white px-4 py-3 text-xs text-emerald-800/60 shadow-sm">
-              Showing {DEFAULT_CENTER_LABEL}. Search, or pick a bin/toilet from the list below, to see its exact
-              location and open it in Google Maps.
+              Showing {followingCity ? cityView.label : "your location"}. Search, or pick a bin/toilet from the list
+              below, to see its exact location and open it in Google Maps.
             </p>
           )}
 
@@ -731,7 +758,7 @@ export default function MapScreen() {
               <h2 className="mb-2 text-sm font-semibold text-emerald-950">Nearby Dustbins</h2>
               <div className="flex flex-col gap-2">
                 {visibleBins.length === 0 && (
-                  <p className="text-xs text-emerald-800/50">{sync.loaded ? "No bins within this distance — try a larger range." : "Loading bins…"}</p>
+                  <p className="text-xs text-emerald-800/50">{!sync.loaded ? "Loading bins…" : emptyCity ? `No bins in ${city.name} yet.` : "No bins within this distance — try a larger range."}</p>
                 )}
                 {(showAllBins || view === "list" ? visibleBins : visibleBins.slice(0, LIST_PREVIEW_COUNT)).map((bin) => (
                   <NearbyRow
@@ -762,7 +789,7 @@ export default function MapScreen() {
               <h2 className="mb-2 text-sm font-semibold text-emerald-950">Nearby Public Toilets</h2>
               <div className="flex flex-col gap-2">
                 {visibleToilets.length === 0 && (
-                  <p className="text-xs text-emerald-800/50">{sync.loaded ? "No toilets within this distance — try a larger range." : "Loading toilets…"}</p>
+                  <p className="text-xs text-emerald-800/50">{!sync.loaded ? "Loading toilets…" : emptyCity ? `No toilets in ${city.name} yet.` : "No toilets within this distance — try a larger range."}</p>
                 )}
                 {(showAllToilets || view === "list" ? visibleToilets : visibleToilets.slice(0, LIST_PREVIEW_COUNT)).map(
                   (toilet) => (

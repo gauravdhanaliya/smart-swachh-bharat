@@ -25,8 +25,10 @@ function LegendShape({ round }) {
   );
 }
 
-// `center` follows the citizen's chosen city (see CitySelector).
-export default function MapPreview({ bins = [], toilets = [], center = DEFAULT_CENTER }) {
+// `center` follows the citizen's chosen city (see CitySelector). `fill`
+// makes the preview take its parent's height (the one-screen Home layout)
+// instead of a fixed 160px.
+export default function MapPreview({ bins = [], toilets = [], center = DEFAULT_CENTER, fill = false }) {
   const navigate = useNavigate();
 
   return (
@@ -35,7 +37,7 @@ export default function MapPreview({ bins = [], toilets = [], center = DEFAULT_C
       onClick={() => navigate("/citizen/map")}
       aria-label={`Open full map — ${bins.length} bins and ${toilets.length} toilets nearby`}
       className="relative block w-full overflow-hidden rounded-2xl border border-emerald-100 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
-      style={{ height: 160 }}
+      style={fill ? { height: "100%", minHeight: 70 } : { height: 160 }}
     >
       <FacilityMap
         bins={bins}
@@ -44,7 +46,7 @@ export default function MapPreview({ bins = [], toilets = [], center = DEFAULT_C
         zoom={12}
         interactive={false}
         compact
-        className="h-full"
+        className="h-full w-full"
       />
 
       <span className="pointer-events-none absolute inset-0 bg-emerald-950/0 transition group-hover:bg-emerald-950/5" />

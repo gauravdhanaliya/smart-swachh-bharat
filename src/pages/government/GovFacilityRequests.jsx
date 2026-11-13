@@ -4,6 +4,7 @@ import StatusBadge from "../../components/StatusBadge";
 import PriorityBadge from "../../components/PriorityBadge";
 import StatusFilterTabs from "../../components/StatusFilterTabs";
 import { useFacilityRequests } from "../../hooks/useFacilityRequests";
+import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { updateFacilityRequestStatus } from "../../services/facilityRequestService";
 import { REQUEST_STATUS } from "../../data/facilityRequests";
 
@@ -124,6 +125,7 @@ const FILTERS = [
 
 export default function GovFacilityRequests() {
   const requests = useFacilityRequests();
+  const { loaded } = useSyncStatus();
   const [filter, setFilter] = useState("all");
 
   const filtered = useMemo(
@@ -169,10 +171,19 @@ export default function GovFacilityRequests() {
       )}
 
       {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
-          <p className="font-semibold text-slate-900">No requests here</p>
-          <p className="mt-1 text-sm text-slate-500">Nothing matches this filter right now.</p>
-        </div>
+        // Until the list has loaded, an empty list means "not here yet", not "none".
+        (loaded || requests.length > 0) && (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
+            {requests.length === 0 ? (
+              <p className="font-semibold text-slate-900">No facility requests yet.</p>
+            ) : (
+              <>
+                <p className="font-semibold text-slate-900">No requests here</p>
+                <p className="mt-1 text-sm text-slate-500">Nothing matches this filter right now.</p>
+              </>
+            )}
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((request) => (

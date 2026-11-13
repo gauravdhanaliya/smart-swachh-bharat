@@ -8,7 +8,8 @@ import ComplaintTimeline from "../../components/ComplaintTimeline";
 import { useComplaint, useComplaintsStatus } from "../../hooks/useComplaints";
 import ProtectedImage from "../../components/ProtectedImage";
 import { assignComplaint, updateComplaint } from "../../services/complaintService";
-import { STATUS, PRIORITY, WORKERS } from "../../data/complaints";
+import { STATUS, PRIORITY } from "../../data/complaints";
+import { useWorkers } from "../../hooks/useWorkers";
 
 function formatDateTime(iso) {
   return new Date(iso).toLocaleString("en-IN", {
@@ -26,6 +27,8 @@ export default function GovComplaintDetails() {
   const complaint = useComplaint(id);
   const loadStatus = useComplaintsStatus();
   const [selectedWorkerId, setSelectedWorkerId] = useState("");
+  // The live directory (demo + added workers, minus removed ones), as on the Workers page.
+  const { workers } = useWorkers();
   const [error, setError] = useState("");
   const [assigning, setAssigning] = useState(false);
 
@@ -44,7 +47,7 @@ export default function GovComplaintDetails() {
       <GovShell title="Complaint Details">
         <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
           <p className="font-semibold text-slate-900">Complaint not found</p>
-          <p className="text-sm text-slate-500">It may have been removed from the demo data set.</p>
+          <p className="text-sm text-slate-500">It may have been deleted, or the app's data was reset.</p>
           <button
             type="button"
             onClick={() => navigate("/official/complaints")}
@@ -64,7 +67,12 @@ export default function GovComplaintDetails() {
     }
     setError("");
     setAssigning(true);
-    const worker = WORKERS.find((w) => w.id === selectedWorkerId);
+    const worker = workers.find((w) => w.id === selectedWorkerId);
+    if (!worker) {
+      setError("That worker is no longer in the directory.");
+      setAssigning(false);
+      return;
+    }
     try {
       await assignComplaint(complaint.id, worker.id, worker.name);
     } catch (err) {
@@ -193,12 +201,15 @@ export default function GovComplaintDetails() {
                 <option value="" disabled>
                   Select a worker…
                 </option>
-                {WORKERS.map((w) => (
+                {workers.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name} — {w.area}
                   </option>
                 ))}
               </select>
+              {workers.length === 0 && (
+                <p className="mt-1.5 text-xs text-slate-500">No workers in the directory. Add one on the Workers page.</p>
+              )}
               {error && <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>}
               <button
                 type="button"
@@ -214,7 +225,7 @@ export default function GovComplaintDetails() {
               <p className="mb-1 text-sm font-bold text-slate-900">Assigned To</p>
               <p className="text-sm text-slate-700">{complaint.assignedWorkerName}</p>
               <p className="mt-1 text-xs text-slate-400">
-                Reassignment isn't needed for this demo once a worker is on the job.
+                The complaint stays with this worker until it is resolved.
               </p>
             </div>
           )}

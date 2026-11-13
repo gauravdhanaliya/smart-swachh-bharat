@@ -88,6 +88,10 @@ const state = {
 const listeners = new Set();
 let inflight = null;
 let polling = false;
+// Bumped by resetStore() (sign-in / sign-out): a fetch started for the
+// previous user may still be in flight, and its answer must not land in the
+// next user's store.
+let generation = 0;
 const poller = createPoller(() => refresh());
 let signature = "";
 
@@ -113,7 +117,9 @@ async function safe(path) {
 
 export function refresh() {
   if (inflight) return inflight;
-  inflight = (async () => {
+  const gen = generation;
+  const run = (async () => {
+    await null; // always settle after `inflight = run` below, even if the first step throws
     try {
       const role = currentRole();
       let next;
@@ -131,6 +137,7 @@ export function refresh() {
           requests: requests?.requests ?? [],
         };
       }
+      if (gen !== generation) return; // signed in/out meanwhile: this answer is someone else's
       const nextSig = JSON.stringify(next);
       const changed = nextSig !== signature || state.error !== null || !state.loaded;
       signature = nextSig;
@@ -142,15 +149,17 @@ export function refresh() {
         state.lastSync = Date.now();
       }
     } catch (err) {
+      if (gen !== generation) return;
       if (state.error?.message !== err.message) {
         state.error = err;
         notify();
       }
     } finally {
-      inflight = null;
+      if (inflight === run) inflight = null;
     }
   })();
-  return inflight;
+  inflight = run;
+  return run;
 }
 
 /** Refresh after a write: waits out any fetch already in flight (it may predate the write). */
@@ -190,10 +199,22 @@ export const getLocations = () => state.locations;
 export const getRemovedLocations = () => state.removed;
 export const getRequestsSnapshot = () => state.requests;
 export const getDerived = () => state.derived;
+/**
+ * Right after sign-in: forget the previous user's data and fetch the new
+ * user's at once, rather than whenever the next screen subscribes or the
+ * next 30-second poll comes round.
+ */
+export function refreshAfterSignIn() {
+  resetStore();
+  return refresh().catch(() => {}); // a failure is reported through getSyncStatus()
+}
+
 export const getSyncStatus = () => ({ loaded: state.loaded, error: state.error, lastSync: state.lastSync });
 
 /** Forget cached data (e.g. on logout) so one user's lists never leak to the next. */
 export function resetStore() {
+  generation += 1;
+  inflight = null; // a fetch for the previous user finishes on its own and is ignored
   signature = "";
   Object.assign(state, { removed: [], requests: [], error: null });
   if (apiEnabled()) Object.assign(state, { locations: [], derived: { bins: [], toilets: [], buildings: [] }, loaded: false });

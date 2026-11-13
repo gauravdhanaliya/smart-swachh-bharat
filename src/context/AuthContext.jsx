@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   LOGIN_METHOD,
   clearLegacySessions,
@@ -10,7 +10,7 @@ import {
 } from "../services/authSession";
 import { signOutUser } from "../services/authService";
 import { selectWorker } from "../hooks/useWorkerSession";
-import { resetStore as resetLocations } from "../services/locationStore";
+import { refreshAfterSignIn, resetStore as resetLocations } from "../services/locationStore";
 import { resetComplaintCache } from "../services/complaintService";
 import { resetGovProfileCache } from "../services/govProfileService";
 import { resetWorkerCache } from "../services/workerService";
@@ -25,6 +25,13 @@ const resetStore = () => {
   resetWorkerCache();
   resetNotifications();
   clearConsentCache();
+};
+
+// A (different) user has just signed in: drop the last one's data and fetch
+// the shared map data for this one now, not at the next 30-second poll.
+const startFresh = () => {
+  resetStore();
+  refreshAfterSignIn();
 };
 import { apiEnabled } from "../services/apiConfig";
 import { SESSION_EXPIRED_MESSAGE, getSessionClient } from "../services/session";
@@ -60,6 +67,18 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => (useApi ? null : readSession()));
   const [status, setStatus] = useState(useApi ? "loading" : "ready");
   const [notice, setNotice] = useState("");
+  // Who the caches were last reset for, so a session change for the same
+  // person (a token refresh) doesn't wipe and re-fetch everything.
+  const userIdRef = useRef(user?.id ?? null);
+  const followUser = (next) => {
+    const id = next?.id ?? null;
+    if (id !== userIdRef.current) {
+      if (id) startFresh();
+      else resetStore();
+      userIdRef.current = id;
+    }
+    setUser(next);
+  };
 
   useEffect(() => {
     clearLegacySessions();
@@ -69,7 +88,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (useApi) return undefined;
     const onStorage = (e) => {
-      if (e.key === null || isSessionKey(e.key)) setUser(readSession());
+      if (e.key === null || isSessionKey(e.key)) followUser(readSession());
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -85,14 +104,15 @@ export function AuthProvider({ children }) {
     const off = client.onChange(({ user: next, reason }) => {
       const appUser = toAppUser(next);
       if (appUser?.role === "worker" && appUser.workerId) selectWorker(appUser.workerId);
-      if (!appUser) resetStore();
-      setUser(appUser);
+      // Every sign-in arrives here (this tab's own logins and other tabs'), so
+      // this is where a new user's data is fetched.
+      followUser(appUser);
       if (reason === "expired") setNotice(SESSION_EXPIRED_MESSAGE);
     });
     client
       .restore()
       .then((session) => {
-        if (live && session) setUser(toAppUser(session.user));
+        if (live && session) followUser(toAppUser(session.user));
       })
       .catch((err) => {
         if (live) setNotice(err.message);
@@ -113,16 +133,12 @@ export function AuthProvider({ children }) {
       // The server signs in as its seeded demo user for this role; nothing else is sent.
       return getSessionClient()
         .loginDemo(role)
-        .then(({ user: u }) => {
-          const appUser = toAppUser(u);
-          resetStore();
-          setUser(appUser);
-          return appUser;
-        });
+        .then(({ user: u }) => toAppUser(u)); // the client's onChange (above) has applied it
     }
     const session = startSession(role, name);
     if (role === "worker") selectWorker(session.id);
-    resetStore();
+    userIdRef.current = session.id;
+    startFresh();
     setUser(session);
     return session;
   };
@@ -133,15 +149,11 @@ export function AuthProvider({ children }) {
     if (useApi) {
       return getSessionClient()
         .loginFirebase(idToken)
-        .then(({ user: u }) => {
-          const appUser = toAppUser(u);
-          resetStore();
-          setUser(appUser);
-          return appUser;
-        });
+        .then(({ user: u }) => toAppUser(u)); // the client's onChange (above) has applied it
     }
     const session = startOtpSession({ uid, phone });
-    resetStore();
+    userIdRef.current = session.id;
+    startFresh();
     setUser(session);
     return session;
   };
@@ -153,6 +165,7 @@ export function AuthProvider({ children }) {
     if (useApi) getSessionClient().logout();
     else clearSession();
     resetStore();
+    userIdRef.current = null;
     setNotice(message);
     setUser(null);
   };

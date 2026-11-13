@@ -7,6 +7,7 @@ import RemoveFacilityDialog from "../../components/RemoveFacilityDialog";
 import RemovedFacilitiesPanel from "../../components/RemovedFacilitiesPanel";
 import { useLiveBins } from "../../hooks/useLiveBins";
 import { useFacilityRemoval } from "../../hooks/useFacilityRemoval";
+import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { BIN_STATUS } from "../../data/bins";
 
 const FILTERS = [
@@ -21,6 +22,8 @@ export default function GovBins() {
   const bins = useLiveBins();
   const [filter, setFilter] = useState("all");
   const removal = useFacilityRemoval("bin");
+  // Only once the list has loaded can "no bins" mean none were added (not "still loading").
+  const { loaded } = useSyncStatus();
 
   const filtered = useMemo(
     () => (filter === "all" ? bins : bins.filter((b) => b.status === filter)),
@@ -131,12 +134,23 @@ export default function GovBins() {
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {loaded && bins.length === 0 && (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+          <p className="text-sm font-semibold text-slate-700">No bins added yet.</p>
+          <button
+            type="button"
+            onClick={() => navigate("/official/add-facility?type=Dustbin")}
+            className="rounded-full bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+          >
+            Add Facility
+          </button>
+        </div>
+      )}
+
+      {bins.length > 0 && filtered.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <p className="text-sm font-semibold text-slate-700">No bins to show</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Try a different filter, or add a facility to get started.
-          </p>
+          <p className="mt-1 text-sm text-slate-500">Try a different filter.</p>
         </div>
       )}
 

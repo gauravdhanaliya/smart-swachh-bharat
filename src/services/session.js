@@ -107,6 +107,9 @@ export function createSessionClient({
   const tabId = `${now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   let accessToken = null;
   let user = null;
+  // When the session this tab holds was issued (login, refresh, or another
+  // tab's announcement). Refreshes are serialised, so a later one is newer.
+  let sessionAt = -1;
   let inflight = null; // (a) the one refresh this tab has in flight
   let bootstrap = null; // (b) the page-load restore
   let lastShared = null; // newest session another tab announced: { session, at }
@@ -137,10 +140,11 @@ export function createSessionClient({
     }
   };
 
-  function setSession(session, reason) {
+  function setSession(session, reason, at = now()) {
     if (user?.uid !== session.user?.uid) conditionalCache.clear();
     accessToken = session.accessToken;
     user = session.user;
+    sessionAt = at;
     hint.set();
     emit(reason);
     return session;
@@ -150,6 +154,7 @@ export function createSessionClient({
     conditionalCache.clear();
     accessToken = null;
     user = null;
+    sessionAt = -1;
     hint.clear();
   }
 
@@ -174,8 +179,10 @@ export function createSessionClient({
       case "refreshed":
         peerRefreshing = false;
         claims.delete(msg.from);
-        lastShared = { session: msg.session, at: msg.at };
-        setSession(msg.session, "sync");
+        // Messages between tabs can arrive late, even after this tab has
+        // refreshed again itself: never swap a newer session for an older one.
+        if (!lastShared || msg.at >= lastShared.at) lastShared = { session: msg.session, at: msg.at };
+        if (msg.at >= sessionAt) setSession(msg.session, "sync", msg.at);
         break;
       case "refresh-failed":
         peerRefreshing = false;
@@ -237,8 +244,9 @@ export function createSessionClient({
     }
     if (res.ok) {
       const session = await res.json();
-      setSession(session, "refresh");
-      post({ type: "refreshed", session, at: now() });
+      const at = now();
+      setSession(session, "refresh", at);
+      post({ type: "refreshed", session, at });
       return session;
     }
     if (res.status === 401 || res.status === 403) {
@@ -363,8 +371,9 @@ export function createSessionClient({
     if (!res.ok) throw await apiErrorFrom(res);
     const session = await res.json();
     bootstrap = null;
-    setSession(session, "login");
-    post({ type: "refreshed", session, at: now() }); // other tabs follow
+    const at = now();
+    setSession(session, "login", at);
+    post({ type: "refreshed", session, at }); // other tabs follow
     return session;
   }
 

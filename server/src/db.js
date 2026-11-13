@@ -18,6 +18,7 @@
 // request reuses it. Every repository method is async.
 
 import { MongoClient } from "mongodb";
+import { requestIdPrefix } from "./ids.js";
 import { BIN_STATUSES, REQUEST_FACILITY_TYPES, REQUEST_STATUS, migrateBinLocation } from "./constants.js";
 import { hashPhone, maskPhone } from "./phone.js";
 import { ensureCollections } from "./schemas.js";
@@ -399,7 +400,7 @@ export function createRepository(db, client, session = null, { phoneHashSecret =
     (await collection.updateOne(filter, { $setOnInsert: doc }, { upsert: true, ...opts })).upsertedCount === 1;
 
   const insertRequest = async (r) => {
-    const id = r.id ?? (await nextId("FR-2026-", "facility_requests"));
+    const id = r.id ?? (await nextId(requestIdPrefix(r.createdAt ?? now()), "facility_requests"));
     await requests.insertOne(requestDoc(id, r), opts);
     return id;
   };
