@@ -1,20 +1,20 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import ScreenShell from "../components/ScreenShell";
-import TaglineStrip from "../components/TaglineStrip";
-import RoleCard from "../components/RoleCard";
+import BrandLogo from "../components/BrandLogo";
+import CityIllustration from "../components/CityIllustration";
+import DemoLoginSheet from "../components/DemoLoginSheet";
+import LoginBackdrop from "../components/LoginBackdrop";
 import PhoneOtpLogin from "../components/PhoneOtpLogin";
 import SessionLoading from "../components/SessionLoading";
 import { useAuth } from "../context/AuthContext";
+import { useDemoLoginEnabled } from "../hooks/useDemoLoginEnabled";
 import { ROLE_HOME } from "../services/authSession";
 
-const ROLES = [
-  { id: "citizen", title: "Citizen", description: "Report issues and track complaints" },
-  { id: "worker", title: "Sanitation Worker", description: "View assigned tasks and request facilities" },
-  { id: "official", title: "Government Official", description: "Monitor, approve and manage facilities" },
-];
+const LOGIN_TAGLINE = "Report it. Track it. Keep it clean.";
+const PROTOTYPE_NOTICE = "Hackathon prototype — not an official government service";
 
-const SECTION = "rounded-3xl border border-emerald-100 bg-white/90 p-4 shadow-sm";
+const QUIET_LINK =
+  "inline-flex min-h-11 cursor-pointer items-center rounded-full px-3 text-sm font-semibold text-brand-green-700 underline decoration-emerald-300 underline-offset-4 hover:bg-emerald-50 hover:decoration-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500";
 
 // What a failed demo login means, in words a presenter can act on.
 function demoErrorMessage(err) {
@@ -23,28 +23,42 @@ function demoErrorMessage(err) {
   return err?.message || "Couldn't sign in. Please try again.";
 }
 
-// Two ways in: a real phone OTP login (always a citizen), and the open demo
-// sign-in where tapping a role signs in as that role's demo user.
+/**
+ * The login screen, sized to fit one phone screen (360x740 and up) without
+ * scrolling: compact header, one card with the phone login (phone step, then
+ * the OTP step in its place), and a small "Try the demo" link that opens the
+ * demo roles in a bottom sheet — only where the demo login is switched on.
+ */
 export default function ChooseRole() {
   const navigate = useNavigate();
   const { role, isAuthenticated, status, notice, usesApi, login, loginWithOtp } = useAuth();
-  const [name, setName] = useState("");
+  const demoEnabled = useDemoLoginEnabled(usesApi);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [demoError, setDemoError] = useState("");
-  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoBusy, setDemoBusy] = useState(null); // role being signed in
+  const demoBusyRef = useRef(null);
+
+  const closeSheet = useCallback(() => {
+    if (demoBusyRef.current) return; // a sign-in is on its way
+    setSheetOpen(false);
+    setDemoError("");
+  }, []);
 
   if (status === "loading") return <SessionLoading />;
   if (isAuthenticated) return <Navigate to={ROLE_HOME[role]} replace />;
 
-  const handleSelect = async (selected) => {
-    if (demoBusy) return;
+  const pickDemoRole = async (selected) => {
+    if (demoBusyRef.current) return;
     setDemoError("");
-    setDemoBusy(true);
+    demoBusyRef.current = selected;
+    setDemoBusy(selected);
     try {
-      const session = await login(selected, name);
+      const session = await login(selected);
       navigate(ROLE_HOME[session.role], { replace: true });
     } catch (err) {
       setDemoError(demoErrorMessage(err));
-      setDemoBusy(false);
+      demoBusyRef.current = null;
+      setDemoBusy(null);
     }
   };
 
@@ -55,100 +69,67 @@ export default function ChooseRole() {
   };
 
   return (
-    <ScreenShell>
-      <div className="mt-2 text-center">
-        <TaglineStrip />
-        <p className="mt-1.5 text-xs font-medium text-emerald-800/50">
-          Connecting Citizens, Government &amp; Sanitation Workers
-        </p>
-      </div>
+    <div className="min-h-dvh bg-emerald-50/40 sm:py-4">
+      <div className="device-frame device-frame--app isolate">
+        <LoginBackdrop />
+        {/* Fits 360x740 without scrolling; scrolls only on smaller or zoomed screens. */}
+        <div inert={sheetOpen || undefined} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {/* Header, card and demo link as one block, centred in the space above the skyline
+              (auto margins: if the screen is too short it starts at the top instead of being cut off).
+              The block reserves the height of its tallest state (the OTP step with a two-line error,
+              measured at 360px wide), so the header stays put between steps and only the card
+              content changes. npm run test:layout checks the header position and that this
+              reserve still matches the tallest state. */}
+          <div className="flex flex-1 flex-col px-4 py-5">
+            <div data-login-block className="my-auto min-h-[448px]">
+              <header>
+                <BrandLogo size="sm" subtitle={LOGIN_TAGLINE} />
+              </header>
 
-      <h2 className="mt-6 text-center text-2xl font-bold text-emerald-950">
-        Welcome Back!
-      </h2>
-      <p className="mt-1 text-center text-sm text-emerald-800/70">
-        Choose how you want to log in
-      </p>
+              <main className="mt-6">
+                {notice && (
+                  <p role="alert" className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                    {notice}
+                  </p>
+                )}
 
-      {notice && (
-        <p role="alert" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
-          {notice}
-        </p>
-      )}
+                <section aria-labelledby="login-title" className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-[0_8px_30px_-16px_rgba(15,110,58,0.35)]">
+                  <h2 id="login-title" className="mb-4 text-2xl font-bold tracking-tight text-emerald-950">
+                    Log in to continue
+                  </h2>
+                  <PhoneOtpLogin onVerified={handleVerified} />
+                </section>
 
-      <section aria-labelledby="otp-login-title" className={`mt-6 ${SECTION}`}>
-        <h3 id="otp-login-title" className="text-base font-bold text-emerald-950">
-          Login with phone (OTP)
-        </h3>
-        <p className="mt-0.5 mb-3 text-xs text-emerald-800/70">
-          For citizens. We send a one-time code to your mobile number.
-        </p>
-        <PhoneOtpLogin onVerified={handleVerified} />
-      </section>
-
-      <div className="my-5 flex items-center gap-3" aria-hidden="true">
-        <span className="h-px flex-1 bg-emerald-200" />
-        <span className="text-xs font-semibold uppercase tracking-wide text-emerald-800/50">or</span>
-        <span className="h-px flex-1 bg-emerald-200" />
-      </div>
-
-      <section aria-labelledby="demo-login-title" className={`border-dashed border-amber-300 ${SECTION}`}>
-        <div className="flex items-center gap-2">
-          <h3 id="demo-login-title" className="text-base font-bold text-emerald-950">
-            Demo login (pick a role)
-          </h3>
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">
-            Demo
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs text-emerald-800/70">
-          For presentations. No phone number or password needed.
-          {usesApi && " Each role signs in as the server's demo account."}
-        </p>
-
-        {/* The server's demo accounts have fixed names, so there is nothing to type in API mode. */}
-        {!usesApi && (
-          <div className="mt-3">
-            <label htmlFor="login-name" className="text-sm font-semibold text-emerald-950">
-              Your name
-            </label>
-            <input
-              id="login-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
-              autoComplete="name"
-              maxLength={60}
-              className="mt-1.5 w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-emerald-950 placeholder:text-emerald-800/40 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
-            />
+                {/* Same height while the server is asked, so nothing jumps when the link appears. */}
+                <div className="mt-2 flex min-h-11 justify-center">
+                  {demoEnabled && (
+                    <button type="button" onClick={() => setSheetOpen(true)} className={QUIET_LINK}>
+                      Try the demo
+                    </button>
+                  )}
+                </div>
+              </main>
+            </div>
           </div>
-        )}
 
-        {demoError && (
-          <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3.5 py-2.5 text-sm font-medium text-red-700">
-            {demoError}
-          </p>
-        )}
+          {/* Anchored just above the footer. Up to 112px tall; on a short screen it shrinks
+              (scaled, never cut off) before the page would scroll. */}
+          <div className="flex h-28 min-h-0 shrink flex-col justify-end" aria-hidden="true">
+            <CityIllustration variant="skyline" className="block h-full min-h-0 w-full opacity-80" />
+          </div>
 
-        <div className="mt-4 flex flex-col gap-3">
-          {ROLES.map((r) => (
-            <RoleCard key={r.id} id={r.id} title={r.title} description={r.description} onSelect={handleSelect} />
-          ))}
+          <footer className="flex flex-col items-center px-4 pb-4 text-center">
+            <Link to="/privacy" className={QUIET_LINK}>
+              Privacy notice
+            </Link>
+            <p className="text-xs font-medium text-balance text-brand-green-800">{PROTOTYPE_NOTICE}</p>
+          </footer>
         </div>
-      </section>
+      </div>
 
-      <p className="mt-4 text-center text-xs text-emerald-800/70">
-        <Link to="/privacy" className="font-semibold text-emerald-700 underline">
-          Privacy notice
-        </Link>
-      </p>
-
-      <p className="mt-6 mx-auto w-fit rounded-2xl bg-white/80 px-4 py-1.5 text-center font-semibold text-emerald-950 shadow-sm backdrop-blur-sm">
-        A Cleaner India
-        <br />
-        Starts with You
-      </p>
-    </ScreenShell>
+      {demoEnabled && (
+        <DemoLoginSheet open={sheetOpen} onClose={closeSheet} onPick={pickDemoRole} busyRole={demoBusy} error={demoError} />
+      )}
+    </div>
   );
 }

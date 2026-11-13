@@ -27,7 +27,16 @@ const ICON_THEME = {
   worker: "bg-orange-500 text-white",
 };
 
-/** A tappable role on the login screen: tapping it signs in as that role. */
+/** The round, coloured icon for a role. */
+export function RoleIcon({ id, className = "h-10 w-10" }) {
+  return (
+    <span className={`flex shrink-0 items-center justify-center rounded-full ${ICON_THEME[id]} ${className}`} aria-hidden="true">
+      {ICONS[id]}
+    </span>
+  );
+}
+
+/** A tappable role: tapping it signs in as that role. */
 export default function RoleCard({ id, title, description, onSelect }) {
   return (
     <button

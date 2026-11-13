@@ -119,6 +119,7 @@ export function createSessionClient({
   // Conditional requests: path -> { etag, body } of the last full answer.
   // Memory only, and cleared whenever the signed-in user changes.
   const conditionalCache = new Map();
+  let authConfig = null; // Promise of GET /api/auth/config
   const waiters = new Set();
   const listeners = new Set();
   const channel = createChannel ? createChannel(CHANNEL_NAME) : null;
@@ -384,6 +385,23 @@ export function createSessionClient({
     requestBlob,
     refresh,
     restore,
+    /**
+     * The server's public login settings: { demoLoginEnabled }. Asked once per
+     * client; a failed request isn't remembered, so the next call retries.
+     */
+    getAuthConfig() {
+      authConfig ??= send("/api/auth/config", {}, null)
+        .then(async (res) => {
+          if (!res.ok) throw await apiErrorFrom(res);
+          const body = await res.json();
+          return { demoLoginEnabled: body?.demoLoginEnabled === true };
+        })
+        .catch((err) => {
+          authConfig = null;
+          throw err;
+        });
+      return authConfig;
+    },
     /** The labelled demo login: the only thing sent is which demo user. */
     loginDemo: (role) => login("/api/auth/demo", { role }),
     /** Phone login: the Firebase ID token proves the number; the server decides the role. */

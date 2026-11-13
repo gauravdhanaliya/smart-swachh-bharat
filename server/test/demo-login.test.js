@@ -46,6 +46,13 @@ describe("demo login switched off (the default)", () => {
     assert.deepEqual(res.json, missing.json);
     assert.deepEqual(res.cookies, []);
   });
+
+  test("GET /api/auth/config tells the login page to hide the demo link", async () => {
+    const res = await call(t.base, "GET", "/api/auth/config");
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json, { demoLoginEnabled: false });
+    assert.deepEqual(res.cookies, []);
+  });
 });
 
 describe("demo login switched on", () => {
@@ -55,6 +62,13 @@ describe("demo login switched on", () => {
     await seedAll(t.repo, { demo: true });
   });
   after(() => t.stop());
+
+  test("GET /api/auth/config says so, needs no sign-in, and reveals nothing else", async () => {
+    const res = await call(t.base, "GET", "/api/auth/config");
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json, { demoLoginEnabled: true });
+    assert.deepEqual(res.cookies, []);
+  });
 
   for (const [asked, uid, role] of [
     ["citizen", "demo-citizen", "citizen"],

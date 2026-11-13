@@ -30,6 +30,7 @@ import { DEMO_BINS, DEMO_TOILETS } from "../../server/src/seed-data.js";
 import { resetRatingCache } from "../services/toiletRatingService";
 import { startLiveServer } from "../test/liveServer";
 import { LOCAL_CONSENT_KEY, acceptConsentLocally } from "../test/consent";
+import { demoLogin } from "../test/loginPage";
 
 const DEMO_CONSENT = { phoneForLogin: false, locationWhenReporting: true, photosAttached: true, readNotice: true };
 
@@ -118,7 +119,7 @@ describe.each([
     }
     const user = userEvent.setup();
     renderAt("/login");
-    await user.click(await screen.findByRole("button", { name: /^citizen/i }));
+    await demoLogin(user, /^citizen/i);
     expect(await screen.findByRole("heading", { level: 1, name: "Before you start" })).toBeInTheDocument();
     for (const name of [/location access/i, /photos i upload/i, /read the privacy notice/i]) {
       await user.click(screen.getByRole("checkbox", { name }));

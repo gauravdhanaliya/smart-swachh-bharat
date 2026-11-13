@@ -20,6 +20,7 @@ import App from "../App";
 import { confirmOtp, sendOtp, signOutUser } from "../services/authService";
 import { SESSION_EXPIRED_MESSAGE, getSessionClient, resetSessionClientForTests } from "../services/session";
 import { createFakeAuthServer } from "../test/fakeAuthServer";
+import { openDemoSheet, requestOtp, typeOtp } from "../test/loginPage";
 
 let server;
 
@@ -68,7 +69,7 @@ describe("page load", () => {
 
   it("with no session it shows the login page, without an error", async () => {
     renderApp("/citizen", { strict: true });
-    expect(await screen.findByRole("region", { name: /demo login/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Log in to continue" })).toBeInTheDocument();
     expect(path()).toBe("/login");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(server.count("/api/auth/refresh")).toBe(1);
@@ -147,26 +148,56 @@ describe("logging in", () => {
     [/^citizen/i, "citizen", "/citizen"],
     [/sanitation worker/i, "worker", "/worker"],
     [/government official/i, "official", "/official"],
-  ])("the demo card %s signs in through /api/auth/demo, sending only the role", async (card, role, home) => {
+  ])("the demo row %s signs in through /api/auth/demo, sending only the role", async (row, role, home) => {
     const user = userEvent.setup();
     renderApp("/login");
-    const demo = await screen.findByRole("region", { name: /demo login/i });
+    const sheet = await openDemoSheet(user);
     // demo accounts have fixed names on the server, so there is nothing to type
-    expect(within(demo).queryByLabelText(/your name/i)).not.toBeInTheDocument();
-    await user.click(within(demo).getByRole("button", { name: card }));
+    expect(within(sheet).queryByRole("textbox")).not.toBeInTheDocument();
+    await user.click(within(sheet).getByRole("button", { name: row }));
     await waitFor(() => expect(path()).toBe(home));
     const call = server.calls.find((c) => c.path === "/api/auth/demo");
     expect(call.body).toEqual({ role });
   });
 
-  it("a server with the demo login switched off says so", async () => {
+  it("the server's config decides whether the demo link is shown, asked once without credentials", async () => {
+    renderApp("/login");
+    expect(await screen.findByRole("button", { name: /try the demo/i })).toBeInTheDocument();
+    const asked = server.calls.filter((c) => c.path === "/api/auth/config");
+    expect(asked).toHaveLength(1);
+    expect(asked[0].method).toBe("GET");
+    expect(asked[0].headers.authorization).toBeUndefined();
+  });
+
+  it("a server with the demo login switched off: no demo link at all", async () => {
+    server = createFakeAuthServer({ demoLoginEnabled: false });
+    resetSessionClientForTests({ fetch: server.fetch, locks: null, createChannel: () => null });
+    renderApp("/login");
+    expect(await screen.findByRole("heading", { name: "Log in to continue" })).toBeInTheDocument();
+    await waitFor(() => expect(server.count("/api/auth/config")).toBe(1));
+    await act(async () => {}); // let the answer land
+    expect(screen.queryByRole("button", { name: /try the demo/i })).not.toBeInTheDocument();
+  });
+
+  it("if the config can't be fetched, the demo link stays hidden (fails closed)", async () => {
+    const broken = (url, init) => (String(url).endsWith("/api/auth/config") ? Promise.reject(new TypeError("Failed to fetch")) : server.fetch(url, init));
+    resetSessionClientForTests({ fetch: broken, locks: null, createChannel: () => null });
+    renderApp("/login");
+    expect(await screen.findByRole("heading", { name: "Log in to continue" })).toBeInTheDocument();
+    await act(async () => {});
+    expect(screen.queryByRole("button", { name: /try the demo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("if the demo login is switched off after the page loaded, the sheet says so", async () => {
     const off = createFakeAuthServer();
     const offFetch = (url, init) => (String(url).endsWith("/api/auth/demo") ? Promise.resolve({ ok: false, status: 404, json: async () => ({ error: "Not found." }) }) : off.fetch(url, init));
     resetSessionClientForTests({ fetch: offFetch, locks: null, createChannel: () => null });
     const user = userEvent.setup();
     renderApp("/login");
-    await user.click(await screen.findByRole("button", { name: /government official/i }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/demo login is switched off/i);
+    const sheet = await openDemoSheet(user);
+    await user.click(within(sheet).getByRole("button", { name: /government official/i }));
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(/demo login is switched off/i);
     expect(path()).toBe("/login");
   });
 
@@ -174,9 +205,8 @@ describe("logging in", () => {
     confirmOtp.mockResolvedValue({ uid: "fb-user", idToken: "good-firebase-id-token" });
     const user = userEvent.setup();
     renderApp("/login");
-    await user.type(await screen.findByLabelText(/mobile number/i), "9876543210");
-    await user.click(screen.getByRole("button", { name: /send otp/i }));
-    await user.type(screen.getByLabelText(/^otp$/i), "123456");
+    await requestOtp(user);
+    await typeOtp(user, "123456");
     await user.click(screen.getByRole("button", { name: /verify/i }));
     await waitFor(() => expect(path()).toBe("/citizen"));
     expect(server.calls.find((c) => c.path === "/api/auth/firebase").body).toEqual({ idToken: "good-firebase-id-token" });
@@ -187,9 +217,8 @@ describe("logging in", () => {
     confirmOtp.mockResolvedValue({ uid: "x", idToken: "bad-token" });
     const user = userEvent.setup();
     renderApp("/login");
-    await user.type(await screen.findByLabelText(/mobile number/i), "9876543210");
-    await user.click(screen.getByRole("button", { name: /send otp/i }));
-    await user.type(screen.getByLabelText(/^otp$/i), "123456");
+    await requestOtp(user);
+    await typeOtp(user, "123456");
     await user.click(screen.getByRole("button", { name: /verify/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/phone verification failed/i);
     expect(path()).toBe("/login");

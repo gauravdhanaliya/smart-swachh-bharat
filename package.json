@@ -15,6 +15,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:node": "node --test server/test/*.test.js tests/*.test.js",
+    "test:layout": "node scripts/check-login-layout.mjs",
     "migrate:sqlite": "node --env-file-if-exists=.env server/scripts/migrate-sqlite-to-mongo.js",
     "grant-role": "node --env-file-if-exists=.env server/scripts/grant-role.js",
     "seed-demo-roles": "node --env-file-if-exists=.env server/scripts/seed-demo-roles.js",

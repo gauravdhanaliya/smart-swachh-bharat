@@ -48,7 +48,7 @@ const ERROR_MESSAGES = {
   "auth/quota-exceeded": "Too many attempts. Please wait a while before trying again.",
   "auth/network-request-failed": "Network problem. Check your internet connection and try again.",
   "auth/captcha-check-failed": "Security check failed. Please try again.",
-  "auth/not-configured": "Phone login is not set up on this build yet. Use the demo login below.",
+  "auth/not-configured": "Phone login is not set up on this build yet. Use “Try the demo” below.",
   "auth/user-mismatch": "That number isn't the one this account signed in with. Use the same number.",
   "auth/requires-recent-login": "For your security, Firebase needs a fresh code. Send a new code and enter it.",
 };

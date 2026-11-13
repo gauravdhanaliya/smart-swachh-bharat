@@ -58,7 +58,7 @@ const DEMO = {
   government: "demo-official",
 };
 
-export function createFakeAuthServer({ latencyMs = 5 } = {}) {
+export function createFakeAuthServer({ latencyMs = 5, demoLoginEnabled = true } = {}) {
   const users = {
     "demo-citizen": { uid: "demo-citizen", role: "citizen", name: "Demo Citizen", phone: null, isDemo: true },
     "demo-worker": { uid: "demo-worker", role: "worker", name: "Vikash Kumar", phone: null, isDemo: true, wid: "w1" },
@@ -134,7 +134,9 @@ export function createFakeAuthServer({ latencyMs = 5 } = {}) {
       t.used = true;
       return json(200, issue(t.uid));
     }
+    if (method === "GET" && path === "/api/auth/config") return json(200, { demoLoginEnabled });
     if (method === "POST" && path === "/api/auth/demo") {
+      if (!demoLoginEnabled) return json(404, { error: "Not found." });
       const uid = DEMO[body?.role];
       if (!uid || Object.keys(body).length !== 1) return json(400, { error: "Please fix the highlighted fields." });
       return json(200, issue(uid));

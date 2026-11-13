@@ -14,6 +14,12 @@
   --color-brand-orange-400: #ffab3d;
   --color-brand-orange-500: #f5920e;
   --color-brand-orange-600: #e07a00;
+
+  /* Login page backdrop blobs. Light enough that brand-green-700 text
+     stays AA even where a blob is at full strength. */
+  --color-backdrop-green: #d7f5e0;
+  --color-backdrop-sky: #d9f0fb;
+  --color-backdrop-amber: #ffeccf;
 }
 
 html, body, #root {

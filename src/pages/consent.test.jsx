@@ -12,6 +12,7 @@ import { startOtpSession, startSession } from "../services/authSession";
 import { clearConsentCache } from "../services/consentService";
 import { DEFAULT_CONSENT_VERSION } from "../../server/src/constants.js";
 import { LOCAL_CONSENT_KEY, acceptConsentLocally } from "../test/consent";
+import { demoLogin } from "../test/loginPage";
 import { seedLocalApi } from "../test/fixtures";
 
 function Path() {
@@ -44,7 +45,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("first login", () => {
   it("demo login shows the consent screen first; Continue stays disabled until every required box is ticked", async () => {
     renderApp("/login");
-    await userEvent.click(await screen.findByRole("button", { name: /^citizen/i }));
+    await demoLogin(userEvent.setup(), /^citizen/i);
     await consentScreen();
     expect(screen.queryByRole("checkbox", { name: PHONE })).toBeNull(); // demo accounts have no phone
     const go = screen.getByRole("button", { name: "Agree and continue" });

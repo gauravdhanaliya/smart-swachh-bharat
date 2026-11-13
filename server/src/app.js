@@ -6,6 +6,7 @@
 //            (/api/auth/firebase-login is kept as an alias)
 //   POST   /api/auth/demo                  { role } -> same, as a seeded demo user;
 //            only when DEMO_LOGIN_ENABLED=true (otherwise the route doesn't exist)
+//   GET    /api/auth/config                public -> { demoLoginEnabled } for the login page
 //   POST   /api/auth/refresh               (refresh cookie) -> new accessToken, rotated cookie
 //   POST   /api/auth/logout                (refresh cookie) revokes it
 //   GET    /api/auth/me                    current user
@@ -198,6 +199,10 @@ export function createApp({ config, repo, verifyFirebase, photoStore = null, log
   });
   app.post("/api/auth/firebase", firebaseLogin);
   app.post("/api/auth/firebase-login", firebaseLogin);
+
+  // What the login page needs to know before anyone signs in: only whether to
+  // offer the demo login. Public, and nothing else is exposed here.
+  app.get("/api/auth/config", (_req, res) => res.json({ demoLoginEnabled: config.demoLoginEnabled }));
 
   // The labelled demo login. The route only exists when DEMO_LOGIN_ENABLED is
   // true, so a production deployment without it answers exactly like any

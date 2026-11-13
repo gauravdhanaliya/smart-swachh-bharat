@@ -4,11 +4,21 @@
  * background flourish on the inner auth screens (`variant="subtle"`).
  */
 export default function CityIllustration({ variant = "full", className = "" }) {
-  const subtle = variant === "subtle";
+  // "skyline": the subtle scene cropped to its drawing (no empty sky), scaled
+  // to fit whatever box it gets and anchored to the bottom, so it shrinks
+  // instead of being cut off.
+  const skyline = variant === "skyline";
+  const subtle = variant === "subtle" || skyline;
 
   if (subtle) {
     return (
-      <svg viewBox="0 0 400 200" className={className} xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <svg
+        viewBox={skyline ? "0 66 400 134" : "0 0 400 200"}
+        preserveAspectRatio={skyline ? "xMidYMax meet" : undefined}
+        className={className}
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
         <g fill="#d7f0e0">
           <rect x="90" y="110" width="26" height="70" />
           <rect x="120" y="85" width="30" height="95" />

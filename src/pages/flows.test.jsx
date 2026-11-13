@@ -26,6 +26,7 @@ import { getFacilityRequests } from "../services/facilityRequestService";
 import { getAllBins } from "../services/facilityService";
 import { refreshFresh } from "../services/locationStore";
 import { rememberGpsAck } from "../utils/gps";
+import { demoLogin } from "../test/loginPage";
 
 function Probe() {
   return <output data-testid="path">{useLocation().pathname}</output>;
@@ -58,14 +59,12 @@ function fakeGps() {
   });
 }
 
-/** Signs in through the demo section of the real login page. */
-async function loginAs(card, name = "") {
+/** Signs in through the "Try the demo" sheet of the real login page. */
+async function loginAs(row) {
   clearSession();
   const user = userEvent.setup();
   const app = renderApp("/login");
-  const demo = screen.getByRole("region", { name: /demo login/i });
-  if (name) await user.type(within(demo).getByLabelText(/your name/i), name);
-  await user.click(within(demo).getByRole("button", { name: card }));
+  await demoLogin(user, row);
   return { ...app, user };
 }
 
@@ -74,7 +73,7 @@ const tileValue = async (label) => Number((await screen.findAllByText(label)).fi
 
 async function citizenReports(description) {
   fakeGps();
-  const { user, unmount } = await loginAs(/^citizen/i, "Asha");
+  const { user, unmount } = await loginAs(/^citizen/i);
   expect(path()).toBe("/citizen");
   await onPage(/, Citizen!$/);
   const totalBefore = await tileValue("Total Complaints");
@@ -91,7 +90,7 @@ async function citizenReports(description) {
   await waitFor(() => expect(path()).toMatch(/^\/citizen\/complaints\/SSB/));
   await onPage("Complaint Tracking");
   const created = getComplaints().find((c) => c.description === description);
-  expect(created).toMatchObject({ citizenName: "Asha", citizenId: "demo-citizen", issueType: "Overflowing Bin", status: "SUBMITTED" });
+  expect(created).toMatchObject({ citizenName: "Demo Citizen", citizenId: "demo-citizen", issueType: "Overflowing Bin", status: "SUBMITTED" });
   return { user, unmount, created, totalBefore };
 }
 
@@ -207,7 +206,7 @@ describe("the whole flow across roles", () => {
 
     // Citizen: the complaint shows the worker's update, and a notification is waiting.
     {
-      const { user } = await loginAs(/^citizen/i, "Asha");
+      const { user } = await loginAs(/^citizen/i);
       await onPage(/, Citizen!$/);
       expect(screen.getByRole("button", { name: /Notifications, \d+ unread/ })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: /Notifications/ }));

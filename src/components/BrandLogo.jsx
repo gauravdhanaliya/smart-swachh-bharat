@@ -2,9 +2,10 @@
  * "Smart Swachh Bharat" brand lockup — the circular bin-and-swoosh mark
  * beside the stacked three-line wordmark.
  * size: "lg" for the splash screen, "sm" for the compact header used on
- * the inner auth screens.
+ * the inner auth screens. `subtitle` is an optional small line under the
+ * compact wordmark (no ministry attribution: this is not a government service).
  */
-export default function BrandLogo({ size = "lg" }) {
+export default function BrandLogo({ size = "lg", subtitle = "Ministry of Housing and Urban Affairs" }) {
   const isLarge = size === "lg";
 
   return (
@@ -20,13 +21,16 @@ export default function BrandLogo({ size = "lg" }) {
       ) : (
         <div className="text-left">
           <h1 className="text-[19px] font-extrabold leading-tight tracking-tight">
-            <span className="text-brand-green-800">Smart </span>
-            <span className="text-brand-green-500">Swachh </span>
+            {/* Spaces outside the coloured spans, so the heading reads "Smart Swachh Bharat", not "SmartSwachhBharat". */}
+            <span className="text-brand-green-800">Smart</span>{" "}
+            <span className="text-brand-green-500">Swachh</span>{" "}
             <span className="text-brand-orange-500">Bharat</span>
           </h1>
-          <p className="text-xs font-medium leading-tight text-emerald-900/60">
-            Ministry of Housing and Urban Affairs
-          </p>
+          {subtitle && (
+            <p data-one-line className="text-xs font-medium leading-tight text-brand-green-800">
+              {subtitle}
+            </p>
+          )}
         </div>
       )}
     </div>
