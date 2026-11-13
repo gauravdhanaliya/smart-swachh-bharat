@@ -70,7 +70,7 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
  * `logSink` receives one JSON line per log event (console.log by default);
  * tests pass their own to read what would be logged.
  */
-export function createApp({ config, repo, verifyFirebase, photoStore = null, logSink, geoFetch }) {
+export function createApp({ config, repo, verifyFirebase, photoStore = null, logSink, geoFetch, geoClock }) {
   const photos = createPhotoService({ photoStore, repo });
   const logger = createLogger(logSink);
   const app = express();
@@ -432,7 +432,7 @@ export function createApp({ config, repo, verifyFirebase, photoStore = null, log
     })
   );
 
-  registerGeoRoutes(app, { repo, config, wrap, fetchImpl: geoFetch });
+  registerGeoRoutes(app, { repo, config, wrap, fetchImpl: geoFetch, clock: geoClock });
   registerCivicRoutes(app, { repo, config, wrap, photos, photoStore });
 
   // ---- errors ------------------------------------------------------

@@ -12,12 +12,37 @@ import { apiClient, startTestServer } from "./helpers.js";
 
 const BUSY = "Search is busy, try again in a moment";
 
-// A stand-in for nominatim.openstreetmap.org that records every call.
-function fakeNominatim() {
+// The geocoder's clock, virtual: time only moves when the API sleeps waiting
+// for the Nominatim slot, and the sleep returns at once (no real waiting). A
+// sleep moves time to when it would have ended, never backwards, so several
+// requests waiting for the same slot wake at the same moment, as for real.
+// "Requests at least a second apart" is then a fact about virtual time, not
+// a race against a busy machine.
+function virtualClock() {
+  let now = Date.now(); // close to real time, so MongoDB's expiry index leaves the slot alone
+  const sleeps = [];
+  return {
+    now: () => now,
+    sleeps,
+    sleep(ms) {
+      const due = now + ms;
+      sleeps.push(ms);
+      return new Promise((resolve) =>
+        setImmediate(() => {
+          now = Math.max(now, due);
+          resolve();
+        })
+      );
+    },
+  };
+}
+
+// A stand-in for nominatim.openstreetmap.org that records every call, timed by `clock`.
+function fakeNominatim(clock) {
   const calls = [];
   let next = null; // { status } to answer the next call with
   const fetchImpl = async (url, options = {}) => {
-    calls.push({ url: new URL(url), headers: options.headers ?? {}, at: Date.now() });
+    calls.push({ url: new URL(url), headers: options.headers ?? {}, at: clock.now() });
     const answer = next;
     next = null;
     if (answer) return new Response(JSON.stringify({ error: "x" }), { status: answer.status });
@@ -47,12 +72,22 @@ function fakeNominatim() {
 let t;
 let api;
 let geo;
+let clock;
+let grants; // virtual times at which the API was given the Nominatim slot
 let citizen;
 let other;
 
 before(async () => {
-  geo = fakeNominatim();
-  t = await startTestServer({ ECOSETU_GEOCODE_USER_AGENT: "EcoSetu-test/1.0 (+https://example.test)" }, { geoFetch: geo.fetchImpl });
+  clock = virtualClock();
+  geo = fakeNominatim(clock);
+  t = await startTestServer({ ECOSETU_GEOCODE_USER_AGENT: "EcoSetu-test/1.0 (+https://example.test)" }, { geoFetch: geo.fetchImpl, geoClock: clock });
+  // Record each time the slot is granted (the moment the one-per-second rule is decided).
+  const claimSlot = t.repo.claimSlot;
+  t.repo.claimSlot = async function (key, intervalMs, nowMs) {
+    const slot = await claimSlot.call(this, key, intervalMs, nowMs);
+    if (slot.granted) grants.push(nowMs);
+    return slot;
+  };
   api = apiClient(t);
   citizen = await api.signIn("geo-citizen");
   other = await api.signIn("geo-other");
@@ -62,6 +97,8 @@ after(() => t.stop());
 // Each test starts with no cache and a free slot.
 beforeEach(async () => {
   geo.reset();
+  clock.sleeps.length = 0;
+  grants = [];
   await t.db.collection("geocode_cache").deleteMany({});
   await t.db.collection("auth_rate_limits").deleteMany({});
 });
@@ -106,9 +143,13 @@ describe("place search", () => {
     assert.equal(ok + busy.length, 4);
     for (const r of busy) assert.equal(r.json.error, BUSY);
     assert.equal(geo.calls.length, ok);
-    const times = geo.calls.map((c) => c.at).sort((a, b) => a - b);
+    // Every Nominatim request had a slot of its own, and the slots were a second or more apart.
+    // (Grant times, not call times: a request's call is stamped when it lands, and
+    // virtual time can jump while it is in flight; really, it follows its grant at once.)
+    assert.equal(grants.length, geo.calls.length);
+    const times = [...grants].sort((a, b) => a - b);
     for (let i = 1; i < times.length; i++) {
-      assert.ok(times[i] - times[i - 1] >= 990, `requests ${times[i] - times[i - 1]} ms apart`);
+      assert.ok(times[i] - times[i - 1] >= 1000, `slots granted ${times[i] - times[i - 1]} ms apart`);
     }
   });
 
@@ -117,7 +158,9 @@ describe("place search", () => {
     const second = await search("Dehradun", other);
     assert.equal(first.status, 200);
     assert.equal(second.status, 200);
-    assert.ok(geo.calls[1].at - geo.calls[0].at >= 990);
+    assert.equal(clock.sleeps.length, 1, "the second search waited once for the slot");
+    assert.ok(clock.sleeps[0] >= 1000 && clock.sleeps[0] <= 1100, `waited ${clock.sleeps[0]} ms`);
+    assert.ok(geo.calls[1].at - geo.calls[0].at >= 1000, `requests ${geo.calls[1].at - geo.calls[0].at} ms apart`);
   });
 
   test("Nominatim saying 429 is passed on as 'busy', and nobody calls it again for a while", async () => {
@@ -179,6 +222,8 @@ describe("street address for a GPS position", () => {
   test("shares the one-per-second slot with place search", async () => {
     await search("Roorkee");
     await reverse(29.86, 77.89);
-    assert.ok(geo.calls[1].at - geo.calls[0].at >= 990);
+    assert.equal(geo.calls.length, 2);
+    assert.equal(clock.sleeps.length, 1, "the address lookup waited for the slot the search had just used");
+    assert.ok(geo.calls[1].at - geo.calls[0].at >= 1000, `requests ${geo.calls[1].at - geo.calls[0].at} ms apart`);
   });
 });

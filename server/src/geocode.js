@@ -32,7 +32,12 @@ const WIDE_TYPES = new Set(["country", "state", "state_district", "region", "cou
 class BusyError extends Error {}
 class UpstreamError extends Error {}
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// The real clock. Tests pass a virtual one ({ now, sleep }) so the
+// one-per-second rule is checked without really waiting a second.
+const REAL_CLOCK = {
+  now: () => Date.now(),
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+};
 
 function singleParam(value, name) {
   if (typeof value !== "string") throw new ValidationError({ [name]: `Send one ${name}.` });
@@ -48,14 +53,14 @@ function coordinate(raw, name, limit) {
   return roundCoord(value); // about 11 m: nearby positions share a cache entry
 }
 
-export function registerGeoRoutes(app, { repo, config, wrap, fetchImpl = globalThis.fetch }) {
+export function registerGeoRoutes(app, { repo, config, wrap, fetchImpl = globalThis.fetch, clock = REAL_CLOCK }) {
   const limiter = rateLimit({ ...config.geoRateLimit, repo, config, name: "geo" });
 
   async function takeSlot() {
-    let slot = await repo.claimSlot(SLOT, INTERVAL_MS);
+    let slot = await repo.claimSlot(SLOT, INTERVAL_MS, clock.now());
     if (!slot.granted && slot.waitMs <= MAX_WAIT_MS) {
-      await sleep(slot.waitMs + 5);
-      slot = await repo.claimSlot(SLOT, INTERVAL_MS);
+      await clock.sleep(slot.waitMs + 5);
+      slot = await repo.claimSlot(SLOT, INTERVAL_MS, clock.now());
     }
     if (!slot.granted) throw new BusyError();
   }
@@ -74,7 +79,7 @@ export function registerGeoRoutes(app, { repo, config, wrap, fetchImpl = globalT
       throw new UpstreamError();
     }
     if (res.status === 429 || res.status === 503) {
-      await repo.holdSlot(SLOT, new Date(Date.now() + BACKOFF_MS), INTERVAL_MS);
+      await repo.holdSlot(SLOT, new Date(clock.now() + BACKOFF_MS), INTERVAL_MS);
       throw new BusyError();
     }
     if (!res.ok) throw new UpstreamError();

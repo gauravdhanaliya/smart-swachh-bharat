@@ -82,7 +82,7 @@ export function runScript(t, script, args = [], env = {}) {
  * in-memory stand-in for the private Blob store (`t.photos`); pass
  * `{ photos: null }` for a server with no photo storage.
  */
-export async function startTestServer(envOverrides = {}, { photos = createMemoryPhotoStore(), logger = () => {}, geoFetch } = {}) {
+export async function startTestServer(envOverrides = {}, { photos = createMemoryPhotoStore(), logger = () => {}, geoFetch, geoClock } = {}) {
   const mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   const config = loadConfig({ ...TEST_ENV, ...envOverrides, MONGODB_URI: mongod.getUri() });
   // If start-up fails, stop the in-memory MongoDB too, or the test run never exits.
@@ -93,7 +93,7 @@ export async function startTestServer(envOverrides = {}, { photos = createMemory
     }
   );
   const repo = createRepository(connection.db, connection.client, null, { phoneHashSecret: config.phoneHashSecret });
-  const app = createApp({ config, repo, photoStore: photos, logSink: logger, verifyFirebase: createFirebaseVerifier(PROJECT_ID, { keys }), geoFetch });
+  const app = createApp({ config, repo, photoStore: photos, logSink: logger, verifyFirebase: createFirebaseVerifier(PROJECT_ID, { keys }), geoFetch, geoClock });
   const server = app.listen(0);
   await new Promise((r) => server.once("listening", r));
   return {

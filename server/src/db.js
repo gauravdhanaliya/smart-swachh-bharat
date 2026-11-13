@@ -574,9 +574,10 @@ export function createRepository(db, client, session = null, { phoneHashSecret =
      * One shared slot per `intervalMs` (e.g. Nominatim's one request a
      * second), across every server instance. Resolves { granted: true }, or
      * { granted: false, waitMs } with the time until the slot is free.
+     * `nowMs` is the current time (tests pass a virtual clock's time).
      */
-    async claimSlot(key, intervalMs) {
-      const at = new Date();
+    async claimSlot(key, intervalMs, nowMs = Date.now()) {
+      const at = new Date(nowMs);
       const fields = { windowStart: at, expiresAt: new Date(at.getTime() + intervalMs + 60_000) };
       const { modifiedCount } = await rateLimits.updateOne(
         { _id: key, windowStart: { $lte: new Date(at.getTime() - intervalMs) } },
@@ -590,7 +591,7 @@ export function createRepository(db, client, session = null, { phoneHashSecret =
         if (!isDuplicateKey(err)) throw err; // someone else holds the slot
       }
       const doc = await rateLimits.findOne({ _id: key });
-      return { granted: false, waitMs: doc ? Math.max(0, doc.windowStart.getTime() + intervalMs - Date.now()) : 0 };
+      return { granted: false, waitMs: doc ? Math.max(0, doc.windowStart.getTime() + intervalMs - nowMs) : 0 };
     },
 
     /** Keeps the slot taken until `until` (backing off after the upstream said "too many"). */
