@@ -1,7 +1,8 @@
 # Deploying EcoSetu
 
 How to get this version from your laptop to Vercel, with MongoDB Atlas,
-Firebase phone login and a private Vercel Blob store. The order matters: Git
+Firebase Authentication (email + password accounts for everyone) and a
+private Vercel Blob store. The order matters: Git
 first (so nothing is lost), then the services, then the deployment, then the
 checks.
 
@@ -135,19 +136,55 @@ Notes:
    charge. Complaints are still filed (without the photo) and the citizen is
    told, so the app keeps working.
 
-## 4. Firebase (phone sign-in)
+## 4. Firebase (email sign-in)
 
-1. Authentication → Sign-in method → enable **Phone**.
+On a first visit the start screen asks for consent first; nothing is created
+in Firebase or MongoDB before that. Then the card on the start screen is the
+login form itself:
+
+- **Log in**: email + password. Used by citizens, officials and workers
+  alike. The role always comes from the server: a citizen, unless an official
+  or worker role was granted to that **verified** email.
+- **Create account**: a new account is a **citizen straight away**; Firebase
+  sends the verification email, and the app shows a dismissible "Verify your
+  email" banner (with "Resend email") until it is verified.
+- **Forgot password?**: sends the reset email.
+- **Try the demo** (below the card): Citizen, Sanitation Worker and
+  Government Official demo users, only when `DEMO_LOGIN_ENABLED=true`
+  (section 8).
+
+There is no anonymous ("Continue without account") or phone sign-in any
+more; the API refuses an anonymous token with a 403.
+
+No message says whether an email has an account (wrong password and unknown
+email read the same; "Create account" with a used email and "Forgot
+password?" never confirm it either). There is no phone sign-in.
+
+1. Authentication → Sign-in method:
+   - enable **Email/Password** (leave "Email link (passwordless sign-in)" off);
+   - **disable Anonymous** (the app no longer uses it). Existing anonymous
+     users in Authentication → Users can be deleted there; `npm run migrate`
+     removes their data from the database (section 6);
+   - **disable Phone** if it is still on from the previous version (and delete
+     any "Phone numbers for testing"). Nothing in the app uses it now.
 2. Authentication → Settings → **Authorized domains**: add
    `smart-swachh-bharat.vercel.app` (and your own domain if you add one);
    keep `localhost`. Firebase doesn't accept wildcards, so a preview deployment
-   (`…-git-<branch>-gauravdhanaliya.vercel.app`) can only sign in by phone if
-   you add that exact domain. Add the branch alias for the branch you test on.
-3. Authentication → Sign-in method → Phone → **Phone numbers for testing**: add
-   two or three numbers with fixed codes for demos (no SMS is sent, no quota
-   used).
+   (`…-git-<branch>-gauravdhanaliya.vercel.app`) can only sign in if you add
+   that exact domain. Add the branch alias for the branch you test on.
+3. Authentication → Templates → **Email address verification** and
+   **Password reset**: set the sender name (e.g. "EcoSetu") so both emails
+   are recognisable. "Create account" and "Resend email" send the first;
+   "Forgot password?" sends the second. A staff role applies only once the
+   address is verified.
+   Also turn on Authentication → Settings → **Email enumeration protection**
+   (on by default for new projects), so Firebase itself doesn't reveal which
+   emails have accounts.
 4. Project settings → Your apps → Web app: copy its config into the
    `VITE_FIREBASE_*` variables (section 5).
+
+Firebase limits sign-ups per IP on its side as well; the API adds its own
+limit on new accounts (section 5, rate limits).
 
 **No service account key is needed.** The server checks Firebase ID tokens
 against Google's public signing keys (with the `jose` library), not with
@@ -173,7 +210,7 @@ PHONE_HASH_SECRET".
 | `MONGODB_DB_NAME` | **Production: `ecosetu`** · **Preview: `ecosetu_preview`** | add it twice, once per environment, with the two values (Vercel lets one name have a different value per environment) |
 | `ECOSETU_JWT_SECRET` | random, 32+ characters | required · Sensitive · **different per environment** |
 | `ECOSETU_JWT_REFRESH_SECRET` | random, 32+ characters, not equal to the other two | required · Sensitive · **different per environment** |
-| `PHONE_HASH_SECRET` | random, 32+ characters, not equal to the other two | required · Sensitive · **different per environment**; **never change it later** in an environment, or its phone lookups stop matching |
+| `PHONE_HASH_SECRET` | random, 32+ characters, not equal to the other two | required · Sensitive · **different per environment**. Keys the hash of a saved account's email (the name is from the old phone sign-in, kept so nothing needs renaming). **Never change it later** in an environment, or roles granted by email stop matching |
 | `ECOSETU_FIREBASE_PROJECT_ID` | your Firebase project id | required |
 | `BLOB_READ_WRITE_TOKEN` / `BLOB_STORE_ID` | set by connecting the Blob store | required (the server refuses to start without a store) |
 | `CRON_SECRET` | random, 16+ characters | Sensitive; for the daily retry of failed photo deletes |
@@ -188,8 +225,8 @@ the same Firebase project, so the same person has the same user id in
 refresh token issued by a preview deployment would also verify on production,
 and the user it names exists there too. With different secrets a preview
 token simply fails to verify on production (401), and the reverse. A
-different `PHONE_HASH_SECRET` means a phone number's hash in the preview
-database can't be matched against production either. In Vercel, add each of
+different `PHONE_HASH_SECRET` means an email's hash in the preview database
+can't be matched against production either. In Vercel, add each of
 the three names twice: once with the Preview value (Preview ticked only) and
 once with the Production value (Production ticked only), like
 `MONGODB_DB_NAME`. The server already refuses to start if, within one
@@ -234,16 +271,21 @@ Rate limits (defaults; change with the `ECOSETU_*_RATE_*` variables in
 | What | Limit | Counted per |
 |---|---|---|
 | Writes (report, assign, rate, profile, …) | 60 per minute | signed-in user |
-| New complaints | 10 per hour | signed-in user |
+| Sign-ups (an account's first sign-in to the API) | 20 per hour (`ECOSETU_SIGNUP_RATE_MAX`) | IP; returning accounts aren't counted |
+| New complaints | 10 per hour per user, and 30 per hour per IP | user and IP |
+| Toilet ratings (new or changed) | 20 per hour per user, and 60 per hour per IP | user and IP |
+| Votes on complaints (set, change or remove) | 60 per hour per user, and 200 per hour per IP | user and IP |
 | Sign-in (`/api/auth/firebase`) and other unsigned `/api/auth` calls | 120 per minute | IP |
 | Session refresh / logout | 120 per minute | session |
 | Demo login | 60 per minute | IP |
-| Failed phone sign-ins | 30 per 10 minutes | IP |
+| Failed sign-ins (bad or forged tokens) | 30 per 10 minutes | IP |
 | Place search / street addresses | 30 per minute per user; Nominatim itself at most 1 per second for the whole app | user |
 
 Signed-in traffic is counted per user so a whole college or hackathon hall on
-one public IP isn't blocked; only routes where nobody is signed in yet are
-counted per IP.
+one public IP isn't blocked. A new account costs little, so sign-ups,
+complaints, ratings and votes are **also** counted per IP, with limits sized
+for a hall full of people, not one person. For a big event on one network,
+raise `ECOSETU_SIGNUP_RATE_MAX` (and the `_IP_` limits) for the day.
 
 ## 6. First deployment: wipe, migrate, seed (both databases)
 
@@ -304,16 +346,22 @@ rm .env
   (Node's `--env-file` never overrides them), so the empty lines don't matter.
 - Each environment's run uses **that environment's** secrets: the Preview
   run (`--environment=preview`) gets the Preview `PHONE_HASH_SECRET` and JWT
-  secrets, the Production run the Production ones. This matters most for
-  `PHONE_HASH_SECRET`: `npm run migrate` turns stored phone numbers into
-  hashes with it, and a hash made with the other environment's secret would
-  never match when that person signs in. Check the label in your password
-  manager before pasting.
+  secrets, the Production run the Production ones. Check the label in your
+  password manager before pasting.
+- `npm run migrate` **removes the accounts "Continue without account" made**
+  (anonymous sign-in, now gone): each one the way "Delete my data" does it,
+  so their complaints stay on file anonymised ("Deleted user") and everything
+  else of theirs goes. It says how many. Accounts that were saved with an
+  email are kept: they log in with that email.
+- It also **removes every phone number and phone hash** left by the old phone
+  sign-in. Accounts it made keep their uid and role. Roles that were still pending for a phone
+  number can't be carried over (a hash can't become an email): the migration
+  drops them and says how many; grant them again by email ("Staff accounts", below).
 - Lost a secret? `MONGODB_URI`: copy it again from Atlas (reset the user's
   password if needed, then update Vercel). The JWT secrets: generate new ones
   in Vercel for that environment (everyone there is signed out once).
-  `PHONE_HASH_SECRET`: don't replace it while that environment has phone
-  users; ask me first.
+  `PHONE_HASH_SECRET`: don't replace it while that environment has saved
+  accounts with roles granted by email; ask me first.
 - PowerShell instead of Git Bash: `$s = Read-Host -AsSecureString "MONGODB_URI"`
   then `$env:MONGODB_URI = [Net.NetworkCredential]::new("", $s).Password`
   for each name, run the scripts, and close the window afterwards.
@@ -334,31 +382,73 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Origin: https://evil.example' $APP/
 curl -s -o /dev/null -w '%{http_code}\n' $APP/api/cron/blob-deletions      # 401 without the secret
 ```
 
+### Staff accounts (worker, official)
+
+Roles are never chosen in the app. Both kinds are granted to an **email**,
+and apply only once Firebase says that email is verified, so nobody can claim
+a role by typing someone else's address.
+
+**Officials: `npm run grant-role` (bootstrap).** This is only for creating
+officials, starting with the first one:
+
+1. The official opens the app, taps **Create account** with their work
+   email, and clicks the link in the verification email.
+   (Or grant first: the role waits for the account.)
+2. You run, with that environment's secrets (as in section 6):
+   `npm run grant-role -- officer@example.org government`. The output shows
+   the email masked. `npm run grant-role -- officer@example.org citizen`
+   takes the role away again.
+3. The role applies at their next sign-in or session refresh.
+
+`grant-role` refuses `worker`: workers are added in the app.
+
+**Workers: only from the Government Official dashboard.** Workers → **Add
+worker** with the worker's name and email. That creates a directory entry and
+a pending worker role for the email, stored only as a keyed hash and a masked
+copy (the dialog shows the masked form of what was typed). When that person
+creates an account with the same email and verifies it, they are a Worker.
+Removing the worker in the directory takes the role away (they become a
+citizen) and cancels a pending invite; restoring brings it back. There is no
+other way to become a worker, apart from the demo login.
+
 ### In the browser
 
-1. Demo login (if enabled) as citizen, worker and official: the consent
-   screen comes first (Profile → "Reset demo consent" shows it again for a
-   presentation), then each opens its own
-   dashboard.
-2. Phone login with a Firebase test number: lands on the citizen dashboard.
-3. As a citizen, report an issue **with a photo**; it appears in My
+1. Open the app in a private window: the consent step shows first.
+   DevTools → Network shows **no request to the API or Firebase** until
+   "Agree and continue", and Firebase → Authentication → Users shows no new
+   user. There is no way in without an account (apart from the demo).
+2. **Create account** with a real email: the citizen Home opens at once,
+   with a "Verify your email" banner; the verification email arrives, and
+   after clicking it "I've verified it" removes the banner. Reload: still
+   signed in. A wrong password and an unknown
+   email give the same message. "Forgot password?" shows the same
+   confirmation for any email, and the reset email arrives for a real one.
+   Atlas: the user has `emailHash` and `emailMasked`, **no plain address**.
+3. As the official (granted with `grant-role`), Workers → **Add worker**
+   with a second real email: the card shows the masked email and "Waiting for
+   sign-up". Create an account with that email and verify it: it opens the
+   Worker dashboard, and the card shows "Account active".
+4. Try the demo (if enabled) as citizen, worker and official: each opens its own
+   dashboard (Profile → "Reset demo consent" shows the consent screen again
+   for a presentation).
+5. As a citizen, report an issue **with a photo**; it appears in My
    Complaints and the photo shows on the complaint.
-4. As the official, assign it to the demo worker; as the worker, start and
+6. As the official, assign it to the demo worker; as the worker, start and
    resolve it with a note. The citizen gets the notifications.
-5. Copy the photo's request URL from DevTools → Network (`/api/complaints/…/photo`)
+7. Copy the photo's request URL from DevTools → Network (`/api/complaints/…/photo`)
    and open it in a private window: it must be refused. Open it signed in as a
    different citizen: 404.
-6. Reload the page while signed in: you stay signed in (one `/api/auth/refresh`
+8. Reload the page while signed in: you stay signed in (one `/api/auth/refresh`
    in the Network tab). Leave the tab hidden for a minute: no requests while
    hidden, one on return.
-7. With a Firebase test number: Profile → Privacy and data → Delete my data.
-   Type DELETE, then confirm the fresh code. The complaint shows "Deleted
-   user" to the official, and Firebase → Authentication → Users no longer
-   lists the number. Withdraw consent on another account: signed out, data
-   still there, consent screen on the next sign-in.
-8. Vercel → project → Logs: request lines show only method, path, status,
-   time and role — no tokens, phone numbers or photo data.
-9. Vercel → project → Settings → Cron Jobs: run `/api/cron/blob-deletions`
+9. Delete my data (type DELETE and the password; a wrong password deletes
+   nothing). The complaint shows "Deleted user" to the
+   official, and Firebase → Authentication → Users no longer lists the
+   account. Withdraw consent on another account: signed out, data still
+   there, consent screen on the next sign-in.
+10. Vercel → project → Logs: request lines show only method, path, status,
+   time and role — no tokens, emails, passwords or photo data.
+11. Vercel → project → Settings → Cron Jobs: run `/api/cron/blob-deletions`
    once; it returns `{"deleted":0,"stillQueued":0}`.
 
 ### Content Security Policy (report-only for now)
@@ -370,8 +460,8 @@ anything the policy would block, but blocks nothing yet.
    box, type `Content Security Policy` (or `Report Only`).
 2. Do every journey once: pan and zoom the map; search a place on the map
    (type a place, press Search); open a view with the embedded OpenStreetMap map;
-   send a phone OTP (reCAPTCHA) and verify it; report with a photo (camera) and
-   view a complaint photo; use the demo login.
+   create an account and log in to it; use "Forgot password?"; report with a
+   photo (camera) and view a complaint photo; use "Try the demo".
 3. A violation looks like
    `[Report Only] Refused to load the image 'https://…' because it violates the following Content Security Policy directive: "img-src …"`.
    It names the blocked address and the directive.
@@ -380,8 +470,8 @@ anything the policy would block, but blocks nothing yet.
 
 ## 8. Demo login: only around presentations
 
-The labelled demo login lets anyone open the citizen, worker and **official**
-dashboards without a phone number. That is what a presentation needs, and
+The labelled demo login ("Try the demo") lets anyone open the citizen, worker
+and **official** dashboards without an account. That is what a presentation needs, and
 what a public site shouldn't offer the rest of the time. Keep
 `DEMO_LOGIN_ENABLED` **unset**, and switch it on only for the event.
 
@@ -391,7 +481,8 @@ what a public site shouldn't offer the rest of the time. Keep
    `true`, for **Production** (or only Preview, if you present from a preview).
 2. Redeploy that environment (Deployments → latest → ⋯ → Redeploy). Variables
    only reach new deployments.
-3. Check: the login page's demo cards sign in. To show the consent screen,
+3. Check: the start screen's "Try the demo" link signs in (log out first to
+   see the start screen). To show the consent screen,
    use Profile → Privacy and data → **Reset demo consent** before you start.
 
 **Switch off** (straight after):
@@ -418,5 +509,7 @@ way; they are labelled DEMO and can't be signed into while the switch is off.
   first deployment this is expected until the variables are set (section 5).
 - **A preview shows production data, or the reverse:** check `MONGODB_DB_NAME`
   for that environment (section 5), then redeploy.
-- **Phone login fails on a preview:** add that preview's exact domain to
-  Firebase's Authorized domains (section 4).
+- **Sign-in fails on a preview** (the app shows "Signing in isn't switched
+  on…" or stays on the start screen): add that preview's exact domain to
+  Firebase's Authorized domains, and check Email/Password is enabled
+  (section 4).

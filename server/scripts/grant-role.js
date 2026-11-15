@@ -1,40 +1,44 @@
-// Gives a user a role. This is the ONLY way anyone becomes a worker or a
-// government official — the app never lets a client choose a role.
+// Makes someone an official (government). This is a bootstrap tool for
+// whoever runs the deployment: officials then add workers themselves, in the
+// app (Workers → Add worker). Workers can't be made here, and the app never
+// lets a client choose a role.
 //
-//   npm run grant-role -- <phone> <citizen|worker|government> [--worker-id w1]
+//   npm run grant-role -- <email> government     # supervisor / superadmin too
+//   npm run grant-role -- <email> citizen        # take the role away again
 //
-// Updates the user with that phone number in MongoDB. If nobody has signed in
-// with it yet, the role is stored as pending and applied at their first
-// sign-in. Re-running is harmless. "government" is the app's `official` role;
-// supervisor and superadmin are accepted too.
-//
-// --worker-id links a worker to one of the demo worker records (w1, w2…) so
-// they see that worker's demo facility requests.
+// The email is the one the person saved their account with (Profile → "Save
+// my account", or "Log in with email" → Create account). If that account has
+// verified its email, it gets the role now; otherwise the role waits (pending)
+// and is applied the next time the account signs in with the email verified,
+// so nobody can claim a role by typing someone else's address. Re-running is
+// harmless.
 
 import { ROLES, parseRoleName } from "../src/constants.js";
-import { describeResult, maskPhone, normalisePhone, withRepo } from "./_shared.js";
+import { maskEmail, normaliseEmail } from "../src/identity.js";
+import { describeResult, withRepo } from "./_shared.js";
 
 const args = process.argv.slice(2);
-const flag = args.indexOf("--worker-id");
-const workerId = flag >= 0 ? args.splice(flag, 2)[1] : null;
-const [phoneArg, roleArg] = args;
+const [emailArg, roleArg] = args;
+const ALLOWED = ROLES.filter((r) => r !== "worker");
 
-const usage = `Usage: npm run grant-role -- <phone> <citizen|worker|government> [--worker-id w1]
-Roles: ${["citizen", "worker", "government", ...ROLES.filter((r) => !["citizen", "worker", "official"].includes(r))].join(", ")}`;
+const usage = `Usage: npm run grant-role -- <email> <government|citizen>
+Roles: government (official), ${ALLOWED.filter((r) => !["citizen", "official"].includes(r)).join(", ")}, or citizen to take a role away.
+Workers are added by an official in the app (the worker directory), not here.`;
 
-const phone = normalisePhone(phoneArg);
+const email = normaliseEmail(emailArg);
 const role = parseRoleName(roleArg);
-if (!phone || !role) {
-  console.error(!phone && phoneArg ? "That isn't a valid 10-digit Indian mobile number.\n" : "");
+if (role === "worker") {
+  console.error("Workers are added by an official in the app: the worker directory → Add worker (name and email).\n");
   console.error(usage);
   process.exit(1);
 }
-if (workerId !== null && !/^[A-Za-z0-9_-]{1,24}$/.test(workerId)) {
-  console.error("--worker-id may only contain letters, digits, - and _ (max 24).");
+if (!email || !role || !ALLOWED.includes(role) || args.length !== 2) {
+  console.error(!email && emailArg ? "That isn't an email address.\n" : "");
+  console.error(usage);
   process.exit(1);
 }
 
 await withRepo(async (repo) => {
-  const { status } = await repo.grantRole({ phone, role, workerId });
-  console.log(`${maskPhone(phone)} → ${role}${workerId ? ` (worker ${workerId})` : ""}: ${describeResult(status)}.`);
+  const { status } = await repo.grantRole({ email, role, workerId: null });
+  console.log(`${maskEmail(email)} → ${role}: ${describeResult(status)}.`);
 });

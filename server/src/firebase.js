@@ -1,5 +1,6 @@
-// Firebase ID-token verification. Phone sign-in happens in the browser; the
-// API only ever sees the resulting ID token.
+// Firebase ID-token verification. Sign-in happens in the browser (an
+// anonymous account, or one saved with email + password); the API only ever
+// sees the resulting ID token.
 //
 // Uses `jose` rather than firebase-admin: verifying a token needs nothing but
 // Google's public signing keys, and jose is a small dependency with no
@@ -12,7 +13,9 @@ const GOOGLE_JWKS_URL =
   "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 
 /**
- * Returns async (idToken) => { uid, phone } that throws on any invalid token.
+ * Returns async (idToken) => { uid, provider, email, emailVerified } and
+ * throws on any invalid token. `provider` is Firebase's sign_in_provider
+ * ("anonymous", "password", "phone"…); `email` is null unless the token has one.
  * `keys` is only overridden in tests (a local JWKS stands in for Google's).
  */
 export function createFirebaseVerifier(projectId, { keys = createRemoteJWKSet(new URL(GOOGLE_JWKS_URL)) } = {}) {
@@ -25,6 +28,12 @@ export function createFirebaseVerifier(projectId, { keys = createRemoteJWKSet(ne
     if (typeof payload.sub !== "string" || !payload.sub || payload.sub.length > 128) {
       throw new Error("Token has no subject.");
     }
-    return { uid: payload.sub, phone: typeof payload.phone_number === "string" ? payload.phone_number : "" };
+    const provider = typeof payload.firebase?.sign_in_provider === "string" ? payload.firebase.sign_in_provider : "";
+    return {
+      uid: payload.sub,
+      provider,
+      email: typeof payload.email === "string" && payload.email ? payload.email : null,
+      emailVerified: payload.email_verified === true,
+    };
   };
 }

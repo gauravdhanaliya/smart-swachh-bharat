@@ -1,34 +1,35 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import ScreenShell from "../components/ScreenShell";
 import SessionLoading from "../components/SessionLoading";
 import { useAuth } from "../context/AuthContext";
 import { LOGIN_METHOD } from "../services/authSession";
-import { RECAPTCHA_CONTAINER_ID, confirmDeleteOtp, firebaseDeletionAvailable, sendDeleteOtp } from "../services/authService";
+import { deleteFirebaseAccount, verifyPassword } from "../services/authService";
 import { deleteMyData } from "../services/consentService";
 import { DELETED_ITEMS, KEPT_ITEMS } from "../data/privacy";
-import { authErrorMessage, digitsOnly, validateOtp, validatePhone } from "../utils/phoneAuth";
+import { accountErrorMessage } from "../utils/accountErrors";
 import { step as stepMotion } from "../utils/motion";
 
 const CONFIRM_WORD = "DELETE";
 const DELETED_NOTICE = "Your data has been deleted. Thank you for using EcoSetu.";
-const STEPS = { review: 1, verify: 2, done: 3 };
+const STEPS = { review: 1, done: 2 };
 
 /**
  * Delete my data. Removes the data (unlike Withdraw consent, which keeps it):
- *   1. the user reads what is deleted and what is kept, and types DELETE;
- *   2. the app's data is deleted on the server (DELETE /api/me/data);
- *   3. a fresh OTP, then user.delete() removes the Firebase sign-in on this
- *      device (Firebase needs a recent sign-in; auth/requires-recent-login
- *      asks for a new code);
- *   4. done: signed out, back to the login page.
- * Demo accounts can't reach it. Once step 2 has run the session is gone, so
- * the flow keeps what it needs from the start (who, which login method).
+ *   1. the user reads what is deleted and what is kept, and types DELETE. An
+ *      email account also enters its password, which is checked with
+ *      Firebase FIRST (re-authentication): a wrong one deletes nothing. (An
+ *      account the old phone sign-in made has no password to ask for.)
+ *   2. the app's data is deleted on the server (DELETE /api/me/data), then
+ *      the Firebase account on this device (user.delete()).
+ *   3. done: signed out, back to the start screen.
+ * Demo accounts can't reach it. Once the server step has run the session is
+ * gone, so the flow keeps what it needs from the start (who, which account).
  */
 export default function DeleteMyData() {
   const { user, status } = useAuth();
-  const [who] = useState(() => (user ? { id: user.id, method: user.method, phone: user.phone ?? null } : null));
+  const [who] = useState(() => (user ? { id: user.id, method: user.method, email: user.email ?? null } : null));
 
   if (status === "loading") return <SessionLoading />;
   if (!who) return <Navigate to="/login" replace />;
@@ -45,7 +46,7 @@ function Header({ step }) {
       </p>
       {step && (
         <p className="mt-3 text-xs font-semibold tracking-wide text-emerald-800/70 uppercase" aria-live="polite">
-          Step {step} of 3
+          Step {step} of 2
         </p>
       )}
     </>
@@ -58,10 +59,10 @@ function DemoCantDelete() {
     <ScreenShell showBack>
       <Header />
       <p className="mt-4 text-sm text-emerald-900/85">
-        Demo accounts are shared by everyone trying the app, so they can&apos;t be deleted. Sign in with your phone number to have
-        data of your own to delete.
+        Demo accounts are shared by everyone trying the app, so they can&apos;t be deleted. Continue as a citizen to have data of your
+        own to delete.
       </p>
-      <button type="button" onClick={() => navigate(-1)} className="mt-5 min-h-11 rounded-full px-5 text-sm font-semibold text-emerald-800">
+      <button type="button" onClick={() => navigate(-1)} className="mt-5 min-h-11 rounded-xl px-5 text-sm font-semibold text-emerald-800">
         Back
       </button>
     </ScreenShell>
@@ -72,19 +73,13 @@ function DeleteFlow({ who }) {
   const navigate = useNavigate();
   const { resetAuth } = useAuth();
   const reduced = useReducedMotion();
-  const [step, setStep] = useState("review"); // review | verify | done
+  const [step, setStep] = useState("review"); // review | done
   const [result, setResult] = useState(null);
-  const [firebaseKept, setFirebaseKept] = useState(false);
+  const [firebase, setFirebase] = useState("deleted"); // deleted | signed-out | kept
 
   const finish = () => {
     resetAuth({ notice: DELETED_NOTICE });
     navigate("/login", { replace: true });
-  };
-
-  const afterServer = async (res) => {
-    setResult(res);
-    const needsFirebase = who.method === LOGIN_METHOD.OTP && (await firebaseDeletionAvailable().catch(() => false));
-    setStep(needsFirebase ? "verify" : "done");
   };
 
   return (
@@ -92,53 +87,76 @@ function DeleteFlow({ who }) {
       <Header step={STEPS[step]} />
       <AnimatePresence mode="wait" initial={false}>
         <motion.div key={step} {...stepMotion(reduced, 1)}>
-          {step === "review" && <Review onDeleted={afterServer} />}
-          {step === "verify" && (
-            <VerifyPhone
+          {step === "review" && (
+            <Review
               who={who}
-              onDeleted={() => setStep("done")}
-              onSkip={() => {
-                setFirebaseKept(true);
+              onDone={(res, firebaseState) => {
+                setResult(res);
+                setFirebase(firebaseState);
                 setStep("done");
               }}
             />
           )}
-          {step === "done" && <Done result={result} firebaseKept={firebaseKept} onFinish={finish} />}
+          {step === "done" && <Done result={result} firebase={firebase} onFinish={finish} />}
         </motion.div>
       </AnimatePresence>
     </ScreenShell>
   );
 }
 
-function Review({ onDeleted }) {
+function Review({ who, onDone }) {
   const ids = useId();
+  const saved = who.method === LOGIN_METHOD.EMAIL;
   const [typed, setTyped] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const ready = typed === CONFIRM_WORD;
+  const ready = typed === CONFIRM_WORD && (!saved || password.length > 0);
 
   const remove = async () => {
     setBusy(true);
     setError("");
+    // 1. The account proves it is its owner before anything is deleted.
+    if (saved) {
+      try {
+        await verifyPassword(password);
+      } catch (err) {
+        setBusy(false);
+        setError(accountErrorMessage(err));
+        return;
+      }
+    }
+    // 2. The app's data, on the server. If this fails nothing has changed.
+    let res;
     try {
-      await onDeleted(await deleteMyData());
+      res = await deleteMyData();
     } catch (err) {
       setBusy(false);
       setError(err?.message || "Your data couldn't be deleted. Nothing was changed; please try again.");
+      return;
     }
+    // 3. The Firebase account on this device.
+    let firebaseState = "deleted";
+    try {
+      const { deleted } = await deleteFirebaseAccount({ expectedUid: who.id });
+      if (!deleted) firebaseState = "signed-out";
+    } catch {
+      firebaseState = "kept";
+    }
+    onDone(res, firebaseState);
   };
 
   return (
     <div className="mt-2">
       <p className="text-sm text-emerald-900/80">
         Only want to stop for now?{" "}
-        <Link to="/account/withdraw" className="font-semibold text-emerald-700 underline">
+        <Link to="/account/withdraw" className="font-semibold text-emerald-700">
           Withdraw consent instead
         </Link>{" "}
         (signs you out, keeps your data).
       </p>
 
-      <div className="mt-4 rounded-3xl border border-red-100 bg-white p-4 shadow-sm">
+      <div className="mt-4 rounded-2xl border border-red-100 bg-white p-4">
         <h2 id={`${ids}-deleted`} className="text-sm font-semibold text-red-900">
           Will be deleted
         </h2>
@@ -157,6 +175,26 @@ function Review({ onDeleted }) {
         </ul>
       </div>
 
+      {saved && (
+        <>
+          <label htmlFor={`${ids}-password`} className="mt-5 block text-sm font-semibold text-emerald-950">
+            Your password
+          </label>
+          <input
+            id={`${ids}-password`}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            aria-describedby={`${ids}-password-help`}
+            className="mt-1.5 min-h-12 w-full rounded-2xl border border-red-200 bg-white px-4 text-base text-emerald-950 focus:border-red-400 focus:ring-2 focus:ring-red-300 focus:outline-none"
+          />
+          <p id={`${ids}-password-help`} className="mt-1 text-xs text-emerald-800/70">
+            For {who.email ?? "your account"}. Checked before anything is deleted.
+          </p>
+        </>
+      )}
+
       <label htmlFor={`${ids}-confirm`} className="mt-5 block text-sm font-semibold text-emerald-950">
         Type DELETE to confirm
       </label>
@@ -171,20 +209,22 @@ function Review({ onDeleted }) {
         className="mt-1.5 min-h-12 w-full rounded-2xl border border-red-200 bg-white px-4 text-base tracking-widest text-emerald-950 focus:border-red-400 focus:ring-2 focus:ring-red-300 focus:outline-none"
       />
       <p id={`${ids}-confirm-help`} className="mt-1 text-xs text-emerald-800/70">
-        In capital letters. After this, you&apos;ll confirm your phone number to remove your sign-in too.
+        In capital letters.
       </p>
 
-      {error && (
-        <p role="alert" className="mt-3 text-sm font-medium text-red-600">
-          {error}
-        </p>
-      )}
+      <div aria-live="assertive">
+        {error && (
+          <p role="alert" className="mt-3 text-sm font-medium text-red-600">
+            {error}
+          </p>
+        )}
+      </div>
 
       <button
         type="button"
         onClick={remove}
         disabled={!ready || busy}
-        className="mt-5 mb-4 min-h-12 w-full cursor-pointer rounded-full bg-red-600 px-5 text-sm font-semibold text-white shadow-md shadow-red-900/20 hover:bg-red-700 btn-disabled"
+        className="mt-5 mb-4 min-h-12 w-full cursor-pointer rounded-xl bg-red-600 px-5 text-sm font-semibold text-white shadow-red-900/20 hover:bg-red-700 btn-disabled"
       >
         {busy ? "Deleting…" : "Delete my data"}
       </button>
@@ -192,149 +232,13 @@ function Review({ onDeleted }) {
   );
 }
 
-function VerifyPhone({ who, onDeleted, onSkip }) {
-  const ids = useId();
-  const codeRef = useRef(null);
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
-  const [sent, setSent] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [confirmSkip, setConfirmSkip] = useState(false);
+const FIREBASE_LINE = {
+  deleted: "Your sign-in account has been removed.",
+  "signed-out": "There was no sign-in account on this device to remove.",
+  kept: "Your sign-in account couldn't be removed from this device. It holds no EcoSetu data; you can ignore it.",
+};
 
-  useEffect(() => {
-    if (sent) codeRef.current?.focus();
-  }, [sent]);
-
-  const send = async () => {
-    const check = validatePhone(phone);
-    if (!check.ok) {
-      setError(check.error);
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      await sendDeleteOtp(phone);
-      setCode("");
-      setSent(true);
-    } catch (err) {
-      setError(authErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirm = async () => {
-    const check = validateOtp(code);
-    if (!check.ok) {
-      setError(check.error);
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      await confirmDeleteOtp(code, { expectedUid: who.id });
-      onDeleted();
-    } catch (err) {
-      setBusy(false);
-      // A used code can't be retried: recent-login and wrong-account errors need a new code.
-      if (["auth/requires-recent-login", "auth/user-mismatch", "auth/code-expired"].includes(err?.code)) setSent(false);
-      setError(authErrorMessage(err));
-    }
-  };
-
-  return (
-    <div className="mt-2">
-      <h2 className="text-lg font-bold text-emerald-950">Verify your phone</h2>
-      <p className="mt-1 text-sm text-emerald-900/80">
-        Your EcoSetu data is deleted. Last step: remove your phone number from our sign-in provider (Firebase). For your
-        security it needs a fresh code{who.phone ? ` sent to the number you signed in with (${who.phone})` : ""}.
-      </p>
-
-      <label htmlFor={`${ids}-phone`} className="mt-4 block text-sm font-semibold text-emerald-950">
-        Phone number
-      </label>
-      <div className="mt-1.5 flex min-h-12 items-center rounded-2xl border border-emerald-200 bg-white focus-within:ring-2 focus-within:ring-emerald-500">
-        <span className="pl-4 text-base font-semibold text-emerald-900">+91</span>
-        <input
-          id={`${ids}-phone`}
-          type="tel"
-          inputMode="numeric"
-          autoComplete="tel-national"
-          value={phone}
-          disabled={sent}
-          onChange={(e) => setPhone(digitsOnly(e.target.value, 10))}
-          className="min-w-0 flex-1 bg-transparent px-3 text-base text-emerald-950 outline-none disabled:text-disabled-ink"
-        />
-      </div>
-
-      {!sent ? (
-        <button
-          type="button"
-          onClick={send}
-          disabled={busy}
-          className="mt-3 min-h-12 w-full cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white btn-disabled"
-        >
-          {busy ? "Sending…" : "Send code"}
-        </button>
-      ) : (
-        <>
-          <label htmlFor={`${ids}-code`} className="mt-4 block text-sm font-semibold text-emerald-950">
-            6-digit code
-          </label>
-          <input
-            id={`${ids}-code`}
-            ref={codeRef}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            value={code}
-            onChange={(e) => setCode(digitsOnly(e.target.value, 6))}
-            className="mt-1.5 min-h-12 w-full rounded-2xl border border-emerald-200 bg-white px-4 text-center text-lg tracking-[0.4em] text-emerald-950 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={confirm}
-            disabled={busy}
-            className="mt-3 min-h-12 w-full cursor-pointer rounded-full bg-red-600 px-5 text-sm font-semibold text-white btn-disabled"
-          >
-            {busy ? "Deleting…" : "Confirm and delete sign-in"}
-          </button>
-        </>
-      )}
-
-      {error && (
-        <p role="alert" className="mt-3 text-sm font-medium text-red-600">
-          {error}
-        </p>
-      )}
-
-      <div id={RECAPTCHA_CONTAINER_ID} />
-
-      <div className="mt-6 mb-4 border-t border-emerald-100 pt-4">
-        {confirmSkip ? (
-          <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
-            <p>Your phone number will stay with Firebase. Your EcoSetu data is already deleted either way.</p>
-            <div className="mt-2 flex gap-2">
-              <button type="button" onClick={onSkip} className="min-h-11 rounded-full bg-white px-4 font-semibold shadow-sm">
-                Skip this step
-              </button>
-              <button type="button" onClick={() => setConfirmSkip(false)} className="min-h-11 rounded-full px-4 font-semibold">
-                Go back
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button type="button" onClick={() => setConfirmSkip(true)} className="min-h-11 text-sm font-semibold text-emerald-800 underline">
-            I can&apos;t get a code now
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Done({ result, firebaseKept, onFinish }) {
+function Done({ result, firebase, onFinish }) {
   const kept = result?.anonymised?.complaints ?? 0;
   return (
     <div className="mt-2 mb-4">
@@ -344,12 +248,12 @@ function Done({ result, firebaseKept, onFinish }) {
         <li>
           {kept === 1 ? "1 complaint is" : `${kept} complaints are`} kept for the municipality as “Deleted user”, with no link to you.
         </li>
-        <li>{firebaseKept ? "Your Firebase sign-in was not removed." : "Your Firebase sign-in has been removed."}</li>
+        <li>{FIREBASE_LINE[firebase]}</li>
       </ul>
       <button
         type="button"
         onClick={onFinish}
-        className="mt-5 min-h-12 w-full cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20"
+        className="mt-5 min-h-12 w-full cursor-pointer rounded-xl bg-emerald-700 px-5 text-sm font-semibold text-white"
       >
         Finish
       </button>

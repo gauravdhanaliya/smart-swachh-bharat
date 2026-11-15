@@ -311,7 +311,7 @@ const routes = [
 
   ["PUT", /^\/me\/consent$/, (_db, _m, body) => {
     const user = requireRole(...ROLES);
-    const consent = validateConsent(body, { phoneUser: user.method === LOGIN_METHOD.OTP });
+    const consent = validateConsent(body);
     if (consent.version !== DEFAULT_CONSENT_VERSION) {
       throw new ApiError("The privacy notice has changed. Please read it again.", { status: 409 });
     }

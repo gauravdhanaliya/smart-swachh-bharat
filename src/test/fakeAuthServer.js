@@ -59,12 +59,27 @@ const DEMO = {
 };
 
 export function createFakeAuthServer({ latencyMs = 5, demoLoginEnabled = true } = {}) {
+  const demo = { type: "demo", email: null, emailVerified: false };
   const users = {
-    "demo-citizen": { uid: "demo-citizen", role: "citizen", name: "Demo Citizen", phone: null, isDemo: true },
-    "demo-worker": { uid: "demo-worker", role: "worker", name: "Vikash Kumar", phone: null, isDemo: true, wid: "w1" },
-    "demo-official": { uid: "demo-official", role: "official", name: "Demo Official", phone: null, isDemo: true },
-    "fb-user": { uid: "fb-user", role: "citizen", name: "citizen", phone: "+91 98XXXXXX10", isDemo: false },
+    "demo-citizen": { uid: "demo-citizen", role: "citizen", name: "Demo Citizen", isDemo: true, account: demo },
+    "demo-worker": { uid: "demo-worker", role: "worker", name: "Vikash Kumar", isDemo: true, wid: "w1", account: demo },
+    "demo-official": { uid: "demo-official", role: "official", name: "Demo Official", isDemo: true, account: demo },
   };
+  // Firebase ID tokens the fake knows (the real server verifies them with Google's keys):
+  //   "email:<uid>:<masked>:<0|1>"    an email account (verified or not): a citizen unless granted a role
+  //   "anon:<uid>"                    an anonymous account (earlier builds): refused, 403
+  //   anything else                   refused, like a bad or expired token
+  function signInWithToken(idToken) {
+    const [kind, uid, masked, verified] = String(idToken ?? "").split(":");
+    if (kind === "anon") return "anonymous";
+    if (kind === "email" && uid && masked) {
+      users[uid] = { ...(users[uid] ?? { uid, role: "citizen", name: "citizen", isDemo: false }), account: { type: "email", email: masked, emailVerified: verified === "1" } };
+      // like the real server: a staff role works only for a verified email
+      if (verified !== "1" && users[uid].role !== "citizen") users[uid] = { ...users[uid], role: "citizen" };
+      return uid;
+    }
+    return null;
+  }
   const refreshTokens = new Map(); // token -> { uid, used }
   const accessTokens = new Map(); // token -> uid
   const jar = { cookie: null }; // one browser, shared by all its tabs
@@ -142,8 +157,10 @@ export function createFakeAuthServer({ latencyMs = 5, demoLoginEnabled = true } 
       return json(200, issue(uid));
     }
     if (method === "POST" && path === "/api/auth/firebase") {
-      if (body?.idToken !== "good-firebase-id-token") return json(401, { error: "Phone verification failed. Please sign in again." });
-      return json(200, issue("fb-user"));
+      const uid = signInWithToken(body?.idToken);
+      if (uid === "anonymous") return json(403, { error: "Using EcoSetu without an account has ended. Log in with email, or create an account." });
+      if (!uid) return json(401, { error: "Sign-in failed. Please try again." });
+      return json(200, issue(uid));
     }
     if (method === "POST" && path === "/api/auth/logout") {
       const t = cookie && refreshTokens.get(cookie);
@@ -176,8 +193,14 @@ export function createFakeAuthServer({ latencyMs = 5, demoLoginEnabled = true } 
     /** True once a used refresh token was presented (the server then signs the user out everywhere). */
     reuseDetected: () => reuseDetected,
     /** A session from an earlier visit: a valid refresh cookie in the jar, nothing in memory. */
+    /** This browser signed in on an earlier visit: the cookie, and the client's "was signed in" hint. */
     signInEarlier(uid = "demo-citizen") {
       issue(uid);
+      localStorage.setItem("ssb_session_hint_v1", "1");
+    },
+    /** An official granted a role to this account's verified email (grant-role, or "Add worker"). */
+    grantRole(uid, role, wid = null) {
+      users[uid] = { ...(users[uid] ?? { uid, name: role, isDemo: false, account: { type: "email", email: null, emailVerified: true } }), role, ...(wid ? { wid } : {}) };
     },
     /** Every access token stops working (15 minutes have passed). */
     expireAccessTokens() {

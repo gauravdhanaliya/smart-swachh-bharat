@@ -14,7 +14,7 @@ export async function startApi(env = process.env) {
     dbName: config.mongoDbName,
     maxPoolSize: config.behindVercel ? 5 : 10,
   });
-  const repo = createRepository(connection.db, connection.client, null, { phoneHashSecret: config.phoneHashSecret });
+  const repo = createRepository(connection.db, connection.client, null, { identityHashSecret: config.identityHashSecret });
   const photoStore = createPhotoStore(config.photoStorage);
   const app = createApp({ config, repo, photoStore, verifyFirebase: createFirebaseVerifier(config.firebaseProjectId) }); // logs to stdout (Vercel's log view)
   config.warnings.forEach((w) => console.warn(`WARN ${w}`));

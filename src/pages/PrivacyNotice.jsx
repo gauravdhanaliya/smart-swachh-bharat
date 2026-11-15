@@ -5,6 +5,7 @@ import {
   DELETED_ITEMS,
   DELETE_SUMMARY,
   DESTINATIONS,
+  ACCOUNT_SUMMARY,
   KEPT_ITEMS,
   OSMF_PRIVACY_URL,
   PRIVACY_CONTACT,
@@ -16,7 +17,7 @@ import {
 // deleting your data, and exactly what deleting removes. The content lives in
 // data/privacy.js, audited against the code.
 
-const SECTION = "rounded-3xl border border-emerald-100 bg-white/90 p-4 shadow-sm";
+const SECTION = "rounded-2xl border border-emerald-100 bg-white/90 p-4";
 const TH = "px-3 py-2 text-left text-[11px] font-semibold tracking-wide text-emerald-800/80 uppercase";
 const TD = "px-3 py-2.5 align-top text-sm text-emerald-900/85";
 
@@ -59,6 +60,9 @@ export default function PrivacyNotice() {
     <ScreenShell showBack>
       <h1 className="mt-2 text-2xl font-bold text-emerald-950">Privacy notice</h1>
       <p className="mt-1 text-sm text-emerald-800/70">What EcoSetu collects, where it goes, how long it is kept, and how to remove it.</p>
+      <p role="note" aria-label="How accounts work" className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+        {ACCOUNT_SUMMARY}
+      </p>
 
       <section aria-labelledby="collect-title" className={`mt-5 ${SECTION}`}>
         <h2 id="collect-title" className="text-base font-bold text-emerald-950">
@@ -85,7 +89,7 @@ export default function PrivacyNotice() {
         />
         <p className="mt-2 text-xs text-emerald-800/70">
           OpenStreetMap Foundation privacy policy:{" "}
-          <a href={OSMF_PRIVACY_URL} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 underline">
+          <a href={OSMF_PRIVACY_URL} target="_blank" rel="noreferrer" className="font-semibold text-emerald-700">
             osmfoundation.org/wiki/Privacy_Policy
           </a>
         </p>
@@ -107,7 +111,7 @@ export default function PrivacyNotice() {
           Deleting your data
         </h2>
         <p className="mt-1 text-sm text-emerald-900/80">
-          After you type DELETE to confirm and verify your phone number again, this happens and can&apos;t be undone:
+          After you type DELETE to confirm and enter your password, this happens and can&apos;t be undone:
         </p>
         <h3 id="deleted-list" className="mt-3 text-sm font-semibold text-emerald-950">
           Deleted for good
@@ -135,7 +139,7 @@ export default function PrivacyNotice() {
       </section>
 
       <p className="mt-6 mb-4 text-center text-sm">
-        <button type="button" onClick={() => navigate(-1)} className="min-h-11 font-semibold text-emerald-700 underline">
+        <button type="button" onClick={() => navigate(-1)} className="min-h-11 font-semibold text-emerald-700">
           Back
         </button>
       </p>

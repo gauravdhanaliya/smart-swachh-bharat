@@ -1,7 +1,8 @@
 // Authentication, in two steps:
 //
-//   1. Firebase Phone Auth proves who the user is (the browser gets a Firebase
-//      ID token; see firebase.js for how the server verifies it).
+//   1. Firebase Authentication proves who the user is: an anonymous account,
+//      or one saved with email + password (the browser gets a Firebase ID
+//      token; see firebase.js for how the server verifies it).
 //   2. POST /api/auth/firebase-login swaps that token for this server's own
 //      short-lived access JWT (+ a rotating refresh token in an httpOnly
 //      cookie; see tokens.js). Every other route only ever sees the access JWT.
@@ -35,7 +36,7 @@ export function authenticate({ config, repo }) {
             uid: user.uid,
             role: user.role,
             name: user.name || user.role,
-            phoneMasked: user.phoneMasked,
+            authProvider: user.authProvider,
             isDemo: user.isDemo,
             ...(user.workerId ? { wid: user.workerId } : {}),
           };

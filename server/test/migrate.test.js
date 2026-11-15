@@ -74,13 +74,12 @@ test("copies SQLite data into MongoDB, keeping the API shape, and is safe to rer
   assert.equal(req.requestedByWorkerName, "Vikash");
   const rawReq = await t.db.collection("facility_requests").findOne({ _id: "FR-2026-009" });
   assert.equal(rawReq.requestedByUser, "uid-2", "the owner is stored as a uid, not as role:phone");
-  assert.deepEqual(await t.repo.getUserByUid("uid-1"), { uid: "uid-1", role: "worker", name: "Asha", workerId: "w2", phoneMasked: "+91 90XXXXXX03", isDemo: false, sessionsRevokedAt: null });
+  assert.deepEqual(await t.repo.getUserByUid("uid-1"), { uid: "uid-1", role: "worker", name: "Asha", workerId: "w2", authProvider: "phone", emailMasked: null, emailVerified: false, isDemo: false, sessionsRevokedAt: null });
   const stored = await t.db.collection("users").findOne({ uid: "uid-1" });
-  assert.equal(stored.phone, undefined, "the plain number is not copied");
-  assert.match(stored.phoneHash, /^[0-9a-f]{64}$/);
+  for (const field of ["phone", "phoneHash", "phoneMasked"]) assert.equal(stored[field], undefined, `${field}: the number is not carried over`);
 
   // second run: nothing duplicated, nothing overwritten
-  await t.repo.grantRole({ phone: "9000000003", role: "official" });
+  await t.repo.grantRole({ uid: "uid-1", role: "official" });
   const second = await run();
   assert.match(second, /locations: 0 copied, 2 already there/);
   assert.equal(await t.db.collection("locations").countDocuments(), 2);

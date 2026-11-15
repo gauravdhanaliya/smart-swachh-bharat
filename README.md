@@ -49,7 +49,7 @@ EcoSetu is our attempt at closing that loop. It's a single web app with three lo
 - OpenStreetMap Nominatim for place search and street addresses (through the API, which keeps to its usage policy: see `server/src/geocode.js`)
 - The browser's localStorage as the data layer for this prototype (complaints, facilities, workers, auth state, preferences)
 
-By default (no `VITE_USE_API`) the app needs no backend: everything lives in the browser or comes from the free OpenStreetMap APIs. With `VITE_USE_API=true` it signs in and reads and writes through the EcoSetu API in `server/` (MongoDB Atlas, Firebase phone login, private Vercel Blob for photos) — see `server/README.md`.
+By default (no `VITE_USE_API`) the app needs no backend: everything lives in the browser or comes from the free OpenStreetMap APIs. With `VITE_USE_API=true` it signs in and reads and writes through the EcoSetu API in `server/` (MongoDB Atlas, Firebase email sign-in, private Vercel Blob for photos) — see `server/README.md`.
 
 ## Getting started
 
@@ -118,10 +118,10 @@ This is a prototype, and we want to be upfront about what's real and what's simu
 - **Real:** the map tiles and place search (OpenStreetMap). The bins and toilets are the COER University demo set plus whatever officials add; none are pulled from Overpass.
 - **Simulated:** bin and toilet fill levels tick up and down on a timer to feel like a live IoT feed. There is no sensor behind them.
 - **Local only:** every complaint, facility request, worker record, and user preference lives in your browser's localStorage. Nothing is sent to a server, because there is no server. Clearing your browser's site data resets everything back to the seed state.
-- **Login:** an open demo login. Optionally type your name, then tap Citizen, Sanitation Worker, or Government Official to go straight to that role's dashboard. There's no password or OTP. The session (`{ id, name, role, loginAt }`) is kept in localStorage until you log out, and each role signs in as a fixed demo user, so the seeded complaints, tasks, and facility requests show up.
+- **Login:** the start screen asks for consent first (nothing is created before that); then its card is the email login itself: **Log in**, **Forgot password?** and **Create account** (a new account is a citizen at once, with a banner asking to verify the email). Citizens, officials and workers all log in this way; the role comes from the server. Where the demo is switched on, **Try the demo** opens the Citizen, Sanitation Worker or Government Official dashboard as a fixed demo user, so the seeded tasks and facility requests show up. Officials add workers by name and email in the worker directory. Without Firebase configured (a local build), only the demo works. Nothing asks for a phone number.
 - **Seed data:** a handful of complaints, bins, toilets, and workers ship pre-loaded so the whole citizen-to-official-to-worker flow can be shown without creating anything new first. Each role's profile page has a "Reset Demo Data" button that restores that seed state without touching your identity settings.
 
-The intended walkthrough: sign in as Citizen and report an overflowing bin, sign in as Government Official and assign it to a worker, sign in as Worker and resolve it, then sign back in as Citizen and Official to see the same complaint marked resolved for everyone.
+The intended walkthrough: try the demo as a citizen (or create an account) and report an overflowing bin, log out and use "Try the demo" as Government Official to assign it to a worker, then as Worker to resolve it. The official sees it marked resolved, and so does the citizen when they log back in to their saved account. Logging out of an unsaved account leaves its complaints behind: "Continue without account" then starts a new account.
 
 ## Known limitations and future improvements
 
@@ -130,7 +130,7 @@ The intended walkthrough: sign in as Citizen and report an overflowing bin, sign
 - No live IoT sensors. Bin fill levels are a client-side simulation, not hardware.
 - Bin and toilet coordinates in the seed data are labeled as demo locations, not verified municipal data. The live OSM layer is community-mapped, not an official registry.
 - The full "View on map" screen doesn't yet follow the city you've picked elsewhere in the app.
-- If we build this further, the next steps are a real backend and database behind `services/`, a genuine SMS/OTP provider, and actual IoT integration for bin fill levels instead of the simulated ticker.
+- If we build this further, the next steps are a real backend and database behind `services/`, and actual IoT integration for bin fill levels instead of the simulated ticker.
 
 ## Team and contact
 

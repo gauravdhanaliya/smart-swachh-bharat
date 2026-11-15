@@ -42,10 +42,10 @@ test("seeds the campus, demo buildings, demo bins, demo toilets, demo requests a
   assert.ok(toilets.every((l) => typeof l.details.openingHours === "string" && Array.isArray(l.details.facilities)));
 
   const worker = await t.repo.getUserByUid("demo-worker");
-  assert.deepEqual([worker.role, worker.workerId, worker.phoneMasked], ["worker", "w1", null]);
+  assert.deepEqual([worker.role, worker.workerId, worker.authProvider, worker.emailMasked], ["worker", "w1", "demo", null]);
   assert.equal((await t.repo.getUserByUid("demo-official")).role, "official");
   assert.equal((await t.repo.getUserByUid("demo-citizen")).role, "citizen");
-  assert.ok((await t.db.collection("users").find({ isDemo: true }).toArray()).every((u) => u.phoneHash === null));
+  assert.ok((await t.db.collection("users").find({ isDemo: true }).toArray()).every((u) => u.emailHash === null && !("phoneHash" in u)));
 });
 
 test("running the seed again inserts nothing and keeps changes made in between", async () => {

@@ -300,9 +300,14 @@ export function createSessionClient({
     return inflight;
   }
 
-  /** (b) Page load: get a session from the refresh cookie, once. */
+  /**
+   * (b) Page load: get a session from the refresh cookie, once. With no
+   * "was signed in" hint (a first visit, or after signing out) there is no
+   * cookie to use, so no request is made at all.
+   */
   function restore() {
     if (accessToken) return Promise.resolve({ accessToken, user });
+    if (!hint.has()) return Promise.resolve(null);
     bootstrap ??= refresh().catch((err) => {
       bootstrap = null;
       throw err;

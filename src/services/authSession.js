@@ -1,30 +1,33 @@
-// The signed-in session, kept in localStorage so a refresh keeps it.
+// The signed-in session in the browser-only build, kept in localStorage so a
+// refresh keeps it. (With VITE_USE_API=true the server's session is used
+// instead: services/session.js.)
 //
-// Two ways to sign in:
-//   - "demo": pick a role on the login screen. Each role signs in as a fixed
-//     demo user whose id matches the seeded data — the worker is "w1"
-//     (Vikash Kumar), who owns the seeded tasks and facility requests.
-//   - "otp":  a real phone number verified by Firebase (services/authService.js).
-//     An OTP user is ALWAYS a citizen; worker and official access exist only
-//     through the demo login.
+// Ways in:
+//   - "email": an email + password account (Log in, or Create account).
+//     Always a citizen here: staff roles come only from the server.
+//   - "demo": the labelled demo login ("Try the demo"). Each role signs in
+//     as a fixed demo user whose id matches the seeded data (the worker is "w1").
+// There is no anonymous sign-in: a session an earlier build saved for
+// "Continue without account" reads as signed out.
 //
-// Stored fields: { id, name, role, method, loginAt } plus a masked `phone`
-// for OTP sessions. The full phone number, the OTP and Firebase's
-// confirmation object are never stored.
+// Stored fields: { id, name, role, method, loginAt } plus, for an email
+// account, the masked `email` and `emailVerified`. Never a password or a token.
 //
 // There is no backend, so this is a client-side guard, not server security.
 
-import { maskPhone, validatePhone } from "../utils/phoneAuth";
-
 const STORAGE_KEY = "ssb_auth_session_v1";
+// What this device agreed to on the start screen (consentService).
+const DEVICE_CONSENT_KEY = "ssb_device_consent_v1";
 
-// Earlier builds' auth storage (OTP demo, Firebase/JWT builds).
-const LEGACY_KEYS = ["ssb_auth_state", "ssb_api_token_v1", "ssb_api_role_v1"];
+// Earlier builds' auth storage (OTP demo, Firebase/JWT builds, and the
+// flags of "Continue without account").
+const LEGACY_KEYS = ["ssb_auth_state", "ssb_api_token_v1", "ssb_api_role_v1", "ssb_signed_out_v1", "ssb_local_citizen_id_v1", "ssb_continued_anon_v1"];
 
-export const LOGIN_METHOD = { DEMO: "demo", OTP: "otp" };
+export const LOGIN_METHOD = { DEMO: "demo", EMAIL: "email", LEGACY: "legacy" };
+const CITIZEN_METHODS = new Set([LOGIN_METHOD.EMAIL, LOGIN_METHOD.LEGACY]);
 
-export const OTP_ROLE = "citizen";
-const OTP_USER_NAME = "Citizen";
+export const CITIZEN_ROLE = "citizen";
+const CITIZEN_NAME = "citizen";
 
 export const DEMO_USERS = {
   citizen: { id: "demo-citizen", name: "Demo Citizen" },
@@ -40,14 +43,25 @@ export const ROLE_HOME = {
 
 export const DEMO_IDS = new Set(Object.values(DEMO_USERS).map((u) => u.id));
 
+/** "asha.verma@example.test" -> "as***@e***.test" (the same mask the server uses). */
+export function maskEmail(email) {
+  const normal = String(email ?? "").trim().toLowerCase();
+  const m = /^([^\s@]+)@([^\s@]+)\.([^\s@.]+)$/.exec(normal);
+  if (!m) return null;
+  const [, local, name, tld] = m;
+  return `${local.slice(0, Math.min(2, local.length - 1) || 1)}***@${name[0]}***.${tld}`;
+}
+
 function isValidDemo(s) {
   return Boolean(DEMO_USERS[s.role]) && s.id === DEMO_USERS[s.role].id;
 }
 
-// An OTP session is only ever a citizen, and can't borrow a demo user's id.
-function isValidOtp(s) {
-  return s.role === OTP_ROLE && typeof s.id === "string" && s.id !== "" && !DEMO_IDS.has(s.id);
+// A citizen session is only ever a citizen, and can't borrow a demo user's id.
+function isValidCitizen(s) {
+  return s.role === CITIZEN_ROLE && typeof s.id === "string" && s.id !== "" && !DEMO_IDS.has(s.id);
 }
+
+const clean = (name) => String(name ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
 
 export function readSession() {
   try {
@@ -57,7 +71,8 @@ export function readSession() {
     // Sessions saved before login methods existed were all demo sessions.
     const method = s.method ?? LOGIN_METHOD.DEMO;
     if (method === LOGIN_METHOD.DEMO && isValidDemo(s)) return { ...s, method };
-    if (method === LOGIN_METHOD.OTP && isValidOtp(s)) return s;
+    // "anonymous" and "otp" sessions from earlier builds: signed out.
+    if (CITIZEN_METHODS.has(method) && isValidCitizen(s)) return s;
   } catch {
     // malformed or blocked storage — treat as signed out
   }
@@ -77,10 +92,9 @@ function save(session) {
 export function startSession(role, name) {
   const demo = DEMO_USERS[role];
   if (!demo) throw new Error(`Unknown role: ${role}`);
-  const clean = String(name ?? "").replace(/\s+/g, " ").trim().slice(0, 60);
   return save({
     id: demo.id,
-    name: clean || demo.name,
+    name: clean(name) || demo.name,
     role,
     method: LOGIN_METHOD.DEMO,
     loginAt: new Date().toISOString(),
@@ -88,20 +102,32 @@ export function startSession(role, name) {
 }
 
 /**
- * Starts a session for a phone-verified user. The role is fixed to citizen
- * here — nothing the caller passes can change it.
+ * Starts the session of an email account. The role is fixed to citizen here:
+ * nothing the caller passes can change it. Only the masked email is kept.
  */
-export function startOtpSession({ uid, phone }) {
-  if (typeof uid !== "string" || uid === "" || DEMO_IDS.has(uid)) throw new Error("A Firebase uid is required.");
-  if (!validatePhone(phone).ok) throw new Error("A valid phone number is required.");
+export function startEmailSession({ uid, email, emailVerified = false, name }) {
+  if (typeof uid !== "string" || uid === "" || DEMO_IDS.has(uid)) throw new Error("An account id is required.");
+  const masked = maskEmail(email);
+  if (!masked) throw new Error("An email address is required.");
   return save({
     id: uid,
-    name: OTP_USER_NAME,
-    role: OTP_ROLE,
-    method: LOGIN_METHOD.OTP,
-    phone: maskPhone(phone),
+    name: clean(name) || CITIZEN_NAME,
+    role: CITIZEN_ROLE,
+    method: LOGIN_METHOD.EMAIL,
+    email: masked,
+    emailVerified: Boolean(emailVerified),
     loginAt: new Date().toISOString(),
   });
+}
+
+/** Changes the name, or whether the email is verified, of the current session. */
+export function updateSession({ name, emailVerified } = {}) {
+  const current = readSession();
+  if (!current) return null;
+  const next = { ...current };
+  if (name !== undefined) next.name = clean(name) || current.name;
+  if (emailVerified !== undefined && current.method === LOGIN_METHOD.EMAIL) next.emailVerified = Boolean(emailVerified);
+  return save(next);
 }
 
 export function clearSession() {
@@ -109,6 +135,19 @@ export function clearSession() {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     // nothing to clear
+  }
+}
+
+/**
+ * Someone logged out (or withdrew consent, or deleted their data): this
+ * device forgets what it agreed to on the start screen, so the next person
+ * using it is asked again.
+ */
+export function markSignedOut() {
+  try {
+    localStorage.removeItem(DEVICE_CONSENT_KEY);
+  } catch {
+    // storage blocked
   }
 }
 

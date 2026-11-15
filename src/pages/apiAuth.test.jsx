@@ -9,18 +9,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../components/FacilityMap", () => ({ default: () => <div data-testid="facility-map" /> }));
 vi.mock("../services/authService", () => ({
-  RECAPTCHA_CONTAINER_ID: "recaptcha-container",
-  sendOtp: vi.fn(),
-  confirmOtp: vi.fn(),
+  logIn: vi.fn(),
+  createAccount: vi.fn(),
+  sendPasswordReset: vi.fn(),
+  refreshAccount: vi.fn(),
+  resendVerification: vi.fn(),
   signOutUser: vi.fn(),
-  resetPendingOtp: vi.fn(),
 }));
 
 import App from "../App";
-import { confirmOtp, sendOtp, signOutUser } from "../services/authService";
+import { createAccount, logIn, signOutUser } from "../services/authService";
 import { SESSION_EXPIRED_MESSAGE, getSessionClient, resetSessionClientForTests } from "../services/session";
 import { createFakeAuthServer } from "../test/fakeAuthServer";
-import { openDemoSheet, requestOtp, typeOtp } from "../test/loginPage";
+import { agreeToConsent, logInWith, loginCard, openDemoSheet } from "../test/loginPage";
+import { markSignedOut } from "../services/authSession";
+import { firstVisit } from "../test/consent";
 
 let server;
 
@@ -45,8 +48,9 @@ beforeEach(() => {
   resetSessionClientForTests({ fetch: server.fetch, locks: null, createChannel: () => null });
   // OpenStreetMap lookups by the map screens: no network in tests.
   vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline"))));
-  sendOtp.mockReset().mockResolvedValue();
-  confirmOtp.mockReset();
+  // The email account "Log in" signs in to (the fake server's token format: email:<uid>:<masked>:<verified>).
+  logIn.mockReset().mockResolvedValue({ uid: "api-user-1", idToken: "email:api-user-1:as***@e***.test:1", email: "asha@example.test", emailVerified: true });
+  createAccount.mockReset();
   signOutUser.mockReset().mockResolvedValue();
 });
 
@@ -61,18 +65,39 @@ describe("page load", () => {
     server.signInEarlier("demo-citizen");
     renderApp("/citizen", { strict: true });
     expect(screen.getByRole("status")).toHaveTextContent(/restoring your session/i);
-    expect(await screen.findByRole("heading", { name: /citizen!/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: /^Hello/ })).toBeInTheDocument();
     expect(path()).toBe("/citizen");
     expect(server.count("/api/auth/refresh")).toBe(1);
     expect(server.hasLiveSession()).toBe(true);
   });
 
-  it("with no session it shows the login page, without an error", async () => {
+  it("a first visit sends nothing at all (no auth call, no API request) until the user agrees", async () => {
+    firstVisit();
+    const user = userEvent.setup();
     renderApp("/citizen", { strict: true });
-    expect(await screen.findByRole("heading", { name: "Log in to continue" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Before you start" })).toBeInTheDocument();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50)); // anything that would be sent, sent
+    });
+    expect(server.calls).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(logIn).not.toHaveBeenCalled();
+
+    await agreeToConsent(user);
+    await logInWith(user);
+    await waitFor(() => expect(path()).toBe("/citizen"));
+    expect(logIn).toHaveBeenCalledTimes(1);
+    const logins = server.calls.filter((c) => c.path === "/api/auth/firebase");
+    expect(logins.map((c) => c.body)).toEqual([{ idToken: "email:api-user-1:as***@e***.test:1" }]);
+    expect(JSON.stringify({ ...localStorage })).not.toContain("email:api-user-1");
+  });
+
+  it("after a logout on purpose, the start screen asks again instead", async () => {
+    markSignedOut();
+    renderApp("/citizen");
+    expect(await screen.findByRole("heading", { level: 1, name: "Before you start" })).toBeInTheDocument();
     expect(path()).toBe("/login");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(server.count("/api/auth/refresh")).toBe(1);
+    expect(server.calls).toEqual([]);
   });
 
   it("a session that can no longer be restored shows the login page with a clear message", async () => {
@@ -88,16 +113,20 @@ describe("page load", () => {
     server.signInEarlier("demo-citizen");
     server.setOffline(true);
     renderApp("/citizen");
-    expect(await screen.findByRole("alert")).toHaveTextContent(/network problem/i);
-    expect(path()).toBe("/login");
+    await waitFor(() => expect(path()).toBe("/login"));
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.some((a) => /network problem/i.test(a.textContent))).toBe(true);
+    expect(within(await loginCard()).getByRole("button", { name: /^log in$/i })).toBeEnabled(); // and it can be tried again
   });
 });
 
 describe("while signed in", () => {
-  it("a refresh that fails mid-session clears the token and sends the user to login with a message", async () => {
-    server.signInEarlier("demo-citizen");
-    renderApp("/citizen/profile");
-    expect(await screen.findByText("Demo Citizen")).toBeInTheDocument();
+  it("a staff session that fails mid-session clears the token and sends them to the start screen with a message", async () => {
+    server.signInEarlier("demo-worker");
+    renderApp("/worker");
+    // signed in for real (the path is /worker from the start, even while restoring)
+    await waitFor(() => expect(getSessionClient().getUser()?.uid).toBe("demo-worker"));
+    expect(screen.queryByRole("status", { name: /restoring/i })).toBeNull();
 
     server.revokeEverything();
     await act(async () => {
@@ -106,6 +135,19 @@ describe("while signed in", () => {
     await waitFor(() => expect(path()).toBe("/login"));
     expect(screen.getByRole("alert")).toHaveTextContent(SESSION_EXPIRED_MESSAGE);
     expect(getSessionClient().getAccessToken()).toBeNull();
+  });
+
+  it("a citizen whose session ends goes to the start screen with a clear message (no silent sign-in)", async () => {
+    server.signInEarlier("demo-citizen");
+    renderApp("/citizen/profile");
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    server.revokeEverything();
+    await act(async () => {
+      await expect(getSessionClient().request("/api/data")).rejects.toThrow(SESSION_EXPIRED_MESSAGE);
+    });
+    await waitFor(() => expect(path()).toBe("/login"));
+    expect(screen.getByRole("alert")).toHaveTextContent(SESSION_EXPIRED_MESSAGE);
+    expect(server.count("/api/auth/firebase")).toBe(0);
   });
 
   it("parallel requests that all get a 401 share one refresh, and the user stays signed in", async () => {
@@ -145,10 +187,9 @@ describe("while signed in", () => {
 
 describe("logging in", () => {
   it.each([
-    [/^citizen/i, "citizen", "/citizen"],
     [/sanitation worker/i, "worker", "/worker"],
     [/government official/i, "official", "/official"],
-  ])("the demo row %s signs in through /api/auth/demo, sending only the role", async (row, role, home) => {
+  ])("the staff demo row %s signs in through /api/auth/demo, sending only the role", async (row, role, home) => {
     const user = userEvent.setup();
     renderApp("/login");
     const sheet = await openDemoSheet(user);
@@ -162,7 +203,7 @@ describe("logging in", () => {
 
   it("the server's config decides whether the demo link is shown, asked once without credentials", async () => {
     renderApp("/login");
-    expect(await screen.findByRole("button", { name: /try the demo/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^try the demo$/i })).toBeInTheDocument();
     const asked = server.calls.filter((c) => c.path === "/api/auth/config");
     expect(asked).toHaveLength(1);
     expect(asked[0].method).toBe("GET");
@@ -173,19 +214,19 @@ describe("logging in", () => {
     server = createFakeAuthServer({ demoLoginEnabled: false });
     resetSessionClientForTests({ fetch: server.fetch, locks: null, createChannel: () => null });
     renderApp("/login");
-    expect(await screen.findByRole("heading", { name: "Log in to continue" })).toBeInTheDocument();
+    expect(await loginCard()).toBeInTheDocument();
     await waitFor(() => expect(server.count("/api/auth/config")).toBe(1));
     await act(async () => {}); // let the answer land
-    expect(screen.queryByRole("button", { name: /try the demo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^try the demo$/i })).not.toBeInTheDocument();
   });
 
   it("if the config can't be fetched, the demo link stays hidden (fails closed)", async () => {
     const broken = (url, init) => (String(url).endsWith("/api/auth/config") ? Promise.reject(new TypeError("Failed to fetch")) : server.fetch(url, init));
     resetSessionClientForTests({ fetch: broken, locks: null, createChannel: () => null });
     renderApp("/login");
-    expect(await screen.findByRole("heading", { name: "Log in to continue" })).toBeInTheDocument();
+    expect(await loginCard()).toBeInTheDocument();
     await act(async () => {});
-    expect(screen.queryByRole("button", { name: /try the demo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^try the demo$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -201,26 +242,66 @@ describe("logging in", () => {
     expect(path()).toBe("/login");
   });
 
-  it("phone login sends the Firebase ID token to /api/auth/firebase and opens the citizen dashboard", async () => {
-    confirmOtp.mockResolvedValue({ uid: "fb-user", idToken: "good-firebase-id-token" });
+  it("a sign-in the server refuses shows the server's reason", async () => {
+    logIn.mockResolvedValue({ uid: "x", idToken: "bad-token", email: "asha@example.test", emailVerified: true });
     const user = userEvent.setup();
     renderApp("/login");
-    await requestOtp(user);
-    await typeOtp(user, "123456");
-    await user.click(screen.getByRole("button", { name: /verify/i }));
-    await waitFor(() => expect(path()).toBe("/citizen"));
-    expect(server.calls.find((c) => c.path === "/api/auth/firebase").body).toEqual({ idToken: "good-firebase-id-token" });
-    expect(JSON.stringify({ ...localStorage })).not.toContain("good-firebase-id-token");
+    await logInWith(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/sign-in failed/i);
+    expect(path()).toBe("/login");
   });
 
-  it("a phone login the server refuses shows the server's reason", async () => {
-    confirmOtp.mockResolvedValue({ uid: "x", idToken: "bad-token" });
+  it("an anonymous Firebase token (an earlier build's) is refused by the server", async () => {
+    logIn.mockResolvedValue({ uid: "old-anon", idToken: "anon:old-anon", email: "asha@example.test", emailVerified: true });
     const user = userEvent.setup();
     renderApp("/login");
-    await requestOtp(user);
-    await typeOtp(user, "123456");
-    await user.click(screen.getByRole("button", { name: /verify/i }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/phone verification failed/i);
-    expect(path()).toBe("/login");
+    await logInWith(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/log in with email|create an account/i);
+    expect(server.hasLiveSession()).toBe(false);
+  });
+});
+
+describe("log in with email: the role always comes from the server", () => {
+  async function logInAs(user, uid, email, verified = true) {
+    logIn.mockResolvedValue({ uid, idToken: `email:${uid}:st***@e***.test:${verified ? 1 : 0}`, email, emailVerified: verified });
+    await logInWith(user, email);
+  }
+
+  it.each([
+    [null, "/citizen"],
+    ["worker", "/worker"],
+    ["official", "/official"],
+  ])("an email account with role %s opens %s", async (role, home) => {
+    if (role) server.grantRole("staff-1", role, role === "worker" ? "w1" : null);
+    const user = userEvent.setup();
+    renderApp("/login");
+    await logInAs(user, "staff-1", "staff@example.test");
+    await waitFor(() => expect(path()).toBe(home));
+    expect(getSessionClient().getUser()).toMatchObject({ uid: "staff-1", role: role ?? "citizen" });
+    // the browser never sends a role of its own
+    expect(server.calls.find((c) => c.path === "/api/auth/firebase").body).toEqual({ idToken: expect.stringMatching(/^email:staff-1:/) });
+  });
+
+  it("a staff role granted to an email that isn't verified yet gives only a citizen", async () => {
+    server.grantRole("staff-2", "official");
+    const user = userEvent.setup();
+    renderApp("/login");
+    await logInAs(user, "staff-2", "staff2@example.test", false);
+    await waitFor(() => expect(path()).toBe("/citizen"));
+  });
+
+  it("Create account sends the new account's token, and the server makes it a citizen", async () => {
+    createAccount.mockResolvedValue({ uid: "new-7", idToken: "email:new-7:ne***@e***.test:0", email: "new@example.test", emailVerified: false, verificationSent: true });
+    const user = userEvent.setup();
+    renderApp("/login");
+    await user.click(within(await loginCard()).getByRole("button", { name: /create account/i }));
+    const card = await screen.findByRole("region", { name: "Create account" });
+    await user.type(within(card).getByLabelText(/^email$/i), "new@example.test");
+    await user.type(within(card).getByLabelText(/choose a password/i), "s3cret-pass");
+    await user.click(within(card).getByRole("button", { name: /^create account$/i }));
+    await waitFor(() => expect(path()).toBe("/citizen"));
+    expect(await screen.findByRole("region", { name: /verify your email/i })).toHaveTextContent("ne***@e***.test");
+    expect(getSessionClient().getUser()).toMatchObject({ uid: "new-7", role: "citizen" });
+    expect(JSON.stringify({ ...localStorage })).not.toContain("new@example.test");
   });
 });

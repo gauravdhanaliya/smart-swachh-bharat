@@ -112,6 +112,7 @@ function workerDto(doc) {
     area: doc.area,
     status: doc.status,
     phoneMasked: doc.phoneMasked ?? null,
+    emailMasked: doc.emailMasked ?? null,
     source: doc.source,
     createdAt: doc.createdAt,
     createdBy: doc.createdBy ?? "",
@@ -135,6 +136,35 @@ export function createCivicRepository({ db, client, nextId }) {
   const ratings = db.collection("toilet_ratings");
   const consents = db.collection("consents");
   const users = db.collection("users");
+  const pendingRoles = db.collection("pending_roles");
+
+  // A directory entry added by email: the account with that verified email
+  // becomes this worker now, or a pending role waits for it.
+  async function inviteWorker(doc) {
+    if (!doc.emailHash) return;
+    const ts = now();
+    const linked = await users.updateOne(
+      { emailHash: doc.emailHash, emailVerified: true, isDemo: { $ne: true }, role: { $in: ["citizen", "worker"] } },
+      { $set: { role: "worker", workerId: doc._id, updatedAt: ts } }
+    );
+    if (linked.matchedCount) {
+      await pendingRoles.deleteOne({ _id: doc.emailHash });
+      return;
+    }
+    await pendingRoles.updateOne(
+      { _id: doc.emailHash },
+      { $set: { kind: "email", role: "worker", workerId: doc._id, updatedAt: ts }, $setOnInsert: { createdAt: ts } },
+      { upsert: true }
+    );
+  }
+
+  // "active": an account is this worker; "invited": waiting for the person to
+  // sign up and verify their email; null: a demo or older entry with no email.
+  async function withAccountStatus(docs) {
+    const ids = docs.map((d) => d._id);
+    const active = new Set((await users.find({ workerId: { $in: ids }, role: "worker" }, { projection: { workerId: 1 } }).toArray()).map((u) => u.workerId));
+    return docs.map((d) => ({ ...workerDto(d), accountStatus: active.has(d._id) ? "active" : d.emailHash ? "invited" : null }));
+  }
   const locations = db.collection("locations");
 
   // Vote counts and the viewer's own vote for a page of complaints, in two queries.
@@ -318,7 +348,7 @@ export function createCivicRepository({ db, client, nextId }) {
         workers.countDocuments(match),
         workers.find(match).sort(sort).skip(skip).limit(limit).toArray(),
       ]);
-      return { total, items: docs.map(workerDto) };
+      return { total, items: await withAccountStatus(docs) };
     },
 
     /** Seeding: the demo directory entries, unless they exist. */
@@ -327,13 +357,30 @@ export function createCivicRepository({ db, client, nextId }) {
       await workers.updateOne({ _id: w.id }, { $setOnInsert: doc }, { upsert: true });
     },
 
-    async addWorker(data, actor) {
+    /**
+     * An official adds a worker by the email they will sign up with (`emailHash`
+     * and `emailMasked` only; the address never reaches here). If an account
+     * with that verified email exists it becomes the worker now; otherwise a
+     * pending worker role waits for it (applied when it signs in verified).
+     * Throws { code: "email_in_directory" } if an active directory entry has
+     * the email, and { code: "email_is_official" } for an official's account.
+     */
+    async addWorker({ emailHash, emailMasked, ...data }, actor) {
+      if (await workers.findOne({ emailHash, removedAt: null }, { projection: { _id: 1 } })) {
+        throw Object.assign(new Error("email_in_directory"), { code: "email_in_directory" });
+      }
+      const owner = await users.findOne({ emailHash }, { projection: { role: 1 } });
+      if (owner && !["citizen", "worker"].includes(owner.role)) {
+        throw Object.assign(new Error("email_is_official"), { code: "email_is_official" });
+      }
       const id = await nextId("gw-", "workers", 1);
       const n = Number(id.slice(3));
       const doc = {
         _id: id,
         displayId: `W${String(n).padStart(3, "0")}`,
         ...data,
+        emailHash,
+        emailMasked,
         source: "GOVERNMENT",
         createdAt: now(),
         createdBy: actor.name,
@@ -344,26 +391,40 @@ export function createCivicRepository({ db, client, nextId }) {
         removalReason: null,
       };
       await workers.insertOne(doc);
-      return workerDto(doc);
+      await inviteWorker(doc);
+      return (await withAccountStatus([doc]))[0];
     },
 
     /** Takes a worker off the directory (reversible). null if missing or already removed. */
+    /**
+     * Takes a worker off the directory (reversible). Their account loses the
+     * worker role at once (its access tokens stop working: the role changed),
+     * and a role still waiting for them is cancelled. The shared demo worker
+     * account keeps its role, so the demo login keeps working.
+     * null if missing or already removed.
+     */
     async removeWorker(id, actor, reason) {
       const doc = await workers.findOneAndUpdate(
         { _id: id, removedAt: null },
         { $set: { removedAt: now(), removedBy: actor.name, removedById: actor.uid, removalReason: reason } },
         { returnDocument: "after" }
       );
-      return doc ? workerDto(doc) : null;
+      if (!doc) return null;
+      await users.updateMany({ workerId: id, role: "worker", isDemo: { $ne: true } }, { $set: { role: "citizen", workerId: null, updatedAt: now() } });
+      await pendingRoles.deleteMany({ role: "worker", workerId: id });
+      return workerDto(doc);
     },
 
+    /** Puts a removed worker back, and gives their account the role again (or invites it again). */
     async restoreWorker(id) {
       const doc = await workers.findOneAndUpdate(
         { _id: id, removedAt: { $ne: null } },
         { $set: { removedAt: null, removedBy: null, removedById: null, removalReason: null } },
         { returnDocument: "after" }
       );
-      return doc ? workerDto(doc) : null;
+      if (!doc) return null;
+      await inviteWorker(doc);
+      return (await withAccountStatus([doc]))[0];
     },
 
     async getComplaintPhotoPaths(id) {
@@ -719,7 +780,8 @@ export function createCivicRepository({ db, client, nextId }) {
           await profiles.deleteOne({ _id: uid }, o);
           await db.collection("refresh_tokens").deleteMany({ uid }, o);
           // rate-limit counters keyed by their id (they'd expire soon anyway)
-          await db.collection("auth_rate_limits").deleteMany({ _id: { $in: [`complaint:${uid}`, `write:user:${uid}`, `auth:user:${uid}`, `geo:user:${uid}`] } }, o);
+          const counters = ["complaint", "rating", "vote", "write", "auth", "geo"].map((name) => `${name}:user:${uid}`);
+          await db.collection("auth_rate_limits").deleteMany({ _id: { $in: counters } }, o);
           if (user.phoneHash) await db.collection("pending_roles").deleteOne({ _id: user.phoneHash }, o);
           result.deleted.account = (await users.deleteOne({ uid }, o)).deletedCount;
         });

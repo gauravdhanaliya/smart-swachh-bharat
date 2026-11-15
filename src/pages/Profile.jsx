@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import CitizenShell from "../components/CitizenShell";
 import SettingsGroup from "../components/SettingsGroup";
 import PrivacySettings from "../components/PrivacySettings";
+import AccountSection from "../components/AccountSection";
 import AddLocationDialog from "../components/AddLocationDialog";
 import ToggleSwitch from "../components/ToggleSwitch";
 import { useAuth } from "../context/AuthContext";
@@ -11,6 +12,9 @@ import { useComplaints } from "../hooks/useComplaints";
 import { useCitizenNotifications } from "../hooks/useCitizenNotifications";
 import { useCitizenPreferences } from "../hooks/useCitizenPreferences";
 import { STATUS } from "../data/complaints";
+import { LOGIN_METHOD } from "../services/authSession";
+import Glyph from "../components/Glyph";
+import Icon from "../components/Icon";
 
 const ICON = {
   fill: "none",
@@ -32,7 +36,7 @@ function LinkRow({ icon, label, value, badge, onClick }) {
   return (
     <button type="button" onClick={onClick} className="flex w-full items-center gap-3 py-3.5 text-left">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-base">
-        {icon}
+        <Glyph value={icon} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-emerald-950">{label}</span>
@@ -73,13 +77,13 @@ export default function Profile() {
       </div>
 
       <div className="flex flex-col gap-5 px-5 pb-8">
-        <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-4">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-2xl">
-            🙂
+            <Icon name="user" className="h-7 w-7" />
           </span>
           <div className="min-w-0">
             <p className="font-semibold text-emerald-950">{user.name}</p>
-            {user.phone && <p className="mt-0.5 text-xs font-medium text-emerald-800/70">{user.phone}</p>}
+            {user.email && <p className="mt-0.5 text-xs font-medium text-emerald-800/70">{user.email}</p>}
             <p className="mt-0.5 text-xs text-emerald-800/50">
               {city.state ? `${city.name}, ${city.state}` : city.name}
             </p>
@@ -90,16 +94,16 @@ export default function Profile() {
           <button
             type="button"
             onClick={() => navigate("/citizen/complaints")}
-            className="rounded-2xl border border-emerald-100 bg-white p-3.5 text-center shadow-sm"
+            className="rounded-2xl border border-emerald-100 bg-white p-3.5 text-center"
           >
             <p className="text-xl font-bold text-emerald-950">{complaints.length}</p>
             <p className="text-xs text-emerald-800/60">Complaints</p>
           </button>
-          <div className="rounded-2xl border border-emerald-100 bg-white p-3.5 text-center shadow-sm">
+          <div className="rounded-2xl border border-emerald-100 bg-white p-3.5 text-center">
             <p className="text-xl font-bold text-emerald-950">{openCount}</p>
             <p className="text-xs text-emerald-800/60">Open</p>
           </div>
-          <div className="rounded-2xl border border-emerald-100 bg-white p-3.5 text-center shadow-sm">
+          <div className="rounded-2xl border border-emerald-100 bg-white p-3.5 text-center">
             <p className="text-xl font-bold text-emerald-950">{resolvedCount}</p>
             <p className="text-xs text-emerald-800/60">Resolved</p>
           </div>
@@ -122,10 +126,10 @@ export default function Profile() {
         </SettingsGroup>
 
         <section className="flex flex-col gap-1">
-          <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-emerald-700/70">
+          <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted">
             My city
           </h2>
-          <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-emerald-100 bg-white p-4">
             <label className="block text-sm font-semibold text-emerald-950" htmlFor="profile-city">
               Home city
             </label>
@@ -150,7 +154,7 @@ export default function Profile() {
               <button
                 type="button"
                 onClick={() => setAddingLocation(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" {...ICON} strokeWidth="2.2" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
@@ -162,7 +166,7 @@ export default function Profile() {
                 <button
                   type="button"
                   onClick={() => removeLocation(city.id)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600"
                 >
                   Remove &ldquo;{city.name}&rdquo;
                 </button>
@@ -189,6 +193,8 @@ export default function Profile() {
           />
         </SettingsGroup>
 
+        <AccountSection />
+
         <PrivacySettings />
 
         <SettingsGroup title="Support">
@@ -201,23 +207,25 @@ export default function Profile() {
         </SettingsGroup>
 
         {confirmingLogout ? (
-          <div className="rounded-2xl border border-red-200 bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-red-200 bg-white p-4">
             <p className="text-sm font-semibold text-emerald-950">Log out of EcoSetu?</p>
-            <p className="mt-0.5 text-xs text-emerald-800/60">
-              You&apos;ll need your mobile number and OTP to sign back in.
+            <p className="mt-0.5 text-xs text-emerald-800/70">
+              {user.method === LOGIN_METHOD.DEMO
+                ? "The demo data stays for the next person trying the demo."
+                : "You can log back in with your email and password."}
             </p>
             <div className="mt-3 flex gap-3">
               <button
                 type="button"
                 onClick={() => setConfirmingLogout(false)}
-                className="flex-1 rounded-full border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700"
+                className="flex-1 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex-1 rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white"
+                className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white"
               >
                 Log out
               </button>
@@ -227,7 +235,7 @@ export default function Profile() {
           <button
             type="button"
             onClick={() => setConfirmingLogout(true)}
-            className="flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-sm"
+            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" {...ICON} aria-hidden="true">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />

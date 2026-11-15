@@ -276,6 +276,20 @@ describe("the static site's headers (vercel.json)", () => {
     assert.match(headers["Permissions-Policy"], /microphone=\(\)/);
     assert.match(headers["Strict-Transport-Security"], /max-age=\d+/);
   });
+
+  test("the CSP allows Firebase sign-in (anonymous, email) and nothing from the old phone sign-in", () => {
+    const config = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
+    const all = config.headers.find((h) => h.source === "/(.*)");
+    const csp = all.headers.find((h) => /^Content-Security-Policy/.test(h.key)).value;
+    const directive = (name) => (csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${name} `)) ?? "").split(/\s+/).slice(1);
+    for (const host of ["https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"]) {
+      assert.ok(directive("connect-src").includes(host), host);
+    }
+    assert.doesNotMatch(csp, /recaptcha/i, "no reCAPTCHA (it was only for phone sign-in)");
+    assert.doesNotMatch(csp, /www\.gstatic\.com|www\.google\.com|apis\.google\.com/, "no Google script, frame or image hosts");
+    assert.deepEqual(directive("script-src"), ["'self'"]);
+    assert.ok(!directive("frame-src").some((src) => /google|firebaseapp/.test(src)));
+  });
 });
 
 describe("shared IPs (college Wi-Fi, a hackathon hall)", () => {
@@ -384,9 +398,8 @@ describe("Content Security Policy for the site (report-only first)", () => {
     for (const host of ["https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"]) {
       assert.ok(directive("connect-src").includes(host), `Firebase Auth: ${host}`);
     }
-    assert.ok(directive("script-src").includes("https://www.google.com/recaptcha/"), "reCAPTCHA script");
-    assert.ok(directive("script-src").includes("https://www.gstatic.com/recaptcha/"));
-    assert.ok(directive("frame-src").includes("https://www.google.com/recaptcha/"), "reCAPTCHA frame");
+    // No phone sign-in, so no reCAPTCHA: scripts come only from the site itself.
+    assert.deepEqual(directive("script-src"), ["'self'"]);
     // Nominatim: the browser-only build calls it directly (the API build goes through /api/geo).
     assert.ok(directive("connect-src").includes("https://nominatim.openstreetmap.org"), "Nominatim");
     assert.ok(!/overpass/.test(csp), "nothing calls Overpass any more, so it isn't allowed");

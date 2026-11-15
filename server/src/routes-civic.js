@@ -31,7 +31,7 @@
 
 import crypto from "node:crypto";
 import { ADMIN_ROLES, COMPLAINT_STATUS, FACILITY_CATEGORIES, ROLES, WORKER_TRANSITIONS } from "./constants.js";
-import { clearRefreshCookie, requireRole } from "./auth.js";
+import { clearRefreshCookie, clientIp, requireRole } from "./auth.js";
 import { ConflictError } from "./civic.js";
 import {
   FACILITY_ID_PATTERN,
@@ -48,6 +48,7 @@ import { ValidationError, onlyFields, pageOf, parsePage } from "./validate.js";
 import { photoNote } from "./photos.js";
 import { sendJsonWithEtag } from "./etag.js";
 import { validateProfile, validateWorker } from "./validate-civic.js";
+import { hashEmail, maskEmail } from "./identity.js";
 
 const NOT_FOUND = { error: "Complaint not found." };
 const REVIEWERS = ["supervisor", ...ADMIN_ROLES];
@@ -73,16 +74,32 @@ export function registerCivicRoutes(app, { repo, config, wrap, photos, photoStor
     await repo.notify({ userId: raw.citizenId, kind: "complaint", complaintId, status: complaint.status, ...NOTICE[complaint.status](complaint) });
   };
 
+  /**
+   * Counts one action against a per-user and a per-IP limit (a new anonymous
+   * account costs nothing, so a per-user limit alone is easy to dodge).
+   * Answers 429 and returns false when either is used up.
+   */
+  async function withinLimits(req, res, name, perUser, perIp, message) {
+    for (const [key, { max, windowMs }] of [
+      [`${name}:user:${req.user.uid}`, perUser],
+      [`${name}:ip:${clientIp(req, config)}`, perIp],
+    ]) {
+      const { count, resetAt } = await repo.hitRateLimit(key, windowMs);
+      if (count > max) {
+        res.setHeader("Retry-After", String(Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000))));
+        res.status(429).json({ error: message });
+        return false;
+      }
+    }
+    return true;
+  }
+
   // ---- complaints --------------------------------------------------------
 
   app.post("/api/complaints", requireRole("citizen"), wrap(async (req, res) => {
     const { photo, ...data } = validateComplaint(req.body);
-    const { max, windowMs } = config.complaintRateLimit;
-    const { count, resetAt } = await repo.hitRateLimit(`complaint:${req.user.uid}`, windowMs);
-    if (count > max) {
-      res.setHeader("Retry-After", String(Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000))));
-      return res.status(429).json({ error: "You have sent a lot of reports recently. Please try again later." });
-    }
+    const message = "You have sent a lot of reports recently. Please try again later.";
+    if (!(await withinLimits(req, res, "complaint", config.complaintRateLimit, config.complaintIpRateLimit, message))) return;
     // Uploaded only after the auth, validation and rate-limit checks above.
     // If the store can't take it, the complaint is still filed, without it.
     const { pathname: photoPath, photoSaved } = await photos.tryUpload(photo, "complaints");
@@ -187,6 +204,7 @@ export function registerCivicRoutes(app, { repo, config, wrap, photos, photoStor
     const direction = validateVote(req.body);
     const scope = complaintScope(req.user);
     if (!(await repo.getComplaint(req.params.id, scope, req.user.uid))) return res.status(404).json(NOT_FOUND);
+    if (!(await withinLimits(req, res, "vote", config.voteRateLimit, config.voteIpRateLimit, "Too many votes. Please try again later."))) return;
     await repo.voteComplaint(req.params.id, req.user.uid, direction);
     res.json({ complaint: await repo.getComplaint(req.params.id, scope, req.user.uid) });
   }));
@@ -233,6 +251,7 @@ export function registerCivicRoutes(app, { repo, config, wrap, photos, photoStor
   app.put("/api/toilets/:id/rating", requireRole("citizen"), wrap(async (req, res) => {
     const rating = validateRating(req.body);
     if (!(await repo.isLiveToilet(req.params.id))) return res.status(404).json({ error: "Toilet not found." });
+    if (!(await withinLimits(req, res, "rating", config.ratingRateLimit, config.ratingIpRateLimit, "Too many ratings. Please try again later."))) return;
     const saved = await repo.upsertRating(req.params.id, req.user.uid, rating);
     res.json({ rating: saved, summary: await repo.ratingSummary(req.params.id) });
   }));
@@ -275,8 +294,18 @@ export function registerCivicRoutes(app, { repo, config, wrap, photos, photoStor
     res.json(pageOf(paging, total, items));
   }));
 
+  // Adds a worker by the email they will sign up with. Only its keyed hash and
+  // a masked copy are stored; becoming the worker needs that email verified.
   app.post("/api/workers", requireRole(...ADMIN_ROLES), wrap(async (req, res) => {
-    res.status(201).json({ worker: await repo.addWorker(validateWorker(req.body), actor(req)) });
+    const { email, ...data } = validateWorker(req.body);
+    try {
+      const worker = await repo.addWorker({ ...data, emailHash: hashEmail(email, config.identityHashSecret), emailMasked: maskEmail(email) }, actor(req));
+      res.status(201).json({ worker });
+    } catch (err) {
+      if (err.code === "email_in_directory") return res.status(409).json({ error: "A worker with this email is already in the directory." });
+      if (err.code === "email_is_official") return res.status(409).json({ error: "This email belongs to an official's account, so it can't be added as a worker." });
+      throw err;
+    }
   }));
 
   app.delete("/api/workers/:id", requireRole(...ADMIN_ROLES), wrap(async (req, res) => {
@@ -309,7 +338,7 @@ export function registerCivicRoutes(app, { repo, config, wrap, photos, photoStor
 
   app.put("/api/me/consent", requireRole(...ROLES), wrap(async (req, res) => {
     // Phone-login users must accept the phone item; demo accounts have no phone.
-    const consent = validateConsent(req.body, { phoneUser: !req.user.isDemo && Boolean(req.user.phoneMasked) });
+    const consent = validateConsent(req.body);
     if (consent.version !== config.consentVersion) {
       return res.status(409).json({ error: "The privacy notice has changed. Please read it again.", version: config.consentVersion });
     }

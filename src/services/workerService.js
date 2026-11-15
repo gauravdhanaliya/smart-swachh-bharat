@@ -17,13 +17,16 @@
 import { WORKERS } from "../data/workers";
 import { apiEnabled } from "./apiConfig";
 import { api, apiAll } from "./api";
+import { maskEmail, normaliseEmail } from "../../server/src/email.js";
 
 // Through the API (officials only): GET/POST /api/workers, DELETE
 // /api/workers/:id, POST /api/workers/:id/restore — cached in memory and
-// refreshed after every change. A phone number comes back only masked.
+// refreshed after every change. An email (or an old phone number) comes back
+// only masked, with accountStatus: "active" (signed in as this worker),
+// "invited" (waiting for them to create and confirm an account) or null.
 const remote = { active: [], removed: [], loaded: false };
 
-const fromApi = (w) => ({ ...w, phone: w.phoneMasked ?? "" });
+const fromApi = (w) => ({ ...w, phone: w.phoneMasked ?? "", emailMasked: w.emailMasked ?? null, accountStatus: w.accountStatus ?? null });
 const removalRecord = (w) => ({
   id: w.id,
   displayId: w.displayId,
@@ -161,19 +164,26 @@ export function getAllWorkers() {
 }
 
 /**
- * POST /api/workers — Government "Add Worker".
- * `data` should already be validated by the caller (name/area required):
- *   { name, role?, area, phone?, status? }
+ * POST /api/workers — Government "Add worker": { name, email, area?, status? }.
+ * The server keeps the email only as a hash (for matching the account) and a
+ * masked copy. When that person creates an account with the same email and
+ * confirms it, they are a worker. This is the only way to become one (besides
+ * the demo login).
+ *
+ * The browser-only build has no accounts to match: it keeps the masked email
+ * only, never the address.
  */
 export function addWorker(data) {
   if (apiEnabled()) {
-    const body = { name: data.name, area: data.area };
-    for (const key of ["role", "phone", "status"]) if (data[key]) body[key] = data[key];
+    const body = { name: data.name, email: data.email };
+    for (const key of ["area", "status"]) if (data[key]) body[key] = data[key];
     return api("/workers", { method: "POST", body }).then(async ({ worker }) => {
       await refreshWorkers();
       return fromApi(worker);
     });
   }
+  const email = normaliseEmail(data.email);
+  if (!data.name?.trim() || !email) throw new Error("Please fix the highlighted fields.");
   const all = getAllWorkers();
   const { id, displayId } = nextWorkerIds(all.map((w) => w.displayId));
 
@@ -181,10 +191,12 @@ export function addWorker(data) {
     id,
     displayId,
     name: data.name.trim(),
-    role: data.role?.trim() || "Sanitation Worker",
-    area: data.area.trim(),
+    role: "Sanitation Worker",
+    area: data.area?.trim() || "",
     status: data.status || "Available",
-    phone: data.phone?.trim() || "",
+    phone: "",
+    emailMasked: maskEmail(email),
+    accountStatus: "invited",
     source: WORKER_SOURCE.GOVERNMENT,
     createdAt: isoNow(),
   };

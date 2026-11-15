@@ -18,7 +18,6 @@ import { DatabaseSync } from "node:sqlite";
 import { loadConfig } from "../src/config.js";
 import { connectDatabase } from "../src/db.js";
 import { migrateBinLocation } from "../src/constants.js";
-import { hashPhone, maskPhone } from "../src/phone.js";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -75,12 +74,15 @@ const tenDigits = (phone) => {
   const d = String(phone ?? "").replace(/\D/g, "").slice(-10);
   return /^\d{10}$/.test(d) ? d : null;
 };
-const user = (secret) => (r) => {
-  const phone = tenDigits(r.phone);
+// The SQLite build signed users in by phone. Their number is not carried
+// over (no phone sign-in any more); the account keeps its uid and role.
+const user = () => (r) => {
   return {
     uid: r.uid,
-    phoneHash: phone ? hashPhone(phone, secret) : null,
-    phoneMasked: phone ? maskPhone(phone) : null,
+    authProvider: "phone",
+    emailHash: null,
+    emailMasked: null,
+    emailVerified: false,
     role: r.role,
     name: String(r.name ?? r.role).slice(0, 80),
     workerId: r.worker_id ?? null,
@@ -161,7 +163,7 @@ try {
     problems
   );
   if (tableExists(sqlite, "users")) {
-    await copy(db.collection("users"), sqliteUsers, user(config.phoneHashSecret), (d) => ({ uid: d.uid }), "users", problems);
+    await copy(db.collection("users"), sqliteUsers, user(), (d) => ({ uid: d.uid }), "users", problems);
   } else {
     console.log("  users: no users table in this SQLite file (nothing to copy)");
   }

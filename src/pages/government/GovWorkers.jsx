@@ -13,6 +13,15 @@ const STATUS_DOT = {
   "On Duty": "bg-orange-500",
 };
 
+// Whether the person has an account yet. Text, not colour alone.
+function AccountBadge({ status }) {
+  if (status === "active")
+    return <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800 ring-1 ring-emerald-200">Account active</span>;
+  if (status === "invited")
+    return <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-900 ring-1 ring-amber-200">Waiting for sign-up</span>;
+  return null;
+}
+
 export default function GovWorkers() {
   const complaints = useComplaints();
   const { workers, addWorker, removeWorker } = useWorkers();
@@ -21,10 +30,11 @@ export default function GovWorkers() {
   const [removeTarget, setRemoveTarget] = useState(null);
   const [error, setError] = useState("");
 
-  // Through the API these are Promises that can be refused; show why.
-  const handleAddConfirm = (draft) => {
+  // The dialog waits for the server; a refusal (for example the email is
+  // already in the directory) shows in the dialog, with what was typed kept.
+  const handleAddConfirm = async (draft) => {
     setError("");
-    Promise.resolve(addWorker(draft)).catch((err) => setError(err?.message || "The worker couldn't be added."));
+    await addWorker(draft);
     setAdding(false);
   };
 
@@ -47,12 +57,12 @@ export default function GovWorkers() {
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+          className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl bg-brand px-4 text-sm font-semibold text-white hover:bg-brand-hover"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Add Worker
+          Add worker
         </button>
       </div>
 
@@ -66,42 +76,52 @@ export default function GovWorkers() {
           ).length;
 
           return (
-            <div key={worker.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={worker.id} className="rounded-2xl border border-line bg-white p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-100 text-sm font-bold text-orange-700">
                     {worker.name.split(" ").map((n) => n[0]).join("")}
                   </span>
                   <div>
-                    <p className="font-semibold text-slate-900">{worker.name}</p>
-                    <p className="text-xs text-slate-500">{worker.role}</p>
+                    <p className="font-semibold text-ink">{worker.name}</p>
+                    <p className="text-xs text-muted">{worker.role}</p>
                   </div>
                 </div>
-                <span className="text-xs font-medium text-slate-400">{worker.displayId}</span>
+                <span className="text-xs font-medium text-muted">{worker.displayId}</span>
               </div>
 
               <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-600">
-                <span className={`h-2 w-2 rounded-full ${STATUS_DOT[worker.status] ?? "bg-slate-400"}`} />
+                <span className={`h-2 w-2 rounded-full ${STATUS_DOT[worker.status] ?? "bg-slate-400"}`} aria-hidden="true" />
                 {worker.status}
-                <span className="text-slate-300">·</span>
-                <span>{worker.area}</span>
+                {worker.area && (
+                  <>
+                    <span className="text-slate-300" aria-hidden="true">·</span>
+                    <span>{worker.area}</span>
+                  </>
+                )}
               </div>
+              {(worker.emailMasked || worker.accountStatus) && (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  {worker.emailMasked && <span className="text-slate-600">{worker.emailMasked}</span>}
+                  <AccountBadge status={worker.accountStatus} />
+                </div>
+              )}
 
-              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-3">
                 <div>
-                  <p className="text-lg font-bold text-slate-900">{activeCount}</p>
-                  <p className="text-[11px] text-slate-500">Active tasks</p>
+                  <p className="text-lg font-bold text-ink">{activeCount}</p>
+                  <p className="text-[11px] text-muted">Active tasks</p>
                 </div>
                 <div>
-                  <p className="text-lg font-bold text-slate-900">{assignedCount}</p>
-                  <p className="text-[11px] text-slate-500">Total assigned</p>
+                  <p className="text-lg font-bold text-ink">{assignedCount}</p>
+                  <p className="text-[11px] text-muted">Total assigned</p>
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => setRemoveTarget(worker)}
-                className="mt-3 w-full rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                className="mt-3 w-full rounded-xl border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
               >
                 Remove Worker
               </button>

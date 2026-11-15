@@ -1,7 +1,8 @@
 // EcoSetu API.
 //
 //   GET    /api/health
-//   POST   /api/auth/firebase              { idToken, name? }   (role comes from the database)
+//   POST   /api/auth/firebase              { idToken, name? }   (role comes from the database;
+//            a new email account is a citizen)
 //            -> { accessToken, expiresIn, user } + refresh token in an httpOnly cookie
 //            (/api/auth/firebase-login is kept as an alias)
 //   POST   /api/auth/demo                  { role } -> same, as a seeded demo user;
@@ -25,6 +26,7 @@
 //   PATCH  /api/facility-requests/:id/status  { status, rejectionReason? }
 //            APPROVED/REJECTED: official, superadmin · UNDER_REVIEW: + supervisor
 
+import { normaliseEmail } from "./identity.js";
 import express from "express";
 import helmet from "helmet";
 import { createLogger, requestLogger } from "./logger.js";
@@ -134,13 +136,20 @@ export function createApp({ config, repo, verifyFirebase, photoStore = null, log
   // Every /api/auth route shares one request budget per IP.
   app.use("/api/auth", rateLimit({ ...config.authRateLimit, repo, config, name: "auth" }));
 
-  // What the client learns about a user. The phone number appears only masked.
+  // How the account signs in, as the client shows it.
+  const ACCOUNT_TYPE = { password: "email", phone: "legacy", demo: "demo" };
+
+  // What the client learns about a user. A saved account's email appears only masked.
   const publicUser = (u) => ({
     uid: u.uid,
     role: u.role,
     name: u.name,
-    phone: u.phoneMasked ?? null,
     isDemo: Boolean(u.isDemo),
+    account: {
+      type: ACCOUNT_TYPE[u.authProvider] ?? "legacy",
+      email: u.emailMasked ?? null,
+      emailVerified: Boolean(u.emailVerified),
+    },
     ...(u.workerId ? { wid: u.workerId } : {}),
   });
 
@@ -157,11 +166,16 @@ export function createApp({ config, repo, verifyFirebase, photoStore = null, log
     return { accessToken, expiresIn: config.accessTtlSeconds, user: publicUser(user) };
   };
 
-  // Firebase has already verified the phone number in the browser; this
-  // finds or creates the user for that Firebase uid and starts the app
-  // session. The role is whatever the database holds (a first-time user is a
-  // citizen unless an admin pre-granted a role to their phone number) — any
-  // role the client sends is ignored.
+  // Firebase has already signed the user in, in the browser; this finds or
+  // creates the user for that Firebase uid and starts the app session.
+  //   password   an email + password account: whatever role the database
+  //              holds (a new account is a citizen; a role granted to the
+  //              email applies once the email is verified). An account's
+  //              FIRST sign-in (a sign-up) counts against a per-IP limit.
+  //   phone      only accounts the old phone sign-in made; no new ones.
+  //   anonymous  refused: there is no "Continue without account" any more.
+  // Any role the client sends is refused (the body takes only idToken, name).
+  const signupLimit = config.signupRateLimit;
   const firebaseLogin = wrap(async (req, res) => {
     const ip = clientIp(req, config);
     if (await loginLimiter.blocked(ip)) {
@@ -169,29 +183,41 @@ export function createApp({ config, repo, verifyFirebase, photoStore = null, log
     }
     const body = validateFirebaseLogin(req.body);
 
-    // The phone number comes from the verified ID token — never from the body.
     let verified;
     try {
       verified = await verifyFirebase(body.idToken);
     } catch {
       await loginLimiter.fail(ip);
-      return res.status(401).json({ error: "Phone verification failed. Please sign in again." });
-    }
-    const mobile = verified.phone.replace(/\D/g, "").slice(-10);
-    if (!/^\d{10}$/.test(mobile)) {
-      return res.status(400).json({ error: "This account has no verified mobile number." });
+      return res.status(401).json({ error: "Sign-in failed. Please try again." });
     }
     await loginLimiter.reset(ip);
 
     let user;
     try {
-      user = await repo.upsertUser({ uid: verified.uid, phone: mobile, name: body.name });
+      if (verified.provider === "password") {
+        if (!normaliseEmail(verified.email)) return res.status(400).json({ error: "This account has no email address." });
+        if (!(await repo.getUserByUid(verified.uid))) {
+          const { count, resetAt } = await repo.hitRateLimit(`signup:ip:${ip}`, signupLimit.windowMs);
+          if (count > signupLimit.max) {
+            res.setHeader("Retry-After", String(Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000))));
+            return res.status(429).json({ error: "Too many new accounts from this network. Please try again later." });
+          }
+        }
+        user = await repo.signInWithEmail({ uid: verified.uid, email: verified.email, emailVerified: verified.emailVerified, name: body.name });
+      } else if (verified.provider === "phone") {
+        user = await repo.signInLegacyPhone({ uid: verified.uid });
+        if (!user) return res.status(403).json({ error: "Phone sign-in is no longer available." });
+      } else if (verified.provider === "anonymous") {
+        return res.status(403).json({ error: "Using EcoSetu without an account has ended. Log in with email, or create an account." });
+      } else {
+        return res.status(403).json({ error: "This sign-in method isn't supported." });
+      }
     } catch (err) {
-      if (err.code === "phone_taken") {
-        return res.status(409).json({ error: "This mobile number is already linked to another account." });
+      if (err.code === "email_taken") {
+        return res.status(409).json({ error: "This email is already saved to another account. Log in to that account instead." });
       }
       if (err.code === "demo_account") {
-        return res.status(403).json({ error: "This account can't be used with phone login." });
+        return res.status(403).json({ error: "This account can only be used through the demo login." });
       }
       throw err;
     }

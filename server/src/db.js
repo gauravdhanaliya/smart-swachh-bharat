@@ -5,10 +5,14 @@
 // Collections (validators and indexes in schemas.js):
 //   locations           _id = "DB-001" style id; soft-deleted via deletedAt
 //   facility_requests   _id = "FR-2026-001" style id
-//   users               one per Firebase uid: { uid, phoneHash, phoneMasked,
-//                       role, name, workerId, isDemo } — never the phone number
-//   pending_roles       roles granted by an admin to a phone number that hasn't
-//                       signed in yet (applied at first sign-in), _id = phone hash
+//   users               one per Firebase uid: { uid, role, name, workerId, isDemo,
+//                       authProvider, emailHash, emailMasked, emailVerified }.
+//                       Citizens are anonymous (no email). A saved account
+//                       has a keyed hash + masked copy of its email — never
+//                       the address itself. No phone numbers.
+//   pending_roles       roles granted by an admin to the email of an account
+//                       that isn't verified or hasn't signed in yet (applied
+//                       once it signs in with that email verified), _id = email hash
 //   refresh_tokens      SHA-256 hashes of issued refresh tokens (TTL-expired)
 //   auth_rate_limits    request counters shared by every instance (TTL-expired)
 //   complaints, toilet_ratings, notifications, consents   (used from Phase 3)
@@ -20,7 +24,7 @@
 import { MongoClient } from "mongodb";
 import { requestIdPrefix } from "./ids.js";
 import { BIN_STATUSES, REQUEST_FACILITY_TYPES, REQUEST_STATUS, migrateBinLocation } from "./constants.js";
-import { hashPhone, maskPhone } from "./phone.js";
+import { hashEmail, maskEmail } from "./identity.js";
 import { ensureCollections } from "./schemas.js";
 import { createCivicRepository } from "./civic.js";
 import { decodePhoto, migratedPhotoPathname } from "./photoStore.js";
@@ -135,64 +139,88 @@ export async function migrateLegacyPhotos(db, store) {
 }
 
 /**
- * Migration (npm run migrate): users saved by older builds hold the plain
- * phone number (`phone`). This replaces it with the keyed hash and the masked
- * copy, re-keys what pointed at the number (pending roles, and facility
- * requests whose owner was stored as "role:phone"), and drops the old unique
- * index.
+ * Migration (npm run migrate): sign-in is no longer by phone. This removes
+ * every phone number and phone hash from the users, marks the accounts the
+ * old phone sign-in made as "phone" (they keep working until they save an
+ * email account), drops roles that were pending for a phone number (a hash
+ * can't be turned into an email: grant those again by email), removes the
+ * "phone for login" consent answer, and drops the phone indexes. Users saved
+ * by the oldest builds (a plain `phone`) are converted on the way, including
+ * the facility requests they owned as "role:phone".
  *
  * Idempotent, and safe if two runs overlap: every step is a conditional
- * update of the same final values, and a second run finds nothing to do.
- * Returns { users, requests, pendingRoles, indexDropped } — what changed.
+ * update to the same final values, and a second run finds nothing to do.
+ * Returns what changed: { users, requests, pendingRoles, consents, indexesDropped }.
  */
-export async function migrateLegacyUsers(db, secret) {
-  const changed = { users: 0, requests: 0, pendingRoles: 0, indexDropped: false };
+export async function migrateLegacyUsers(db) {
+  const changed = { users: 0, requests: 0, pendingRoles: 0, consents: 0, indexesDropped: 0 };
   const users = db.collection("users");
-  // Drop the old index first: once `phone` is unset on two users, a unique
-  // index on it would see two nulls and refuse the second.
-  const oldIndex = (await users.indexes()).find((i) => i.key && "phone" in i.key);
-  if (oldIndex) {
+  for (const index of await users.indexes()) {
+    if (!index.key || !("phone" in index.key || "phoneHash" in index.key)) continue;
     try {
-      await users.dropIndex(oldIndex.name);
-      changed.indexDropped = true;
+      await users.dropIndex(index.name);
+      changed.indexesDropped += 1;
     } catch (err) {
       if (err?.code !== 27) throw err; // IndexNotFound: an overlapping run dropped it first
     }
   }
 
-  const legacy = await users.find({ phone: { $exists: true } }).toArray();
-  for (const doc of legacy) {
-    const one = await convertLegacyUser(db, doc, secret);
+  for (const doc of await users.find({ phone: { $exists: true } }).toArray()) {
+    const one = await convertLegacyUser(db, doc);
     changed.users += one.user;
     changed.requests += one.requests;
   }
 
-  const pending = db.collection("pending_roles");
-  for (const row of await pending.find({ _id: { $regex: "^\\d{10}$" } }).toArray()) {
-    const { _id: phone, ...rest } = row;
-    try {
-      await pending.updateOne({ _id: hashPhone(phone, secret) }, { $setOnInsert: rest }, { upsert: true });
-    } catch (err) {
-      if (err?.code !== 11000) throw err; // an overlapping run inserted it first
-    }
-    const gone = await pending.deleteOne({ _id: phone });
-    changed.pendingRoles += gone.deletedCount;
-  }
+  const stripped = await users.updateMany(
+    { $or: [{ phoneHash: { $exists: true } }, { phoneMasked: { $exists: true } }] },
+    { $unset: { phoneHash: "", phoneMasked: "" } },
+    { bypassDocumentValidation: true }
+  );
+  changed.users += stripped.modifiedCount;
+  // Every account from before this change was a demo account or a phone sign-in.
+  const fill = { emailHash: null, emailMasked: null, emailVerified: false };
+  const bypass = { bypassDocumentValidation: true };
+  changed.users += (await users.updateMany({ authProvider: { $exists: false }, isDemo: true }, { $set: { authProvider: "demo", ...fill } }, bypass)).modifiedCount;
+  changed.users += (await users.updateMany({ authProvider: { $exists: false } }, { $set: { authProvider: "phone", ...fill } }, bypass)).modifiedCount;
+
+  changed.pendingRoles = (await db.collection("pending_roles").deleteMany({ kind: { $ne: "email" } })).deletedCount;
+  changed.consents = (
+    await db.collection("consents").updateMany({ "items.phoneForLogin": { $exists: true } }, { $unset: { "items.phoneForLogin": "" } }, bypass)
+  ).modifiedCount;
   return changed;
 }
 
 /**
- * Converts one old-format user (plain `phone`) in place: hash + masked copy,
- * the fields newer builds require, and the facility requests it owned as
- * "role:phone". Used by the migration, and at sign-in for an account that
- * signs in before the migration has run. Returns { user: 0|1, requests }.
+ * Accounts made by "Continue without account" (anonymous Firebase sign-in)
+ * can't sign in any more. Each one is removed the way "Delete my data" does
+ * it (`deleteUserData`, from the civic repo): its complaints stay on file,
+ * anonymised; everything else of it goes. An anonymous account that was
+ * later saved with an email is a "password" account and is kept.
+ * Idempotent. Returns how many were removed.
  */
-async function convertLegacyUser(db, doc, secret) {
+export async function removeAnonymousAccounts(db, deleteUserData) {
+  let removed = 0;
+  for (const { uid } of await db.collection("users").find({ authProvider: "anonymous", isDemo: { $ne: true } }, { projection: { uid: 1 } }).toArray()) {
+    await deleteUserData(uid);
+    removed += 1;
+  }
+  return removed;
+}
+
+/**
+ * Converts one user saved by the oldest builds (a plain `phone`) in place:
+ * the number is dropped, the fields newer builds require are filled in, and
+ * the facility requests it owned as "role:phone" now point at its uid. Used
+ * by the migration, and at sign-in for such an account if the migration
+ * hasn't run yet. Returns { user: 0|1, requests }.
+ */
+async function convertLegacyUser(db, doc) {
   const digits = String(doc.phone ?? "").replace(/\D/g, "").slice(-10);
-  const known = /^\d{10}$/.test(digits);
   const set = {
-    phoneHash: known ? hashPhone(digits, secret) : null,
-    phoneMasked: known ? maskPhone(digits) : null,
+    authProvider: doc.isDemo ? "demo" : "phone",
+    emailHash: null,
+    emailMasked: null,
+    emailVerified: false,
     createdAt: doc.createdAt ?? doc.updatedAt ?? now(),
     updatedAt: doc.updatedAt ?? now(),
     isDemo: Boolean(doc.isDemo),
@@ -201,9 +229,9 @@ async function convertLegacyUser(db, doc, secret) {
   };
   const res = await db
     .collection("users")
-    .updateOne({ _id: doc._id, phone: { $exists: true } }, { $set: set, $unset: { phone: "" } }, { bypassDocumentValidation: true });
+    .updateOne({ _id: doc._id, phone: { $exists: true } }, { $set: set, $unset: { phone: "", phoneHash: "", phoneMasked: "" } }, { bypassDocumentValidation: true });
   let requests = 0;
-  if (known) {
+  if (/^\d{10}$/.test(digits)) {
     const moved = await db
       .collection("facility_requests")
       .updateMany({ requestedByUser: { $regex: `^[a-z]+:${digits}$` } }, { $set: { requestedByUser: doc.uid } }, { bypassDocumentValidation: true });
@@ -276,7 +304,7 @@ function requestDto(doc) {
   };
 }
 
-// The masked phone is the only phone data that ever leaves the database layer.
+// The masked email is the only email data that ever leaves the database layer.
 function userDto(doc) {
   return doc
     ? {
@@ -284,7 +312,9 @@ function userDto(doc) {
         role: doc.role,
         name: doc.name,
         workerId: doc.workerId ?? null,
-        phoneMasked: doc.phoneMasked ?? null,
+        authProvider: doc.authProvider ?? (doc.isDemo ? "demo" : "phone"),
+        emailMasked: doc.emailMasked ?? null,
+        emailVerified: Boolean(doc.emailVerified),
         isDemo: Boolean(doc.isDemo),
         sessionsRevokedAt: doc.sessionsRevokedAt ?? null,
       }
@@ -299,9 +329,9 @@ const idPrefix = (type) => ID_PREFIX[type] ?? (type === "campus" ? "CP-" : "BL-"
 /**
  * `session` is set only on the transaction-bound copy handed to
  * repo.transaction(fn); everything else uses the plain repository.
- * `phoneHashSecret` is needed by the methods that take a phone number.
+ * `identityHashSecret` (PHONE_HASH_SECRET) keys the email hash of saved accounts.
  */
-export function createRepository(db, client, session = null, { phoneHashSecret = null } = {}) {
+export function createRepository(db, client, session = null, { identityHashSecret = null } = {}) {
   const locations = db.collection("locations");
   const requests = db.collection("facility_requests");
   const users = db.collection("users");
@@ -310,7 +340,7 @@ export function createRepository(db, client, session = null, { phoneHashSecret =
   const pendingRoles = db.collection("pending_roles");
   const rateLimits = db.collection("auth_rate_limits");
   const opts = session ? { session } : {};
-  const phoneHash = (phone) => hashPhone(phone, phoneHashSecret);
+  const emailHash = (email) => hashEmail(email, identityHashSecret);
 
   // Atomic per-prefix sequence. The counter starts from the highest id that
   // already exists, so ids from seeds or imports are never reused. Counter
@@ -437,46 +467,64 @@ export function createRepository(db, client, session = null, { phoneHashSecret =
     },
 
     /**
-     * Signs a Firebase uid in. An existing user keeps their stored role (only
-     * the phone/name are refreshed). A first-time user gets the role an admin
-     * pre-granted for their phone number (see grantRole), otherwise "citizen" —
-     * never anything a client asked for. Throws { code: "phone_taken" } if the
-     * phone number already belongs to a different uid. The number itself is
-     * not stored: only its keyed hash and a masked copy.
+     * Signs in an email + password account, or makes a new citizen for it.
+     * Stores the email only as a keyed hash and a masked copy. A role granted
+     * to this email (pending_roles: grant-role, or an official's "Add worker")
+     * is applied only when Firebase says the email is verified: otherwise
+     * anyone could create an account with an official's address and take
+     * their role.
+     * Throws { code: "email_taken" } if another account has this email, and
+     * { code: "demo_account" } for a seeded demo uid.
      */
-    async upsertUser({ uid, phone, name }) {
-      // The seeded demo accounts are reachable only through the demo login.
+    async signInWithEmail({ uid, email, emailVerified, name }) {
       if (await users.findOne({ uid, isDemo: true }, { projection: { _id: 1 }, ...opts })) {
         throw Object.assign(new Error("demo_account"), { code: "demo_account" });
       }
-      const ts = now();
-      const hash = phoneHash(phone);
-      const pending = await pendingRoles.findOne({ _id: hash }, opts);
-      const set = { phoneHash: hash, phoneMasked: maskPhone(phone), updatedAt: ts, lastLoginAt: ts };
-      // An account from an older build that signs in before `npm run migrate`
-      // has run is converted first, so the validator accepts the update.
       const legacy = await users.findOne({ uid, phone: { $exists: true } }, opts);
-      if (legacy) await convertLegacyUser(db, legacy, phoneHashSecret);
-      const onInsert = {
-        uid,
-        createdAt: ts,
-        role: pending?.role ?? "citizen",
-        workerId: pending?.workerId ?? null,
-        isDemo: false,
+      if (legacy) await convertLegacyUser(db, legacy);
+      const ts = now();
+      const hash = emailHash(email);
+      const set = {
+        authProvider: "password",
+        emailHash: hash,
+        emailMasked: maskEmail(email),
+        emailVerified: Boolean(emailVerified),
+        updatedAt: ts,
+        lastLoginAt: ts,
+        ...(name ? { name } : {}),
       };
-      if (name) set.name = name;
-      else onInsert.name = onInsert.role;
+      const onInsert = { uid, createdAt: ts, role: "citizen", workerId: null, isDemo: false, ...(name ? {} : { name: "citizen" }) };
       try {
-        await users.updateOne({ uid }, { $set: set, $setOnInsert: onInsert }, { upsert: true, ...opts });
+        await users.updateOne({ uid }, { $set: set, $unset: { phoneHash: "", phoneMasked: "" }, $setOnInsert: onInsert }, { upsert: true, ...opts });
       } catch (err) {
-        if (isDuplicateKey(err)) throw Object.assign(new Error("phone_taken"), { code: "phone_taken" });
+        if (isDuplicateKey(err)) throw Object.assign(new Error("email_taken"), { code: "email_taken" });
         throw err;
       }
-      if (pending) await pendingRoles.deleteOne({ _id: hash }, opts);
+      if (emailVerified) {
+        const pending = await pendingRoles.findOne({ _id: hash, kind: "email" }, opts);
+        if (pending) {
+          await users.updateOne({ uid }, { $set: { role: pending.role, workerId: pending.workerId ?? null, updatedAt: ts } }, opts);
+          await pendingRoles.deleteOne({ _id: hash }, opts);
+        }
+      }
       return this.getUserByUid(uid);
     },
 
-    /** Seeding: adds a phoneless demo user unless one with this uid exists. */
+    /**
+     * An account the old phone sign-in made. It keeps working (same uid,
+     * same role) until its owner saves an email account; no new ones.
+     * Returns null if there is no such account.
+     */
+    async signInLegacyPhone({ uid }) {
+      const doc = await users.findOne({ uid }, opts);
+      if (!doc || doc.isDemo) return null;
+      if (doc.phone !== undefined) await convertLegacyUser(db, doc);
+      const ts = now();
+      await users.updateOne({ uid }, { $set: { lastLoginAt: ts, updatedAt: ts } }, opts);
+      return this.getUserByUid(uid);
+    },
+
+    /** Seeding: adds a demo user (no email) unless one with this uid exists. */
     insertDemoUserIfMissing({ uid, role, name, workerId = null }) {
       const ts = now();
       return insertIfMissing(users, { uid }, {
@@ -484,8 +532,10 @@ export function createRepository(db, client, session = null, { phoneHashSecret =
         role,
         name,
         workerId,
-        phoneHash: null,
-        phoneMasked: null,
+        authProvider: "demo",
+        emailHash: null,
+        emailMasked: null,
+        emailVerified: false,
         isDemo: true,
         createdAt: ts,
         updatedAt: ts,
@@ -493,28 +543,29 @@ export function createRepository(db, client, session = null, { phoneHashSecret =
     },
 
     /**
-     * Admin operation (npm run grant-role): sets the role of the user with this
-     * phone number (found through its hash), or with this uid. If nobody has
-     * signed in with the number yet, the role is stored as pending and applied
-     * at their first sign-in.
+     * Admin operation (npm run grant-role): sets the role of the account
+     * saved with this email, or of this uid. The email must be verified for
+     * the role to apply now; otherwise (or if nobody has saved this email
+     * yet) it is stored as pending and applied when the account signs in with
+     * the email verified.
      * Returns { status: "updated" | "pending" | "not_found" }.
      */
-    async grantRole({ phone, uid, role, workerId = null }) {
+    async grantRole({ email, uid, role, workerId = null }) {
       const ts = now();
       const update = { $set: { role, workerId, updatedAt: ts } };
       if (uid) {
         const res = await users.updateOne({ uid }, update, opts);
         return { status: res.matchedCount ? "updated" : "not_found" };
       }
-      const hash = phoneHash(phone);
-      const res = await users.updateOne({ phoneHash: hash }, update, opts);
+      const hash = emailHash(email);
+      const res = await users.updateOne({ emailHash: hash, emailVerified: true, isDemo: false }, update, opts);
       if (res.matchedCount) {
         await pendingRoles.deleteOne({ _id: hash }, opts);
         return { status: "updated" };
       }
       await pendingRoles.updateOne(
         { _id: hash },
-        { $set: { role, workerId, updatedAt: ts }, $setOnInsert: { createdAt: ts } },
+        { $set: { kind: "email", role, workerId, updatedAt: ts }, $setOnInsert: { createdAt: ts } },
         { upsert: true, ...opts }
       );
       return { status: "pending" };
@@ -838,7 +889,7 @@ export function createRepository(db, client, session = null, { phoneHashSecret =
       let result;
       await client.withSession(async (s) => {
         await s.withTransaction(async () => {
-          result = await fn(createRepository(db, client, s, { phoneHashSecret }));
+          result = await fn(createRepository(db, client, s, { identityHashSecret }));
         });
       });
       return result;

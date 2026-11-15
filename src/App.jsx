@@ -3,12 +3,11 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { MotionConfig } from "motion/react";
 import AppErrorBoundary from "./components/AppErrorBoundary";
 import { AuthProvider } from "./context/AuthContext";
-import RequireRole from "./components/RequireRole";
+import RequireRole, { HomeRedirect } from "./components/RequireRole";
 import SessionLoading from "./components/SessionLoading";
-import Splash from "./pages/Splash";
 import ChooseRole from "./pages/ChooseRole";
 import CitizenHome from "./pages/CitizenHome";
-// Splash, login and the citizen Home are in the main bundle (the first
+// The start screen and the citizen Home are in the main bundle (the first
 // screens most people see); every other page downloads on its first visit.
 const PrivacyNotice = lazy(() => import("./pages/PrivacyNotice"));
 const WithdrawConsent = lazy(() => import("./pages/WithdrawConsent"));
@@ -54,7 +53,8 @@ export default function App() {
     <AuthProvider>
       <Suspense fallback={<SessionLoading message="Loading…" />}>
       <Routes>
-        <Route path="/" element={<Splash />} />
+        {/* No splash: straight to the citizen side (signed in silently), your own home, or the start screen. */}
+        <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<ChooseRole />} />
         <Route path="/privacy" element={<PrivacyNotice />} />
         {/* Any signed-in account; no consent gate (you can always leave or delete). */}

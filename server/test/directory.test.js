@@ -117,18 +117,19 @@ describe("worker directory (officials only)", () => {
     assert.equal((await api.call("GET", "/api/workers")).status, 401);
   });
 
-  test("add: validated, the phone kept only masked, ids generated", async () => {
-    for (const body of [{}, { name: "A" }, { name: "A", area: "B", status: "Asleep" }, { name: "A", area: "B", phone: "12345" }, { name: "A", area: "B", id: "w1" }, { name: "x".repeat(81), area: "B" }]) {
+  test("add: name + email (the email kept only masked and hashed), ids generated; no phone any more", async () => {
+    for (const body of [{}, { name: "A" }, { name: "A", email: "a@example.test", status: "Asleep" }, { name: "A", email: "a@example.test", phone: "+91 98765 43210" }, { name: "A", email: "a@example.test", id: "w1" }, { name: "x".repeat(81), email: "a@example.test" }]) {
       assert.equal((await api.call("POST", "/api/workers", { token: official.token, body })).status, 400, JSON.stringify(body));
     }
-    const res = await api.call("POST", "/api/workers", { token: official.token, body: { name: "  Meena  ", area: "Ganeshpur", phone: "+91 98765 43210", status: "On Duty" } });
+    const res = await api.call("POST", "/api/workers", { token: official.token, body: { name: "  Meena  ", email: "meena@example.test", area: "Ganeshpur", status: "On Duty" } });
     assert.equal(res.status, 201, JSON.stringify(res.json));
     const w = res.json.worker;
     assert.match(w.id, /^gw-\d+$/);
     assert.match(w.displayId, /^W\d{3}$/);
-    assert.deepEqual([w.name, w.area, w.status, w.role, w.phoneMasked, w.source], ["Meena", "Ganeshpur", "On Duty", "Sanitation Worker", "+91 98XXXXXX10", "GOVERNMENT"]);
+    assert.deepEqual([w.name, w.area, w.status, w.role, w.emailMasked, w.phoneMasked, w.source], ["Meena", "Ganeshpur", "On Duty", "Sanitation Worker", "me***@e***.test", null, "GOVERNMENT"]);
     const doc = await t.db.collection("workers").findOne({ _id: w.id });
-    assert.ok(!JSON.stringify(doc).includes("9876543210"), "the full number is never stored");
+    assert.ok(!JSON.stringify(doc).includes("meena@example.test"), "the address is never stored");
+    assert.match(doc.emailHash, /^[0-9a-f]{64}$/);
   });
 
   test("remove and restore; removed workers can't be assigned", async () => {

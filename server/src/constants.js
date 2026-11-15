@@ -136,10 +136,18 @@ export const FACILITY_LOCATION_TYPE = { bin: "dustbin", toilet: "public_toilet" 
 // Toilet rating categories (each optional, 1 to 5) and the consent items.
 // Shared by the API and the web app.
 export const RATING_CATEGORIES = ["cleanliness", "water", "lighting", "safety", "accessibility"];
-export const CONSENT_ITEMS = ["phoneForLogin", "locationWhenReporting", "photosAttached", "readNotice"];
+export const CONSENT_ITEMS = ["locationWhenReporting", "photosAttached", "readNotice"];
 // The privacy-notice version when ECOSETU_CONSENT_VERSION isn't set (and in
 // the browser-only build). Raise it when the notice changes.
-export const DEFAULT_CONSENT_VERSION = 1;
+// 2: no phone sign-in; anonymous citizens, optional saved email account.
+// 3: no anonymous sign-in; everyone has an email account.
+export const DEFAULT_CONSENT_VERSION = 3;
+
+// How an account signs in (users.authProvider). "phone" accounts were made by
+// the old phone sign-in and keep working; no new ones are made. "anonymous"
+// accounts ("Continue without account") can't sign in any more: npm run
+// migrate removes them.
+export const AUTH_PROVIDERS = ["anonymous", "password", "phone", "demo"];
 
 // Shown when a complaint was filed but its photo couldn't be stored.
 export const PHOTO_NOT_SAVED = "Photo could not be saved, your complaint was submitted without it.";

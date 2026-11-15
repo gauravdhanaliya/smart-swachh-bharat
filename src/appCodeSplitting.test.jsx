@@ -42,12 +42,12 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("code splitting", () => {
-  it("the login page and the citizen Home don't load the other pages' code", async () => {
+  it("the start screen and the citizen Home don't load the other pages' code", async () => {
     show("/login");
-    expect(screen.getByRole("heading", { name: "Log in to continue" })).toBeInTheDocument(); // rendered at once
+    expect(screen.getByRole("heading", { name: "Log in" })).toBeInTheDocument(); // rendered at once
     startSession("citizen", "Asha");
     show("/citizen");
-    expect(await screen.findByRole("heading", { name: /, Citizen!$/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: /^Hello/ })).toBeInTheDocument();
     expect([...loaded]).toEqual([]);
   });
 

@@ -23,20 +23,34 @@ export const keys = createLocalJWKSet({
   keys: [{ ...(await exportJWK(good.publicKey)), kid: "test-key", alg: "RS256", use: "sig" }],
 });
 
-// A stable, unique-per-uid phone number (phone numbers are unique per account).
+// A stable, unique-per-uid address for accounts saved with email + password.
+export const emailFor = (uid) => `${uid.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.|\.$/g, "") || "user"}@example.test`;
+// Legacy only: accounts made by the old phone sign-in.
 export const phoneFor = (uid) => `+91${(parseInt(crypto.createHash("sha1").update(uid).digest("hex").slice(0, 10), 16) % 9_000_000_000) + 1_000_000_000}`;
 
-/** Signs a Firebase-shaped ID token. Override fields to forge bad ones. */
+/**
+ * Signs a Firebase-shaped ID token. Override fields to forge bad ones.
+ *   provider "password" (default): an email + password account (`email`,
+ *     `emailVerified`, default the uid's address, verified)
+ *   provider "anonymous": refused by the API now (no anonymous sign-in)
+ *   provider "phone": the old phone sign-in (legacy accounts only)
+ */
 export function idToken({
   uid,
-  phone = phoneFor(uid),
+  provider = "password",
+  email = provider === "password" ? emailFor(uid) : undefined,
+  emailVerified = true,
+  phone = provider === "phone" ? phoneFor(uid) : undefined,
   projectId = PROJECT_ID,
   issuer = `https://securetoken.google.com/${projectId}`,
   audience = projectId,
   expiresIn = "1h",
   forged = false,
 } = {}) {
-  return new SignJWT({ phone_number: phone })
+  const claims = { firebase: { sign_in_provider: provider, identities: {} } };
+  if (email !== undefined) Object.assign(claims, { email, email_verified: emailVerified });
+  if (phone !== undefined) claims.phone_number = phone;
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: "RS256", kid: "test-key" })
     .setSubject(uid)
     .setIssuer(issuer)
@@ -54,6 +68,12 @@ export const TEST_ENV = {
   PHONE_HASH_SECRET: "test-phone-hash-secret-test-phone-hash",
   ECOSETU_AUTH_RATE_MAX: "100000", // rate limiting has its own test
   ECOSETU_WRITE_RATE_MAX: "100000",
+  ECOSETU_SIGNUP_RATE_MAX: "100000", // sign-ups per IP have their own test
+  ECOSETU_COMPLAINT_IP_RATE_MAX: "100000",
+  ECOSETU_RATING_RATE_MAX: "100000",
+  ECOSETU_RATING_IP_RATE_MAX: "100000",
+  ECOSETU_VOTE_RATE_MAX: "100000",
+  ECOSETU_VOTE_IP_RATE_MAX: "100000",
 };
 
 /**
@@ -92,7 +112,7 @@ export async function startTestServer(envOverrides = {}, { photos = createMemory
       throw err;
     }
   );
-  const repo = createRepository(connection.db, connection.client, null, { phoneHashSecret: config.phoneHashSecret });
+  const repo = createRepository(connection.db, connection.client, null, { identityHashSecret: config.identityHashSecret });
   const app = createApp({ config, repo, photoStore: photos, logSink: logger, verifyFirebase: createFirebaseVerifier(PROJECT_ID, { keys }), geoFetch, geoClock });
   const server = app.listen(0);
   await new Promise((r) => server.once("listening", r));
@@ -115,7 +135,8 @@ export async function startTestServer(envOverrides = {}, { photos = createMemory
  *   call(method, path, { token, body, headers, cookie })
  *   signIn(uid, { role, workerId, name })  -> { token, user, cookie }
  *   listAll(path, key, token)              -> every item, following the pages
- * Roles other than citizen are granted in the database first, as in production.
+ * Everyone signs in with an email account (verified). Staff roles are
+ * granted to the email first, as in production.
  */
 export function apiClient(t) {
   async function call(method, path, { token, body, headers = {}, cookie } = {}) {
@@ -139,9 +160,13 @@ export function apiClient(t) {
   }
 
   async function signIn(uid, { role = "citizen", workerId = null, name } = {}) {
-    const phone = phoneFor(uid);
-    if (role !== "citizen") await t.repo.grantRole({ phone: phone.slice(-10), role, workerId });
-    const res = await call("POST", "/api/auth/firebase", { body: { idToken: await idToken({ uid, phone }), ...(name ? { name } : {}) } });
+    let token;
+    if (role === "citizen") token = await idToken({ uid });
+    else {
+      await t.repo.grantRole({ email: emailFor(uid), role, workerId });
+      token = await idToken({ uid, provider: "password" });
+    }
+    const res = await call("POST", "/api/auth/firebase", { body: { idToken: token, ...(name ? { name } : {}) } });
     if (res.status !== 200) throw new Error(`sign-in failed for ${uid}: ${res.status} ${JSON.stringify(res.json)}`);
     const cookie = res.cookies.find((c) => c.startsWith("ssb_refresh="))?.split(";")[0] ?? "";
     return { token: res.json.accessToken, user: res.json.user, cookie };

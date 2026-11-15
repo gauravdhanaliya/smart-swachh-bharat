@@ -1,366 +1,311 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+// The start screen. A first visit asks for consent (consent.test.jsx); then
+// the card is the email login itself: Log in, Forgot password?, Create
+// account (a new account is a citizen at once, asked to verify its email by
+// a banner). "Try the demo" opens the three demo roles where the demo login
+// is on. There is no anonymous sign-in. The profile shows the account,
+// changes the password, and logs out.
+
+import { StrictMode } from "react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { acceptConsentForAll } from "../test/consent";
-import { demoLogin, openDemoSheet, otpBoxes, otpValue, phoneInput, queryOtpBoxes, requestOtp, sendOtpButton, typeOtp } from "../test/loginPage";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { acceptConsentForAll, firstVisit } from "../test/consent";
+import { agreeToConsent, demoLogin, logInWith, loginCard, openDemoSheet } from "../test/loginPage";
 
 // Leaflet needs a real layout engine; the map itself is not under test here.
 vi.mock("../components/FacilityMap", () => ({ default: () => <div data-testid="facility-map" /> }));
 
 vi.mock("../services/authService", () => ({
-  RECAPTCHA_CONTAINER_ID: "recaptcha-container",
-  sendOtp: vi.fn(),
-  confirmOtp: vi.fn(),
+  logIn: vi.fn(),
+  createAccount: vi.fn(),
+  sendPasswordReset: vi.fn(),
+  refreshAccount: vi.fn(),
+  resendVerification: vi.fn(),
+  changePassword: vi.fn(),
+  verifyPassword: vi.fn(),
+  deleteFirebaseAccount: vi.fn(),
+  firebaseAvailable: vi.fn(async () => true),
   signOutUser: vi.fn(),
-  resetPendingOtp: vi.fn(),
 }));
 
 import App from "../App";
-import { confirmOtp, sendOtp, signOutUser } from "../services/authService";
-import { readSession, startOtpSession, startSession } from "../services/authSession";
+import * as authService from "../services/authService";
+import { readSession, startEmailSession, startSession } from "../services/authSession";
 
 function Probe() {
   return <output data-testid="path">{useLocation().pathname}</output>;
 }
 
-function renderApp(path = "/login") {
-  return render(
+function renderApp(path = "/", { strict = false } = {}) {
+  const tree = (
     <MemoryRouter initialEntries={[path]}>
       <App />
       <Probe />
     </MemoryRouter>
   );
+  return render(strict ? <StrictMode>{tree}</StrictMode> : tree);
 }
 
 const path = () => screen.getByTestId("path").textContent;
+const authError = (code) => Object.assign(new Error(code), { code });
+const account = (uid, email = "asha@example.test", verified = true) => ({ uid, idToken: `t-${uid}`, email, emailVerified: verified });
 
 beforeEach(() => {
-  acceptConsentForAll("fb-uid-1"); // the consent screen has its own tests (consent.test.jsx)
-  sendOtp.mockReset().mockResolvedValue();
-  confirmOtp.mockReset().mockResolvedValue({ uid: "fb-uid-1" });
-  signOutUser.mockReset().mockResolvedValue();
+  acceptConsentForAll("saved-9", "new-5", "me-1"); // the consent screen has its own tests (consent.test.jsx)
+  for (const fn of Object.values(authService)) fn.mockReset?.();
+  authService.sendPasswordReset.mockResolvedValue();
+  authService.resendVerification.mockResolvedValue();
+  authService.signOutUser.mockResolvedValue();
+  authService.firebaseAvailable.mockResolvedValue(true);
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
-describe("login page", () => {
-  it("is short and neutral: compact header, one heading, phone first", () => {
-    renderApp();
-    expect(screen.getByRole("heading", { level: 1, name: /smart swachh bharat/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "Log in to continue" })).toBeInTheDocument();
-    expect(screen.getByText("Report it. Track it. Keep it clean.")).toBeInTheDocument();
-    for (const gone of [/welcome back/i, /connecting citizens/i, /cleaner india/i, /choose how you want to log in/i, /\|/]) {
-      expect(screen.queryByText(gone)).not.toBeInTheDocument();
-    }
-    expect(screen.getByText("Hackathon prototype — not an official government service")).toBeInTheDocument();
+describe("start screen", () => {
+  it("is the email login form itself: email, password, Log in, Forgot password?, Create account; no anonymous way in", async () => {
+    renderApp("/");
+    await waitFor(() => expect(path()).toBe("/login"));
+    expect(await screen.findByRole("heading", { level: 1, name: /smart swachh bharat/i })).toBeInTheDocument();
+    const card = await loginCard();
+    expect(within(card).getByRole("heading", { name: "Log in" })).toBeInTheDocument();
+    expect(within(card).getByLabelText(/^email$/i)).toHaveAttribute("autocomplete", "email");
+    expect(within(card).getByLabelText(/^password$/i)).toHaveAttribute("autocomplete", "current-password");
+    expect(within(card).getByRole("button", { name: /^log in$/i })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: /forgot password/i })).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: /create account/i })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(); // not a sheet
+    expect(screen.queryByText(/continue without account|continue as citizen/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/mobile number|otp/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Hackathon prototype, not an official government service")).toBeInTheDocument();
+    // "Try the demo" is an outlined button inside the card
+    expect(within(card).getByRole("button", { name: /^try the demo$/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /privacy notice/i })).toHaveAttribute("href", "/privacy");
-    // The phone field is the first field on the page.
-    expect(screen.getAllByRole("textbox")[0]).toBe(phoneInput());
   });
 
-  it("puts +91 inside the phone field and asks for the numeric keypad", () => {
-    renderApp();
-    const field = phoneInput();
-    expect(field).toHaveAttribute("inputmode", "numeric");
-    expect(field).toHaveAttribute("autocomplete", "tel-national");
-    expect(field).toHaveAttribute("type", "tel");
-    const wrapper = field.closest("[data-field]");
-    expect(within(wrapper).getByText("+91")).toBeInTheDocument();
-    expect(screen.getByText("Mobile number").tagName).toBe("LABEL"); // a visible label, not a placeholder
-  });
-
-  it("shows no demo cards and no name field on the page itself", () => {
-    renderApp();
-    expect(screen.queryByRole("button", { name: /sanitation worker|government official/i })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/your name/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /try the demo/i })).toBeInTheDocument();
-  });
-});
-
-describe("phone step", () => {
-  it("keeps Send OTP disabled until 10 valid digits are entered", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    expect(sendOtpButton()).toBeDisabled();
-    await user.type(phoneInput(), "98765");
-    expect(sendOtpButton()).toBeDisabled();
-    await user.type(phoneInput(), "43210");
-    expect(sendOtpButton()).toBeEnabled();
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("explains a full number that can't be an Indian mobile, under the field", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    await user.type(phoneInput(), "5876543210");
-    expect(sendOtpButton()).toBeDisabled();
-    const error = screen.getByRole("alert");
-    expect(error).toHaveTextContent(/valid 10 digit/i);
-    expect(phoneInput()).toHaveAttribute("aria-invalid", "true");
-    expect(phoneInput().getAttribute("aria-describedby")).toContain(error.id);
-    await user.click(sendOtpButton());
-    expect(sendOtp).not.toHaveBeenCalled();
-  });
-
-  it("only lets digits into the phone field, up to 10", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    await user.type(phoneInput(), "98a7 6-54321099");
-    expect(phoneInput()).toHaveValue("9876543210");
-  });
-
-  it.each([
-    ["auth/too-many-requests", /too many attempts/i],
-    ["auth/network-request-failed", /network/i],
-    ["auth/invalid-phone-number", /valid 10 digit/i],
-    ["auth/not-configured", /not set up/i],
-  ])("shows a clear error when sending fails with %s, and stays on the phone step", async (code, message) => {
-    sendOtp.mockRejectedValue({ code });
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    expect(await screen.findByRole("alert")).toHaveTextContent(message);
-    expect(queryOtpBoxes()).toHaveLength(0);
-    expect(phoneInput()).toHaveValue("9876543210");
-  });
-});
-
-describe("OTP step", () => {
-  it("replaces the phone step with six one-digit boxes and focuses the first", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    expect(sendOtp).toHaveBeenCalledWith("9876543210");
-    const boxes = await screen.findAllByRole("textbox", { name: /^digit \d of 6$/i });
-    expect(boxes).toHaveLength(6);
-    expect(screen.queryByLabelText(/mobile number/i)).not.toBeInTheDocument();
-    await waitFor(() => expect(boxes[0]).toHaveFocus());
-    // The first box takes a whole autofilled code (iOS fills only the first field); the rest hold one digit.
-    expect(boxes[0]).toHaveAttribute("autocomplete", "one-time-code");
-    expect(boxes[0]).toHaveAttribute("maxlength", "6");
-    for (const box of boxes) expect(box).toHaveAttribute("inputmode", "numeric");
-    for (const box of boxes.slice(1)) expect(box).toHaveAttribute("maxlength", "1");
-    expect(screen.getByRole("group", { name: /enter the 6 digit code/i })).toHaveAccessibleDescription(/\+91 98XXXXXX10/);
-  });
-
-  it("moves along as digits are typed and back with Backspace", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    await typeOtp(user, "12a3");
-    expect(otpValue()).toBe("123");
-    expect(otpBoxes()[3]).toHaveFocus();
-    await user.keyboard("{Backspace}");
-    expect(otpBoxes()[2]).toHaveFocus();
-    expect(otpValue()).toBe("12");
-  });
-
-  it("accepts a pasted code, wherever it is pasted", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    await user.click(otpBoxes()[3]);
-    await user.paste(" 123-456 ");
-    expect(otpValue()).toBe("123456");
-    expect(otpBoxes()[5]).toHaveFocus();
-    expect(screen.getByRole("button", { name: /verify/i })).toBeEnabled();
-  });
-
-  it("accepts the whole code from SMS autofill into the first box", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    // Autofill sets the first box's value in one go, like a change event with 6 characters.
-    fireEvent.change(otpBoxes()[0], { target: { value: "654321" } });
-    expect(otpValue()).toBe("654321");
-  });
-
-  it("keeps Verify disabled until all 6 digits are in", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    await typeOtp(user, "123");
-    expect(screen.getByRole("button", { name: /verify/i })).toBeDisabled();
-    await user.keyboard("456");
-    expect(screen.getByRole("button", { name: /verify/i })).toBeEnabled();
-  });
-
-  it("signs a verified user in as a citizen and opens the citizen dashboard", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    await typeOtp(user, "123456");
-    await user.click(screen.getByRole("button", { name: /verify/i }));
-
-    expect(await screen.findByRole("heading", { name: /citizen!/i })).toBeInTheDocument();
-    expect(path()).toBe("/citizen");
-    expect(confirmOtp).toHaveBeenCalledWith("123456");
-    expect(readSession()).toMatchObject({ id: "fb-uid-1", role: "citizen", method: "otp", phone: "+91 98XXXXXX10" });
-    // Nothing sensitive is left in storage.
-    const everything = JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage });
-    expect(everything).not.toContain("123456");
-    expect(everything).not.toContain("9876543210");
-  });
-
-  it("shows a wrong OTP inline under the boxes, announced, and stays on the login page", async () => {
-    confirmOtp.mockRejectedValue({ code: "auth/invalid-verification-code" });
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    await typeOtp(user, "000000");
-    await user.click(screen.getByRole("button", { name: /verify/i }));
-    const error = await screen.findByRole("alert");
-    expect(error).toHaveTextContent(/incorrect/i);
-    const group = screen.getByRole("group", { name: /enter the 6 digit code/i });
-    expect(group.compareDocumentPosition(error) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    for (const box of otpBoxes()) expect(box).toHaveAttribute("aria-invalid", "true");
-    expect(otpBoxes()[0].getAttribute("aria-describedby")).toContain(error.id);
-    expect(path()).toBe("/login");
+  it("every page, signed out, goes to the start screen and signs nothing in", () => {
+    for (const target of ["/citizen", "/citizen/map", "/worker", "/official"]) {
+      const { unmount } = renderApp(target);
+      expect(path()).toBe("/login");
+      unmount();
+    }
+    expect(authService.logIn).not.toHaveBeenCalled();
     expect(readSession()).toBeNull();
   });
 
-  it("after a wrong code: boxes cleared, first focused, red until the user types, nothing selected", async () => {
-    confirmOtp.mockRejectedValueOnce({ code: "auth/invalid-verification-code" });
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    await typeOtp(user, "000000");
-    await user.click(screen.getByRole("button", { name: /verify/i }));
-    await screen.findByRole("alert");
-
-    expect(otpValue()).toBe("");
-    await waitFor(() => expect(otpBoxes()[0]).toHaveFocus());
-    const active = document.activeElement;
-    expect(active.selectionEnd - active.selectionStart).toBe(0); // no highlighted digit
-    for (const box of otpBoxes()) {
-      expect(box).toHaveAttribute("aria-invalid", "true");
-      expect(box.className).toMatch(/\bborder-red-400\b/);
-    }
-    expect(screen.getByRole("button", { name: /verify/i })).toBeDisabled();
-
-    // The first digit typed ends the error state for every box.
-    await user.keyboard("1");
-    expect(otpValue()).toBe("1");
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    for (const box of otpBoxes()) {
-      expect(box).not.toHaveAttribute("aria-invalid");
-      expect(box.className).not.toMatch(/\bborder-red-400\b/);
-    }
-    expect(otpBoxes()[1]).toHaveFocus();
+  it.each(["/citizen", "/citizen/map", "/citizen/report"])("signed out, %s shows the start screen's login card (nothing of the page)", async (target) => {
+    renderApp(target);
+    expect(await loginCard()).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Main" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
   });
 
-  it.each([
-    ["auth/code-expired", /expired/i],
-    ["auth/too-many-requests", /too many attempts/i],
-    ["auth/network-request-failed", /network/i],
-  ])("shows a clear error when verifying fails with %s", async (code, message) => {
-    confirmOtp.mockRejectedValue({ code });
+  it("logs in and goes to the home the server's role gives (a citizen here)", async () => {
+    authService.logIn.mockResolvedValue(account("saved-9"));
     const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    await typeOtp(user, "123456");
-    await user.click(screen.getByRole("button", { name: /verify/i }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    renderApp("/login");
+    await logInWith(user, "asha@example.test", "s3cret-pass");
+    expect(authService.logIn).toHaveBeenCalledWith({ email: "asha@example.test", password: "s3cret-pass" });
+    await waitFor(() => expect(path()).toBe("/citizen"));
+    expect(readSession()).toMatchObject({ id: "saved-9", role: "citizen", method: "email", email: "as***@e***.test" });
+  });
+
+  it("under StrictMode a double tap logs in once", async () => {
+    authService.logIn.mockResolvedValue(account("saved-9"));
+    const user = userEvent.setup();
+    renderApp("/login", { strict: true });
+    const card = await loginCard();
+    await user.type(within(card).getByLabelText(/^email$/i), "asha@example.test");
+    await user.type(within(card).getByLabelText(/^password$/i), "s3cret-pass");
+    const button = within(card).getByRole("button", { name: /^log in$/i });
+    await user.click(button);
+    await user.click(button).catch(() => {});
+    await waitFor(() => expect(path()).toBe("/citizen"));
+    expect(authService.logIn).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks the fields first: errors under each field, and nothing is sent", async () => {
+    const user = userEvent.setup();
+    renderApp("/login");
+    const card = await loginCard();
+    await user.type(within(card).getByLabelText(/^email$/i), "not-an-email");
+    await user.click(within(card).getByRole("button", { name: /^log in$/i }));
+    expect(within(card).getByLabelText(/^email$/i)).toHaveAttribute("aria-invalid", "true");
+    expect(within(card).getByLabelText(/^email$/i)).toHaveAccessibleDescription(/valid email/i);
+    expect(within(card).getByLabelText(/^password$/i)).toHaveAccessibleDescription(/enter your password/i);
+    expect(authService.logIn).not.toHaveBeenCalled();
+  });
+
+  it("a wrong password and an unknown email get the same message", async () => {
+    const user = userEvent.setup();
+    renderApp("/login");
+    const card = await loginCard();
+    const messages = [];
+    for (const code of ["auth/invalid-credential", "auth/user-not-found", "auth/wrong-password"]) {
+      authService.logIn.mockRejectedValueOnce(authError(code));
+      await user.clear(within(card).getByLabelText(/^email$/i));
+      await user.type(within(card).getByLabelText(/^email$/i), "asha@example.test");
+      await user.clear(within(card).getByLabelText(/^password$/i));
+      await user.type(within(card).getByLabelText(/^password$/i), "nope-nope");
+      await user.click(within(card).getByRole("button", { name: /^log in$/i }));
+      messages.push((await within(card).findByRole("alert")).textContent);
+    }
+    expect(new Set(messages).size).toBe(1);
+    expect(messages[0]).toMatch(/email or password is wrong/i);
     expect(readSession()).toBeNull();
   });
 
-  it("allows a resend only after a 30 second cooldown", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    renderApp();
-    await requestOtp(user);
-    // The countdown's interval starts in a passive effect, which React flushes
-    // on a later task. Flush it now, so the interval exists (on the fake clock)
-    // before the clock is advanced; otherwise this test depends on timing.
-    await act(async () => {});
-
-    const resend = screen.getByRole("button", { name: /resend otp/i });
-    expect(resend).toBeDisabled();
-    expect(resend).toHaveTextContent(/30s/);
-
-    // The fake clock also runs with real time (shouldAdvanceTime), so leave a
-    // few seconds of margin for a busy machine on either side of 30 s.
-    act(() => vi.advanceTimersByTime(25000));
-    expect(resend).toBeDisabled();
-
-    act(() => vi.advanceTimersByTime(6000));
-    expect(resend).toBeEnabled();
-
-    await user.click(resend);
-    expect(sendOtp).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("button", { name: /resend otp/i })).toBeDisabled();
-  });
-
-  it("Change number goes back to the phone step with the number kept and focused", async () => {
+  it("without Firebase in this build, logging in says so and points to the demo", async () => {
+    authService.logIn.mockRejectedValue(authError("auth/not-configured"));
     const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    await user.click(screen.getByRole("button", { name: /change number/i }));
-    const field = await screen.findByLabelText(/mobile number/i);
-    expect(field).toHaveValue("9876543210");
-    await waitFor(() => expect(field).toHaveFocus());
-    expect(queryOtpBoxes()).toHaveLength(0);
-  });
-
-  it("controls are at least 44px touch targets", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    await requestOtp(user);
-    for (const name of [/change number/i, /resend otp/i, /verify/i]) {
-      expect(screen.getByRole("button", { name }).className).toMatch(/\bmin-h-11\b|\bh-12\b/);
-    }
-    for (const box of otpBoxes()) expect(box.className).toMatch(/\bh-12\b/);
+    renderApp("/login");
+    await logInWith(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/aren't set up on this build.*demo/i);
   });
 });
 
-describe("demo login (browser-only build: always offered)", () => {
-  it("opens a sheet of three roles, with no name field", async () => {
+describe("create account", () => {
+  const openCreate = async (user) => {
+    const card = await loginCard();
+    await user.click(within(card).getByRole("button", { name: /create account/i }));
+    return screen.findByRole("region", { name: "Create account" });
+  };
+
+  it("makes a citizen who can use the app at once, and asks them to verify their email", async () => {
+    authService.createAccount.mockResolvedValue({ ...account("new-5", "new@example.test", false), verificationSent: true });
     const user = userEvent.setup();
-    renderApp();
+    renderApp("/login");
+    const card = await openCreate(user);
+    expect(within(card).getByLabelText(/choose a password/i)).toHaveAttribute("autocomplete", "new-password");
+    expect(within(card).getByLabelText(/choose a password/i)).toHaveAccessibleDescription(/at least 8 characters/i);
+    await user.type(within(card).getByLabelText(/^email$/i), "new@example.test");
+    await user.type(within(card).getByLabelText(/choose a password/i), "s3cret-pass");
+    await user.click(within(card).getByRole("button", { name: /^create account$/i }));
+    expect(authService.createAccount).toHaveBeenCalledWith({ email: "new@example.test", password: "s3cret-pass" });
+    await waitFor(() => expect(path()).toBe("/citizen"));
+    expect(readSession()).toMatchObject({ id: "new-5", role: "citizen", method: "email", emailVerified: false });
+    const banner = await screen.findByRole("region", { name: /verify your email/i });
+    expect(banner).toHaveTextContent("ne***@e***.test");
+  });
+
+  it("with an email that already has an account, doesn't say so", async () => {
+    authService.createAccount.mockRejectedValue(authError("auth/account-not-created"));
+    const user = userEvent.setup();
+    renderApp("/login");
+    const card = await openCreate(user);
+    await user.type(within(card).getByLabelText(/^email$/i), "taken@example.test");
+    await user.type(within(card).getByLabelText(/choose a password/i), "s3cret-pass");
+    await user.click(within(card).getByRole("button", { name: /^create account$/i }));
+    const alert = await within(card).findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn't use that email for a new account/i);
+    expect(alert.textContent).not.toMatch(/already (has|exists|registered|in use)|taken/i);
+    expect(readSession()).toBeNull();
+  });
+
+  it("asks for 8+ characters before sending anything", async () => {
+    const user = userEvent.setup();
+    renderApp("/login");
+    const card = await openCreate(user);
+    await user.type(within(card).getByLabelText(/^email$/i), "new@example.test");
+    await user.type(within(card).getByLabelText(/choose a password/i), "short");
+    await user.click(within(card).getByRole("button", { name: /^create account$/i }));
+    expect(within(card).getByLabelText(/choose a password/i)).toHaveAccessibleDescription(/use at least 8 characters/i);
+    expect(authService.createAccount).not.toHaveBeenCalled();
+  });
+});
+
+describe("forgot password", () => {
+  it("sends the link and shows the same confirmation for any email, then goes back to log in", async () => {
+    const user = userEvent.setup();
+    renderApp("/login");
+    await user.click(within(await loginCard()).getByRole("button", { name: /forgot password/i }));
+    const card = await screen.findByRole("region", { name: /reset your password/i });
+    await user.type(within(card).getByLabelText(/^email$/i), "anyone@example.test");
+    await user.click(within(card).getByRole("button", { name: /send reset link/i }));
+    expect(authService.sendPasswordReset).toHaveBeenCalledWith("anyone@example.test");
+    const sent = await screen.findByRole("region", { name: /check your inbox/i });
+    expect(within(sent).getByRole("status")).toHaveTextContent(/if anyone@example.test has an ecosetu account/i);
+    await user.click(within(sent).getByRole("button", { name: /back to log in/i }));
+    expect(await screen.findByRole("region", { name: "Log in" })).toBeInTheDocument();
+  });
+});
+
+describe("Verify your email banner", () => {
+  const unverified = () => startEmailSession({ uid: "me-1", email: "asha@example.test", emailVerified: false });
+
+  it("shows until the email is verified, can resend the email, and picks up 'verified'", async () => {
+    unverified();
+    authService.refreshAccount.mockResolvedValue(account("me-1", "asha@example.test", true));
+    const user = userEvent.setup();
+    renderApp("/citizen");
+    const banner = await screen.findByRole("region", { name: /verify your email/i });
+    await user.click(within(banner).getByRole("button", { name: /resend email/i }));
+    expect(authService.resendVerification).toHaveBeenCalled();
+    expect(await within(banner).findByText(/sent again/i)).toBeInTheDocument();
+    await user.click(within(banner).getByRole("button", { name: /i've verified it/i }));
+    await waitFor(() => expect(screen.queryByRole("region", { name: /verify your email/i })).not.toBeInTheDocument());
+    expect(readSession().emailVerified).toBe(true);
+  });
+
+  it("can be dismissed for this session", async () => {
+    unverified();
+    const user = userEvent.setup();
+    const { unmount } = renderApp("/citizen");
+    await user.click(within(await screen.findByRole("region", { name: /verify your email/i })).getByRole("button", { name: /dismiss/i }));
+    await waitFor(() => expect(screen.queryByRole("region", { name: /verify your email/i })).not.toBeInTheDocument());
+    unmount();
+    renderApp("/citizen/map");
+    await screen.findByTestId("path");
+    expect(screen.queryByRole("region", { name: /verify your email/i })).not.toBeInTheDocument();
+  });
+
+  it("isn't shown to a verified account or a demo account", async () => {
+    startEmailSession({ uid: "me-1", email: "asha@example.test", emailVerified: true });
+    const first = renderApp("/citizen");
+    expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /verify your email/i })).not.toBeInTheDocument();
+    first.unmount();
+    startSession("citizen", "");
+    renderApp("/citizen");
+    expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /verify your email/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("try the demo", () => {
+  it("opens a sheet with Citizen, Sanitation Worker and Government Official", async () => {
+    const user = userEvent.setup();
+    renderApp("/login");
     const sheet = await openDemoSheet(user);
     expect(sheet).toHaveAttribute("aria-modal", "true");
-    for (const role of [/^citizen/i, /sanitation worker/i, /government official/i]) {
-      expect(within(sheet).getByRole("button", { name: role })).toBeInTheDocument();
-    }
+    const rows = within(sheet).getAllByRole("button").filter((b) => b.getAttribute("aria-label") !== "Close");
+    expect(rows.map((r) => r.textContent)).toEqual([expect.stringMatching(/^Citizen/), expect.stringMatching(/^Sanitation Worker/), expect.stringMatching(/^Government Official/)]);
     expect(within(sheet).queryByRole("textbox")).not.toBeInTheDocument();
   });
 
   it.each([
-    [/^citizen/i, "citizen", "/citizen", "Demo Citizen"],
-    [/sanitation worker/i, "worker", "/worker", undefined],
-    [/government official/i, "official", "/official", "Demo Official"],
-  ])("signs in through the %s row", async (row, role, home, name) => {
+    [/^citizen/i, "citizen", "/citizen"],
+    [/sanitation worker/i, "worker", "/worker"],
+    [/government official/i, "official", "/official"],
+  ])("signs in through the %s row", async (row, role, home) => {
     const user = userEvent.setup();
-    renderApp();
+    renderApp("/login");
     await demoLogin(user, row);
-    expect(path()).toBe(home);
-    expect(readSession()).toMatchObject({ role, method: "demo", ...(name ? { name } : {}) });
-    expect(sendOtp).not.toHaveBeenCalled();
+    await waitFor(() => expect(path()).toBe(home));
+    expect(readSession()).toMatchObject({ role, method: "demo" });
+    expect(authService.logIn).not.toHaveBeenCalled();
   });
 
   it("closes on Escape and gives focus back to the link", async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderApp("/login");
     await openDemoSheet(user);
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    await waitFor(() => expect(screen.getByRole("button", { name: /try the demo/i })).toHaveFocus());
-  });
-
-  it("closes with its Close button", async () => {
-    const user = userEvent.setup();
-    renderApp();
-    const sheet = await openDemoSheet(user);
-    await user.click(within(sheet).getByRole("button", { name: /^close$/i }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: /^try the demo$/i })).toHaveFocus());
   });
 
   it("keeps keyboard focus inside the sheet", async () => {
     const user = userEvent.setup();
-    renderApp();
+    renderApp("/login");
     const sheet = await openDemoSheet(user);
     await waitFor(() => expect(sheet.contains(document.activeElement)).toBe(true));
     const focusable = within(sheet).getAllByRole("button");
@@ -371,24 +316,79 @@ describe("demo login (browser-only build: always offered)", () => {
     focusable[0].focus();
     await user.tab({ shift: true });
     expect(document.activeElement).toBe(focusable.at(-1));
-    await user.tab();
-    expect(document.activeElement).toBe(focusable[0]);
   });
 });
 
-describe("role guard for OTP users", () => {
-  it.each(["/worker", "/worker/tasks", "/official", "/official/complaints", "/official/workers"])(
-    "sends an OTP citizen away from %s",
-    async (target) => {
-      startOtpSession({ uid: "fb-uid-1", phone: "9876543210" });
-      renderApp(target);
-      expect(await screen.findByRole("heading", { name: /citizen!/i })).toBeInTheDocument();
-      expect(path()).toBe("/citizen");
-    }
-  );
+describe("profile: your account", () => {
+  const section = () => screen.findByRole("region", { name: /your account/i });
 
-  it("treats an OTP session edited to a staff role as signed out", () => {
-    startOtpSession({ uid: "fb-uid-1", phone: "9876543210" });
+  it("shows the masked email and whether it is verified; no 'Save my account'", async () => {
+    startEmailSession({ uid: "me-1", email: "asha.verma@example.test", emailVerified: false });
+    renderApp("/citizen/profile");
+    const s = await section();
+    expect(within(s).getByText(/signed in as/i)).toHaveTextContent("Signed in as as***@e***.test · not verified yet");
+    expect(within(s).queryByRole("form", { name: /save my account/i })).not.toBeInTheDocument();
+    expect(within(s).queryByText(/save my account|log in to a saved account/i)).not.toBeInTheDocument();
+  });
+
+  it("changes the password: current first, then a new one of 8+ characters", async () => {
+    startEmailSession({ uid: "me-1", email: "asha@example.test", emailVerified: true });
+    authService.changePassword.mockResolvedValue();
+    const user = userEvent.setup();
+    renderApp("/citizen/profile");
+    const s = await section();
+    await user.click(within(s).getByRole("button", { name: /^change password$/i }));
+    const form = within(s).getByRole("form", { name: /change password/i });
+    const submit = within(form).getByRole("button", { name: /^change password$/i });
+    await user.type(within(form).getByLabelText(/current password/i), "old-pass-1");
+    await user.type(within(form).getByLabelText(/^new password$/i), "short");
+    expect(submit).toBeDisabled();
+    await user.type(within(form).getByLabelText(/^new password$/i), "-and-long");
+    await user.click(submit);
+    expect(authService.changePassword).toHaveBeenCalledWith({ current: "old-pass-1", next: "short-and-long" });
+    expect(await within(form).findByText("Password changed.")).toBeInTheDocument();
+  });
+
+  it("a wrong current password is explained", async () => {
+    startEmailSession({ uid: "me-1", email: "asha@example.test", emailVerified: true });
+    authService.changePassword.mockRejectedValue(authError("auth/invalid-credential"));
+    const user = userEvent.setup();
+    renderApp("/citizen/profile");
+    const s = await section();
+    await user.click(within(s).getByRole("button", { name: /^change password$/i }));
+    const form = within(s).getByRole("form", { name: /change password/i });
+    await user.type(within(form).getByLabelText(/current password/i), "wrong-one");
+    await user.type(within(form).getByLabelText(/^new password$/i), "new-pass-22");
+    await user.click(within(form).getByRole("button", { name: /^change password$/i }));
+    expect(await within(form).findByRole("alert")).toHaveTextContent(/email or password is wrong/i);
+  });
+
+  it("an optional name can be set (and cleared back to anonymous)", async () => {
+    startEmailSession({ uid: "me-1", email: "asha@example.test", emailVerified: true });
+    const user = userEvent.setup();
+    renderApp("/citizen/profile");
+    const s = await section();
+    const name = within(s).getByLabelText(/name/i);
+    expect(name).toHaveValue("");
+    await user.type(name, "Asha");
+    await user.click(within(s).getByRole("button", { name: /^save$/i }));
+    expect(await within(s).findByText("Name saved.")).toBeInTheDocument();
+    expect(readSession().name).toBe("Asha");
+    await user.clear(name);
+    await user.click(within(s).getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(readSession().name).toBe("citizen"));
+  });
+});
+
+describe("role guard for citizens", () => {
+  it.each(["/worker", "/worker/tasks", "/official", "/official/complaints", "/official/workers"])("sends a citizen away from %s", async (target) => {
+    startEmailSession({ uid: "me-1", email: "asha@example.test", emailVerified: true });
+    renderApp(target);
+    await waitFor(() => expect(path()).toBe("/citizen"));
+  });
+
+  it("treats a citizen session edited to a staff role as signed out", () => {
+    startEmailSession({ uid: "me-1", email: "asha@example.test" });
     const key = "ssb_auth_session_v1";
     localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key)), role: "official" }));
     renderApp("/official");
@@ -399,27 +399,40 @@ describe("role guard for OTP users", () => {
 describe("logout", () => {
   async function logoutFromProfile(user) {
     await user.click(await screen.findByRole("button", { name: /^logout$/i }));
+    expect(screen.getByText(/you can log back in with your email and password/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^log out$/i }));
   }
 
-  it("signs an OTP user out of Firebase and clears the session", async () => {
-    startOtpSession({ uid: "fb-uid-1", phone: "9876543210" });
+  it("signs out of Firebase, clears the session and this device's agreement (the next person is asked again)", async () => {
+    startEmailSession({ uid: "me-1", email: "asha@example.test", emailVerified: true });
     const user = userEvent.setup();
     renderApp("/citizen/profile");
-    expect(await screen.findByText("+91 98XXXXXX10")).toBeInTheDocument();
     await logoutFromProfile(user);
-    expect(signOutUser).toHaveBeenCalledTimes(1);
+    expect(authService.signOutUser).toHaveBeenCalledTimes(1);
     expect(readSession()).toBeNull();
-    expect(path()).toBe("/login");
+    await waitFor(() => expect(path()).toBe("/login"));
+    expect(await screen.findByRole("heading", { level: 1, name: "Before you start" })).toBeInTheDocument();
   });
 
   it("clears a demo session without calling Firebase", async () => {
     startSession("citizen", "Asha");
     const user = userEvent.setup();
     renderApp("/citizen/profile");
-    await logoutFromProfile(user);
-    expect(signOutUser).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole("button", { name: /^logout$/i }));
+    await user.click(screen.getByRole("button", { name: /^log out$/i }));
+    expect(authService.signOutUser).not.toHaveBeenCalled();
     expect(readSession()).toBeNull();
-    expect(path()).toBe("/login");
+    await waitFor(() => expect(path()).toBe("/login"));
+  });
+});
+
+describe("a first visit", () => {
+  it("shows the consent step first, then the login card; nothing is sent before", async () => {
+    firstVisit();
+    const user = userEvent.setup();
+    renderApp("/");
+    await agreeToConsent(user);
+    expect(await loginCard()).toBeInTheDocument();
+    expect(authService.logIn).not.toHaveBeenCalled();
   });
 });

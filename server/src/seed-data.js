@@ -121,8 +121,8 @@ export const DEMO_WORKERS = [
   { id: "w2", displayId: "W002", name: "Ramesh Kumar", role: "Sanitation Worker", area: "COER University & Haridwar Road", status: "On Duty", phoneMasked: "+91 98XXXXXX02" },
 ];
 
-// Demo accounts for the labelled demo login. They have no phone number, so
-// nobody can sign in as them through OTP.
+// Demo accounts for the labelled demo login. A Firebase sign-in (anonymous,
+// email or phone) can never reach them: only POST /api/auth/demo can.
 export const DEMO_USERS = [
   { uid: "demo-citizen", role: "citizen", name: "Demo Citizen", workerId: null },
   { uid: "demo-worker", role: "worker", name: "Vikash Kumar", workerId: "w1" },

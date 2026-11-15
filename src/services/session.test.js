@@ -35,11 +35,12 @@ describe("signing in", () => {
     expect(server.calls.at(-1).body).toEqual({ role: "worker" });
   });
 
-  it("phone login hands the Firebase ID token to the server", async () => {
+  it("an email sign-in hands only the Firebase ID token to the server; the role comes back from it", async () => {
     const server = createFakeAuthServer();
-    const session = await tab(server).loginFirebase("good-firebase-id-token");
-    expect(session.user).toMatchObject({ uid: "fb-user", role: "citizen" });
-    expect(server.calls.at(-1)).toMatchObject({ path: "/api/auth/firebase", body: { idToken: "good-firebase-id-token" } });
+    const session = await tab(server).loginFirebase("email:fb-user-1:as***@e***.test:1");
+    expect(session.user).toMatchObject({ uid: "fb-user-1", role: "citizen", account: { type: "email", email: "as***@e***.test" } });
+    expect(server.calls.at(-1)).toMatchObject({ path: "/api/auth/firebase", body: { idToken: "email:fb-user-1:as***@e***.test:1" } });
+    expect(Object.keys(server.calls.at(-1).body)).toEqual(["idToken"]);
   });
 });
 
@@ -89,13 +90,14 @@ describe("b. restoring on page load happens once", () => {
     expect(server.count("/api/auth/refresh")).toBe(1, "a later call reuses the result");
   });
 
-  it("with no earlier session, restore resolves to null quietly", async () => {
+  it("with no earlier session, restore resolves to null quietly, without asking the server", async () => {
     const server = createFakeAuthServer();
     const onChange = vi.fn();
     const client = tab(server);
     client.onChange(onChange);
     await expect(client.restore()).resolves.toBeNull();
     expect(onChange).not.toHaveBeenCalledWith(expect.objectContaining({ reason: "expired" }));
+    expect(server.calls).toHaveLength(0); // a first visit makes no request before the user has agreed to anything
   });
 });
 

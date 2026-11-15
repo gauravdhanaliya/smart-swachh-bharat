@@ -12,7 +12,7 @@ import {
 } from "./constants.js";
 import { CONSENT_ITEMS, RATING_CATEGORIES } from "./schemas.js";
 import { ValidationError, onlyFields, parseCoordinates, photo, rejectUnknown, text } from "./validate.js";
-import { maskPhone, normalisePhone } from "./phone.js";
+import { normaliseEmail } from "./email.js";
 
 const isPlainObject = (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v);
 const fail = (errors) => {
@@ -158,12 +158,11 @@ export function validateRating(body) {
 }
 
 /**
- * PUT /api/me/consent — { version, items: { phoneForLogin, locationWhenReporting,
- * photosAttached, readNotice } }, every item a boolean. The notice, location
- * and photo items must be accepted; the phone item too for phone-login users.
- * The version is checked by the route (a stale one is a 409, not a 400).
+ * PUT /api/me/consent — { version, items: { locationWhenReporting,
+ * photosAttached, readNotice } }, every item a boolean, and every one must be
+ * accepted. The version is checked by the route (a stale one is a 409, not a 400).
  */
-export function validateConsent(input, { phoneUser }) {
+export function validateConsent(input) {
   const body = onlyFields(input, ["version", "items"]);
   const errors = {};
   if (!Number.isInteger(body.version) || body.version < 0) errors.version = "Version must be a whole number.";
@@ -175,8 +174,7 @@ export function validateConsent(input, { phoneUser }) {
   for (const key of CONSENT_ITEMS) {
     if (typeof body.items[key] !== "boolean") errors[key] = "Must be true or false.";
   }
-  const required = ["readNotice", "locationWhenReporting", "photosAttached", ...(phoneUser ? ["phoneForLogin"] : [])];
-  for (const key of required) {
+  for (const key of CONSENT_ITEMS) {
     if (body.items[key] === false) errors[key] = "This box must be ticked to continue.";
   }
   fail(errors);
@@ -209,21 +207,20 @@ export function validateProfile(input, { gov }) {
 
 const WORKER_STATUSES = ["Available", "On Duty"];
 
-/** POST /api/workers: { name, area, role?, phone?, status? }. A phone number is kept only masked. */
+/**
+ * POST /api/workers: { name, email, area?, status? }. The email is the one
+ * the worker will sign up with; the caller stores only its hash and a masked
+ * copy (it is returned here normalised, for that, and nothing else).
+ */
 export function validateWorker(input) {
-  const body = onlyFields(input, ["name", "area", "role", "phone", "status"]);
+  const body = onlyFields(input, ["name", "email", "area", "status"]);
   const errors = {};
   const name = text(body, "name", 80, errors, { required: true, label: "Name" });
-  const area = text(body, "area", 120, errors, { required: true, label: "Area" });
-  const role = text(body, "role", 60, errors, { label: "Role" }) || "Sanitation Worker";
+  const area = text(body, "area", 120, errors, { label: "Area" });
   const status = body.status ?? "Available";
   if (!WORKER_STATUSES.includes(status)) errors.status = "Status must be Available or On Duty.";
-  let phoneMasked = null;
-  if (body.phone !== undefined && body.phone !== "") {
-    const digits = typeof body.phone === "string" ? normalisePhone(body.phone) : null;
-    if (!digits) errors.phone = "Enter a valid 10 digit mobile number.";
-    else phoneMasked = maskPhone(digits);
-  }
+  const email = typeof body.email === "string" ? normaliseEmail(body.email) : null;
+  if (!email) errors.email = "Enter the email address the worker will sign up with.";
   fail(errors);
-  return { name, area, role, status, phoneMasked };
+  return { name, area, role: "Sanitation Worker", status, email };
 }

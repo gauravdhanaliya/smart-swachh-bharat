@@ -82,7 +82,7 @@ describe("demo login switched on", () => {
       assert.equal(res.json.user.uid, uid);
       assert.equal(res.json.user.role, role);
       assert.equal(res.json.user.isDemo, true);
-      assert.equal(res.json.user.phone, null, "demo users have no phone number");
+      assert.deepEqual(res.json.user.account, { type: "demo", email: null, emailVerified: false }, "demo users have no email");
       assert.match(refreshCookie(res), /^ssb_refresh=/);
 
       const me = await call(t.base, "GET", "/api/auth/me", { token: res.json.accessToken });
@@ -134,17 +134,19 @@ describe("demo login switched on", () => {
 
   test("a Firebase login can never take over a demo account", async () => {
     for (const path of ["/api/auth/firebase", "/api/auth/firebase-login"]) {
-      const res = await call(t.base, "POST", path, { body: { idToken: await idToken({ uid: "demo-official", phone: "+919000044401" }) } });
-      assert.equal(res.status, 403, path);
-      assert.deepEqual(res.cookies, []);
+      for (const provider of ["anonymous", "password", "phone"]) {
+        const res = await call(t.base, "POST", path, { body: { idToken: await idToken({ uid: "demo-official", provider }) } });
+        assert.equal(res.status, 403, `${path} ${provider}`);
+        assert.deepEqual(res.cookies, []);
+      }
     }
     const doc = await t.db.collection("users").findOne({ uid: "demo-official" });
-    assert.equal(doc.phoneHash, null, "the demo account was not given a phone");
+    assert.equal(doc.emailHash, null, "the demo account was not given an email");
     assert.equal(doc.role, "official");
   });
 
   test("POST /api/auth/firebase is the login route (firebase-login stays as an alias)", async () => {
-    const res = await call(t.base, "POST", "/api/auth/firebase", { body: { idToken: await idToken({ uid: "fb-route", phone: "+919000044402" }) } });
+    const res = await call(t.base, "POST", "/api/auth/firebase", { body: { idToken: await idToken({ uid: "fb-route" }) } });
     assert.equal(res.status, 200);
     assert.equal(res.json.user.role, "citizen");
     assert.equal(res.json.user.isDemo, false);
@@ -174,7 +176,7 @@ describe("demo login without seeded demo users", () => {
   });
 
   test("a real (non-demo) user with a demo uid is never used for a demo login", async () => {
-    await t.repo.upsertUser({ uid: "demo-citizen", phone: "9000044403", name: "Real person" });
+    await t.repo.signInWithEmail({ uid: "demo-citizen", email: "real.person@example.test", emailVerified: true, name: "Real person" });
     const res = await call(t.base, "POST", "/api/auth/demo", { body: { role: "citizen" } });
     assert.equal(res.status, 503);
   });
@@ -203,7 +205,7 @@ describe("demo login rate limit", () => {
 // reset the demo accounts' consent; nobody else can, and only when demo
 // login is switched on.
 describe("reset demo consent", () => {
-  const ITEMS = { phoneForLogin: false, locationWhenReporting: true, photosAttached: true, readNotice: true };
+  const ITEMS = { locationWhenReporting: true, photosAttached: true, readNotice: true };
   let t;
   before(async () => {
     t = await startTestServer({ DEMO_LOGIN_ENABLED: "true" });
@@ -212,7 +214,7 @@ describe("reset demo consent", () => {
   after(() => t.stop());
 
   const demo = async (role) => (await call(t.base, "POST", "/api/auth/demo", { body: { role }, headers: WEB })).json.accessToken;
-  const accept = (token, items = ITEMS) => call(t.base, "PUT", "/api/me/consent", { token, body: { version: 1, items } });
+  const accept = (token, items = ITEMS) => call(t.base, "PUT", "/api/me/consent", { token, body: { version: t.config.consentVersion, items } });
   const consentOf = async (token) => (await call(t.base, "GET", "/api/me/consent", { token })).json;
 
   test("a demo account resets consent for every demo account, and stays signed in", async () => {
@@ -231,7 +233,7 @@ describe("reset demo consent", () => {
 
   test("a real account can't use it, and its own consent is untouched", async () => {
     const real = (await call(t.base, "POST", "/api/auth/firebase", { body: { idToken: await idToken({ uid: "real-person-1" }) } })).json.accessToken;
-    assert.equal((await accept(real, { ...ITEMS, phoneForLogin: true })).status, 200); // phone users accept the phone item too
+    assert.equal((await accept(real)).status, 200);
     const res = await call(t.base, "POST", "/api/me/consent/reset-demo", { token: real });
     assert.equal(res.status, 403);
     assert.equal((await consentOf(real)).upToDate, true);

@@ -7,13 +7,35 @@
 export const PRIVACY_CONTACT = "Gaurav Kumar, Team EcoSetu (gauravgk2177@gmail.com)";
 export const ATLAS_REGION = "AWS Mumbai (ap-south-1), India";
 
+/** Shown at the top of the privacy notice: how accounts work. */
+export const ACCOUNT_SUMMARY =
+  "Nothing is created until you agree on the start screen. You use EcoSetu with an email account (or the demo): your complaints and history stay with it on any device. Your email address and password stay at Firebase (Google); EcoSetu never stores either.";
+
 /** What the app collects. */
 export const COLLECTED = [
   {
-    data: "Phone number",
-    why: "To sign you in with a one-time code (OTP).",
-    where: "Firebase Authentication. EcoSetu's database keeps only a one-way hash and a masked copy (+91 98XXXXXX10).",
-    required: "Only for phone login",
+    data: "Account ID",
+    why: "So your complaints, ratings and notifications stay yours. Made when you create an account, after you agree; no phone number, no name needed.",
+    where: "Firebase Authentication (Google) and EcoSetu's database.",
+    required: "Yes, to use the app",
+  },
+  {
+    data: "Email address and password",
+    why: "To log in on any device and keep your history; to confirm the address and reset a forgotten password; and so an official or worker role given to that email reaches you once it is confirmed.",
+    where: "Firebase Authentication holds the address and your password (EcoSetu never sees the password). EcoSetu's database keeps only a keyed one-way hash and a masked copy (as***@g***.com), never the address.",
+    required: "Yes, to use the app",
+  },
+  {
+    data: "Worker's email, added by an official",
+    why: "An official adds a sanitation worker by name and email. When that person creates an account with the same email and confirms it, they become a worker.",
+    where: "EcoSetu's database keeps only a keyed one-way hash (to recognise the account) and a masked copy (an***@g***.com) shown in the worker directory, never the address. Removing the worker cancels it.",
+    required: "Staff only",
+  },
+  {
+    data: "Your agreement on the start screen",
+    why: "So nothing is created before you agree, and you aren't asked twice.",
+    where: "This browser only, until you sign in; then it is recorded with your account on EcoSetu's server. Logging out forgets it on this device, so the next person is asked again.",
+    required: "Yes, to use the app",
   },
   {
     data: "Location (GPS or a pin you place)",
@@ -63,13 +85,13 @@ export const COLLECTED = [
 export const DESTINATIONS = [
   {
     service: "Firebase Authentication (Google)",
-    data: "Your phone number, and the one-time codes sent to it. Google reCAPTCHA checks the sign-in isn't automated.",
-    why: "Phone login (OTP).",
-    kept: "Until you delete your data: the last step of “Delete my data” deletes your Firebase sign-in on your device.",
+    data: "Your account ID, email address and password (Google stores the password hashed).",
+    why: "To sign you in (Log in, Create account). Google sends the email that confirms an address and the one that resets a password.",
+    kept: "Until you delete your data: “Delete my data” deletes your Firebase account as its last step.",
   },
   {
     service: `MongoDB Atlas (EcoSetu's database, region: ${ATLAS_REGION})`,
-    data: "Your account (role, display name, phone number only as a one-way hash and a masked copy), complaints with their locations, ratings and comments, votes, notifications, your consent record and sign-in sessions.",
+    data: "Your account (account ID, role, display name if you set one, and the email only as a keyed one-way hash and a masked copy), the worker directory (a worker's email only hashed and masked), complaints with their locations, ratings and comments, votes, notifications, your consent record and sign-in sessions.",
     why: "To run the app.",
     kept: "Until you delete your data. Complaints are then kept anonymised: they show “Deleted user”, with no link to you and no photo you attached. Sign-in sessions expire after 7 days; request counters within an hour.",
   },
@@ -81,7 +103,7 @@ export const DESTINATIONS = [
   },
   {
     service: "Vercel hosting (request logs)",
-    data: "For each request: the method, the page path without its query, the status, the time taken, your role and a random request id. Never phone numbers, codes, tokens, locations, search words or photos.",
+    data: "For each request: the method, the page path without its query, the status, the time taken, your role and a random request id. Never emails, passwords, tokens, locations, search words or photos.",
     why: "To keep the service running and find faults.",
     kept: "Vercel keeps these logs for 1 hour on the Hobby plan (1 day on Pro).",
   },
@@ -107,8 +129,8 @@ export const DESTINATIONS = [
 
 /** What "Delete my data" removes, and what it keeps (server/src/civic.js, deleteUserData). */
 export const DELETED_ITEMS = [
-  "Your account, and the hashed and masked copies of your phone number",
-  "Your Firebase sign-in (the phone number Google holds for login), removed on this device as the last step",
+  "Your account, and the hashed and masked copies of your email",
+  "Your Firebase sign-in account (and the email and password Google holds), removed as the last step",
   "Photos you attached to complaints or facility requests",
   "Your toilet ratings and comments (they stop counting towards averages)",
   "Your notifications",

@@ -1,8 +1,8 @@
-// Firebase app + Auth, used only for phone OTP login.
+// Firebase app + Auth: email + password accounts (no anonymous sign-in).
 //
 // The config comes from VITE_FIREBASE_* variables (see .env.example). These
 // are the public web config values, not secrets — access is controlled by the
-// Firebase console (authorized domains, phone provider), not by hiding them.
+// Firebase console (authorized domains, sign-in providers), not by hiding them.
 //
 // Nothing is initialized until getFirebaseAuth() is first called, and this
 // module is only loaded on demand by authService.js.

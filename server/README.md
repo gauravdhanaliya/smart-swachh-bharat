@@ -17,7 +17,7 @@ npm run test:node   # API + script + client-adapter tests (in-memory MongoDB)
 
 Copy the root `.env.example` to `.env` and fill it in: Mongo URI, two JWT secrets, `PHONE_HASH_SECRET`, Firebase project id. In development the server falls back to insecure defaults and warns. In production it **fails closed**: with `NODE_ENV=production` or on any Vercel deployment (`VERCEL=1`), a missing or short secret, a malformed `MONGODB_URI`, or the same secret used twice stops the server at start.
 
-Everyone logs in with a mobile number and a Firebase Phone Auth OTP; the role comes from the database.
+After consent on the start screen, everyone logs in with email + password (or creates an account: a citizen at once, asked to verify the email). Officials and workers log in the same way. The role always comes from the database. There is no anonymous and no phone sign-in.
 
 ## Database
 
@@ -57,14 +57,14 @@ All routes and rules are listed at the top of `server/src/routes-civic.js`. In s
 - **Votes**: one per user per complaint (`complaint_votes`, unique index); `direction: null` removes it.
 - **Ratings**: citizens only, one per user per toilet (rating again replaces it); averages and per-category averages come from MongoDB aggregations; `/api/toilets/ratings/low` (officials) lists live toilets averaging below 3 with at least 3 ratings.
 - **Notifications** are created by the server when a citizen's complaint is assigned, started or resolved, and when a worker's facility request is reviewed. Users list and mark only their own.
-- **Consent** is versioned (`ECOSETU_CONSENT_VERSION`); saving an older version is a 409. The notice, location and photo items must be accepted, and the phone item too for phone-login users. Withdrawing consent deletes it and signs the user out everywhere at once, including access tokens that haven't expired yet.
+- **Consent** is versioned (`ECOSETU_CONSENT_VERSION`); saving an older version is a 409. The notice, location and photo items must all be accepted (there is no phone item any more; the default notice version is 2). Withdrawing consent deletes it and signs the user out everywhere at once, including access tokens that haven't expired yet.
 - **Delete my data** (`DELETE /api/me/data` with `{ "confirm": true }`) deletes the account, ratings, notifications, votes, consent, sessions and the photos the user attached, in one transaction (the blobs right after it), and anonymises what the municipality keeps: complaints lose their owner and show "Deleted user". Every record that shows an official or worker by name also stores their user id (`createdById`, `deletedById`, `reviewedById`, `assignedWorkerUid`, never sent to clients), and anonymising goes by that id — two people with the same name never affect each other. Records written before these ids existed carry none and are left as they are. The shared demo accounts can't be deleted. The public `/privacy` page explains this to users.
 - **The map**: `GET /api/locations/map` returns every live bin and toilet in one response (at most `ECOSETU_MAP_LIMIT`, default 2,000; `truncated` says if there were more) with only `id, type, status, statusSource, latitude, longitude, name, isDemo, ratingAverage`, and `Cache-Control: public, max-age=30`. `GET /api/locations/:id` returns one full record for detail screens, and `GET /api/locations?kind=building|facility` filters the full list.
 
 ## Profile, worker directory
 
 - `GET/PATCH /api/profile`: every user has a display name; officials also a government profile (state, district, ministry), starting from the app's defaults. Unknown fields are refused (a citizen sending `district` gets a 400).
-- `GET /api/workers` (paged; `?removed=true` for the removed ones), `POST /api/workers`, `DELETE /api/workers/:id` `{ reason? }`, `POST /api/workers/:id/restore` — officials only. A phone number typed for a worker is stored only masked. A worker removed from the directory can't be assigned complaints until restored.
+- `GET /api/workers` (paged; `?removed=true` for the removed ones), `POST /api/workers`, `DELETE /api/workers/:id` `{ reason? }`, `POST /api/workers/:id/restore` — officials only. Adding a worker takes a name and an email (stored only hashed and masked) and creates a pending worker role for it (see Roles); each entry comes back with `emailMasked` and `accountStatus` (`active`, `invited` or null). A worker removed from the directory can't be assigned complaints until restored.
 
 ## Polling and conditional requests
 
@@ -113,15 +113,27 @@ The whole file is rejected if any row is invalid. `--replace-demo` hides the sim
 - Switching the demo worker on the Worker profile screen doesn't change the server identity (set at login).
 
 
-## Sessions: Firebase Phone Auth + server-issued JWTs
+## Sessions: Firebase Authentication + server-issued JWTs
 
-1. **Firebase proves the phone number.** The browser runs Phone Auth (OTP) and
-   gets a Firebase ID token.
+1. **Firebase signs the user in, in the browser**: "Create account"
+   (`createUserWithEmailAndPassword`, then the verification email) or "Log in"
+   (`signInWithEmailAndPassword`). The browser gets a Firebase ID token.
 2. **`POST /api/auth/firebase`** (alias `/api/auth/firebase-login`) verifies that token (RS256 signature
    against Google's public keys, issuer, audience = `ECOSETU_FIREBASE_PROJECT_ID`,
-   expiry), takes the phone number from it, upserts the user in MongoDB by
-   Firebase uid (storing only a keyed hash and a masked copy of the number, see
-   "Phone numbers") and returns:
+   expiry) and reads its `sign_in_provider`:
+   - `password`: the role the database holds; a new account is a citizen.
+     An account's first sign-in (a sign-up) counts against a per-IP limit
+     (`ECOSETU_SIGNUP_RATE_MAX`, default 20/hour); returning ones don't. The
+     email is stored only as a keyed hash and a masked copy (see "Emails"). A
+     role granted to that email applies only when the token says the email
+     is verified. Another account with the same email is a 409.
+   - `anonymous`: refused with a 403 ("Continue without account" is gone;
+     `npm run migrate` removes the accounts it made).
+   - `phone`: only accounts the old phone sign-in made (they keep working
+     until saved with an email); a new phone account is a 403.
+   - anything else is a 403.
+
+   It then returns:
    - an **access token**: JWT, 15 min, payload `{ sub: <user id>, role }`,
      signed with `ECOSETU_JWT_SECRET`, sent as `Authorization: Bearer`;
    - a **refresh token**: JWT, 7 days, signed with `ECOSETU_JWT_REFRESH_SECRET`,
@@ -156,8 +168,9 @@ parallel 401s in a tab share one refresh; the page-load restore runs once even
 under React StrictMode; across tabs, `navigator.locks` lets one tab refresh and
 the others adopt its result over `BroadcastChannel` (without Web Locks, tabs
 claim the refresh on the channel and the lowest claim wins). A refused refresh
-clears the token and returns the user to the login page with "Your session has
-expired. Please log in again."
+clears the token. Staff return to the start screen with "Your session has
+expired. Please log in again.", citizens included (there is no silent
+sign-in).
 
 The cookie is `SameSite=Strict` when the site and API share an origin (dev proxy,
 single host) and `SameSite=None; Secure` when the frontend is on another origin
@@ -171,56 +184,83 @@ instance shares one limit; on Vercel the client address is taken from
 
 In production the server refuses to start without both JWT secrets and
 `PHONE_HASH_SECRET` (each ≥ 32 chars, all different). In development it uses
-random JWT secrets and a fixed phone-hash value, and warns.
+random JWT secrets and a fixed email-hash key, and warns.
 
-## Phone numbers
+## Emails
 
-The database never holds a phone number. A user record keeps:
+No phone numbers are stored, and no email addresses. An account's user
+record keeps:
 
-- `phoneHash`: HMAC-SHA256 of the 10-digit number keyed with `PHONE_HASH_SECRET`.
-  A plain SHA-256 would be no protection (there are only a few billion
-  possible numbers, so every hash could be reversed); with a server-side key
-  a leaked database alone reveals nothing. The hash is how `grant-role` finds
-  a user and how one-account-per-number is enforced (unique index).
-- `phoneMasked`: `+91 98XXXXXX10`, the only form the API ever returns.
+- `emailHash`: HMAC-SHA256 of the lowercased, trimmed address, keyed with
+  `PHONE_HASH_SECRET` (the variable kept its name from the phone sign-in, so
+  existing deployments need no change). A plain hash could be reversed by
+  guessing likely addresses; with a server-side key a leaked database alone
+  reveals nothing. The hash is how `grant-role` finds an account, and a unique
+  index keeps one account per address.
+- `emailMasked`: `as***@g***.com`, the only form the API ever returns.
+- `emailVerified`: from the latest Firebase token.
+- `authProvider`: `password`, `phone` (made by the old phone sign-in),
+  `demo`, or `anonymous` (made by "Continue without account": they can't sign
+  in any more, and `npm run migrate` removes them, keeping their complaints
+  anonymised).
 
-Changing `PHONE_HASH_SECRET` after users exist breaks the lookup by number
-(the uid-based login still works).
+Changing `PHONE_HASH_SECRET` after roles were granted by email breaks the
+lookup by email (sign-in by uid still works).
+
+Worker-directory contact numbers, entered by officials, are not a sign-in:
+they are still kept masked only (`+91 98XXXXXX10`).
 
 ## Migrations
 
 Data from older builds is converted by `npm run migrate`, run once after
 deploying an upgrade, never on connect (several Vercel instances can
-cold-start at the same moment). Today it converts users holding a plain phone
-number (hash + masked copy; the old `phone` index is dropped; request owners
-stored as `role:phone` become uids) and bins holding a fill percentage. It logs
+cold-start at the same moment). Today it removes every phone number and
+phone hash from the users (no phone sign-in any more; those accounts are
+marked `authProvider: "phone"` and keep their uid and role), drops roles still
+pending for a phone number (grant them again by email), removes the "phone
+for login" consent answers and the phone indexes, re-keys request owners
+stored as `role:phone` to uids, and converts bins holding a fill percentage. It logs
 what it changed, a second run reports "Nothing to change", and two overlapping
 runs are safe. A user who signs in before it has run is converted at that
 moment, so nobody is locked out.
 
 ### Firebase setup
-1. Firebase console → create a project → Authentication → enable **Phone**.
+1. Firebase console → create a project → Authentication → Sign-in method:
+   enable **Email/Password**; leave **Anonymous** and **Phone** off.
 2. Project settings → add a **Web app**; copy its config into the root `.env`
    (see `.env.example`) and set `ECOSETU_FIREBASE_PROJECT_ID` to the project id.
 3. Authentication → Settings → **Authorized domains**: add your deploy domain.
-4. For free testing, add fixed **test phone numbers** (Authentication → Phone).
+4. Authentication → Templates → Email address verification and Password
+   reset: set a sender name; "Create account" and "Forgot password?" send them.
 
 ## Roles
 
-A client can't choose a role: `firebase-login` ignores any role it is sent. A
-new account is a **citizen**; everything else is granted by an admin with
-database access, using the scripts below. Roles live in the `users` collection.
+A client can't choose a role: `firebase-login` refuses any role it is sent. A
+new account is a **citizen**.
+A staff role is granted to an **email**, kept only as an HMAC and a masked
+copy in `pending_roles`, and applies only when the account signs in with that
+email **verified**, so typing someone else's address gets nobody their role.
+A user whose role changes gets a new access token on their next refresh.
 
-```
-npm run grant-role -- <phone> <citizen|worker|government> [--worker-id w1]
-npm run seed-demo-roles                      # numbers from DEMO_*_PHONE in .env
-npm run seed-demo-roles -- <citizen> <worker> <government>
-```
-`government` is the app's `official` role (supervisor and superadmin are also
-accepted by `grant-role`). If the person hasn't signed in yet, the role is saved
-in `pending_roles` and applied at their first sign-in. A user whose role changes
-gets a new access token on their next refresh. Phone numbers are masked in
-script output.
+- **Officials: `npm run grant-role` (bootstrap only).**
+
+  ```
+  npm run grant-role -- <email> <citizen|government|supervisor|superadmin>
+  ```
+
+  `government` is the app's `official` role. If a verified account has that
+  email the role applies now; otherwise it waits in `pending_roles`.
+  `citizen` takes a role away. It refuses `worker`, and there is no
+  `--worker-id` any more. Emails are masked in its output.
+- **Workers: only from the official's worker directory** (`POST
+  /api/workers` with `{ name, email, area?, status? }`). The directory entry
+  keeps `emailHash` and `emailMasked`; a pending worker role for that email
+  points at the entry. When that person creates (and verifies) an account
+  with the email, they become a worker linked to the entry. Removing the
+  entry turns a linked account back into a citizen and cancels the pending
+  role; restoring it invites again. An email already in the directory, or one
+  that belongs to an official, is a 409. Apart from the demo login there is
+  no other way to become a worker.
 
 ## MongoDB
 
@@ -260,7 +300,7 @@ them, start from a clean database:
 3. From your machine, with the production values in `.env`:
    `npm run migrate` (nothing to do on an empty database, but it confirms
    the connection and the Blob store) and then `npm run seed`.
-4. Sign in once with the demo login and with a phone number to check.
+4. Open the app, create an account, and try the demo login, to check.
 
 Do this only while the database holds demo data. Once real users exist, never
 drop it: write a migration instead.

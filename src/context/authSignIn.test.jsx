@@ -3,6 +3,11 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../services/authService", () => ({
+  logIn: vi.fn(async ({ email }) => ({ uid: "email-1", idToken: "t", email, emailVerified: true })),
+  signOutUser: vi.fn(async () => {}),
+}));
+
 vi.mock("../services/locationStore", () => ({
   refreshAfterSignIn: vi.fn(() => Promise.resolve()),
   resetStore: vi.fn(),
@@ -30,6 +35,7 @@ vi.mock("../services/session", async (orig) => ({ ...(await orig()), getSessionC
 
 import { AuthProvider, useAuth } from "./AuthContext";
 import { refreshAfterSignIn, resetStore } from "../services/locationStore";
+import { agreeOnThisDevice } from "../test/consent";
 
 const wrapper = ({ children }) => <AuthProvider>{children}</AuthProvider>;
 
@@ -41,7 +47,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("browser-only build", () => {
-  it("demo and phone sign-ins fetch the new user's data at once", () => {
+  it("demo and email sign-ins fetch the new user's data at once", async () => {
     const { result } = renderHook(() => useAuth(), { wrapper });
     act(() => {
       result.current.login("official", "");
@@ -49,9 +55,11 @@ describe("browser-only build", () => {
     expect(refreshAfterSignIn).toHaveBeenCalledTimes(1);
     act(() => result.current.resetAuth());
     expect(resetStore).toHaveBeenCalled();
-    act(() => {
-      result.current.loginWithOtp({ uid: "fb-uid-3", phone: "9876543210" });
+    agreeOnThisDevice(); // a logout forgets the agreement; the next person agrees again
+    await act(async () => {
+      await result.current.logInWithEmail({ email: "asha@example.test", password: "s3cret-pass" });
     });
+    expect(result.current.user).toMatchObject({ id: "email-1", role: "citizen", method: "email" });
     expect(refreshAfterSignIn).toHaveBeenCalledTimes(2);
   });
 
@@ -67,6 +75,14 @@ describe("browser-only build", () => {
 
 describe("API build", () => {
   beforeEach(() => vi.stubEnv("VITE_USE_API", "true"));
+
+  it("unmounting stops following the session client (no listener left behind)", async () => {
+    const { unmount } = renderHook(() => useAuth(), { wrapper });
+    await act(async () => {});
+    expect(client.listeners.size).toBe(1);
+    unmount();
+    expect(client.listeners.size).toBe(0);
+  });
 
   it("signing in fetches once (not twice for the same login)", async () => {
     const { result } = renderHook(() => useAuth(), { wrapper });

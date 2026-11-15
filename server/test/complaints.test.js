@@ -363,7 +363,8 @@ describe("votes", () => {
 });
 
 describe("per-user rate limit", () => {
-  test("creating complaints is limited per user, not per IP", async () => {
+  // Per IP too (citizen-auth.test.js); here the IP limit is out of the way.
+  test("creating complaints is limited per user", async () => {
     const small = await startTestServer({ ECOSETU_COMPLAINT_RATE_MAX: "3" });
     try {
       const a = apiClient(small);
@@ -374,7 +375,7 @@ describe("per-user rate limit", () => {
       for (let i = 0; i < 5; i++) statuses.push((await make(one, i)).status);
       assert.deepEqual(statuses, [201, 201, 201, 429, 429]);
       assert.equal((await make(two, 9)).status, 201, "another user from the same IP is not affected");
-      assert.ok(await small.db.collection("auth_rate_limits").findOne({ _id: "complaint:rl-1" }));
+      assert.ok(await small.db.collection("auth_rate_limits").findOne({ _id: "complaint:user:rl-1" }));
     } finally {
       await small.stop();
     }

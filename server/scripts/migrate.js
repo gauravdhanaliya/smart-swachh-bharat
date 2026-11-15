@@ -9,20 +9,26 @@
 // left to change and says so.
 //
 // Current migrations:
-//   - users: plain phone number -> keyed hash + masked copy (PHONE_HASH_SECRET)
-//   - pending roles and facility-request owners re-keyed off the phone number
-//   - the old unique index on users.phone dropped
+//   - users: accounts "Continue without account" made (anonymous sign-in, now
+//     removed) are deleted like "Delete my data": their complaints are kept,
+//     anonymised
+//   - users: no phone sign-in any more: phone numbers and phone hashes removed,
+//     accounts the phone sign-in made marked "phone" (they keep working)
+//   - roles still pending for a phone number dropped (grant them again by email),
+//     facility-request owners re-keyed off the phone number, the phone indexes
+//     and the "phone for login" consent answers removed
 //   - bins: fill percentage -> categorical status
 //   - photos: base64 inside documents -> the private Vercel Blob store
 //     (needs BLOB_READ_WRITE_TOKEN; without it the script stops and says so)
 
-import { countLegacyPhotos, migrateLegacyBins, migrateLegacyPhotos, migrateLegacyUsers } from "../src/db.js";
+import { countLegacyPhotos, migrateLegacyBins, migrateLegacyPhotos, migrateLegacyUsers, removeAnonymousAccounts } from "../src/db.js";
 import { createPhotoStore } from "../src/photoStore.js";
 import { withRepo } from "./_shared.js";
 
 await withRepo(async (repo, config, db) => {
   console.log(`Migrating database "${config.mongoDbName}"`);
-  const users = await migrateLegacyUsers(db, config.phoneHashSecret);
+  const users = await migrateLegacyUsers(db);
+  const anonymous = await removeAnonymousAccounts(db, (uid) => repo.deleteUserData(uid));
   const bins = await migrateLegacyBins(db);
 
   const waiting = await countLegacyPhotos(db);
@@ -39,10 +45,12 @@ await withRepo(async (repo, config, db) => {
   }
 
   const lines = [
-    [`users: ${users.users} converted to a phone hash`, users.users],
+    [`users: ${users.users} changes removing phone numbers and phone hashes`, users.users],
+    [`anonymous accounts: ${anonymous} removed (their complaints kept, anonymised)`, anonymous],
     [`facility request owners: ${users.requests} re-keyed from phone to uid`, users.requests],
-    [`pending roles: ${users.pendingRoles} re-keyed to the phone hash`, users.pendingRoles],
-    [`old phone index: dropped`, users.indexDropped ? 1 : 0],
+    [`pending roles: ${users.pendingRoles} granted to a phone number removed (grant them again by email)`, users.pendingRoles],
+    [`consents: ${users.consents} "phone for login" answers removed`, users.consents],
+    [`old phone indexes: ${users.indexesDropped} dropped`, users.indexesDropped],
     [`bins: ${bins} converted from a fill percentage to a status`, bins],
     [`photos: ${photos} moved to private Blob storage`, photos],
   ].filter(([, n]) => n > 0);

@@ -23,6 +23,7 @@ export default function WithdrawConsent() {
     setError("");
     try {
       await withdrawConsent();
+      // The account is kept: logging in again (and agreeing) brings it back.
       resetAuth({ notice: WITHDRAWN_NOTICE });
       navigate("/login", { replace: true });
     } catch (err) {
@@ -38,7 +39,7 @@ export default function WithdrawConsent() {
         <strong>This screen withdraws your consent.</strong> Your data is kept. It does not delete anything.
       </p>
 
-      <div className="mt-4 rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm">
+      <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-4">
         <h2 className="text-sm font-semibold text-emerald-950">What happens</h2>
         <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-emerald-900/85">
           <li>You are signed out on every device straight away.</li>
@@ -51,7 +52,7 @@ export default function WithdrawConsent() {
       {user.method !== LOGIN_METHOD.DEMO && (
         <p className="mt-3 text-sm text-emerald-900/80">
           Want your data removed?{" "}
-          <Link to="/account/delete" className="font-semibold text-red-700 underline">
+          <Link to="/account/delete" className="font-semibold text-red-700">
             Delete my data instead
           </Link>
         </p>
@@ -68,11 +69,11 @@ export default function WithdrawConsent() {
           type="button"
           onClick={withdraw}
           disabled={busy}
-          className="min-h-12 cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 hover:bg-emerald-800 btn-disabled"
+          className="min-h-12 cursor-pointer rounded-xl bg-emerald-700 px-5 text-sm font-semibold text-white hover:bg-brand-hover btn-disabled"
         >
           {busy ? "Withdrawing…" : "Withdraw and sign out"}
         </button>
-        <button type="button" onClick={() => navigate(-1)} className="min-h-11 rounded-full px-5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">
+        <button type="button" onClick={() => navigate(-1)} className="min-h-11 rounded-xl px-5 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">
           Cancel
         </button>
       </div>

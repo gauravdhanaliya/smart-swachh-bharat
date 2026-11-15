@@ -34,19 +34,26 @@ test("every collection exists with a validator, and setting them up twice is har
 });
 
 describe("users", () => {
-  const user = { uid: "s-user", phoneHash: "a".repeat(64), phoneMasked: "+91 98XXXXXX10", role: "citizen", name: "A", workerId: null, isDemo: false, createdAt: ts, updatedAt: ts, lastLoginAt: ts };
-  test("valid record is accepted; missing role, unknown role, plain phone, bad hash or mask are rejected", async () => {
+  const user = { uid: "s-user", authProvider: "anonymous", emailHash: null, emailMasked: null, emailVerified: false, role: "citizen", name: "A", workerId: null, isDemo: false, createdAt: ts, updatedAt: ts, lastLoginAt: ts };
+  const saved = { ...user, uid: "s-saved", authProvider: "password", emailHash: "a".repeat(64), emailMasked: "as***@e***.test", emailVerified: true };
+  test("valid records are accepted; missing or unknown role, a plain phone or email, a bad hash or provider are rejected", async () => {
     await accepts("users", user);
+    await accepts("users", saved);
     await rejects("users", { ...user, uid: "s-2", role: undefined });
     await rejects("users", { ...user, uid: "s-3", role: "emperor" });
     await rejects("users", { ...user, uid: "s-4", phone: "9876543210" });
-    await rejects("users", { ...user, uid: "s-5", phoneHash: "not-hex" });
-    await rejects("users", { ...user, uid: "s-6", phoneMasked: "+91 9876543210" });
-    await rejects("users", { ...user, uid: "s-7", name: "x".repeat(81) });
+    await rejects("users", { ...user, uid: "s-5", email: "asha@example.test" });
+    await rejects("users", { ...saved, uid: "s-6", emailHash: "not-hex" });
+    await rejects("users", { ...user, uid: "s-7", authProvider: "google.com" });
+    await rejects("users", { ...user, uid: "s-8", name: "x".repeat(81) });
   });
-  test("demo users have no phone at all, and several of them may coexist", async () => {
-    await accepts("users", { ...user, uid: "s-demo-1", phoneHash: null, phoneMasked: null, isDemo: true });
-    await accepts("users", { ...user, uid: "s-demo-2", phoneHash: null, phoneMasked: null, isDemo: true });
+  test("accounts without an email may coexist; two accounts can't share an email hash", async () => {
+    await accepts("users", { ...user, uid: "s-anon-1" });
+    await accepts("users", { ...user, uid: "s-anon-2", authProvider: "demo", isDemo: true });
+    await assert.rejects(db.collection("users").insertOne({ ...saved, uid: "s-saved-2" }), (err) => err.code === 11000, "unique email hash");
+  });
+  test("an account from the phone build (phone hash still there) is accepted until the migration removes it", async () => {
+    await accepts("users", { ...user, uid: "s-old", authProvider: "phone", phoneHash: "b".repeat(64), phoneMasked: "+91 98XXXXXX10" });
   });
 });
 
@@ -114,12 +121,13 @@ describe("notifications, consents, refresh tokens, rate limits", () => {
     assert.ok(keys.includes(JSON.stringify({ userId: 1, createdAt: -1, _id: -1 })));
   });
 
-  test("consents are keyed by user with a version and the four checkboxes", async () => {
-    const items = { phoneForLogin: true, locationWhenReporting: true, photosAttached: true, readNotice: true };
+  test("consents are keyed by user with a version and the three checkboxes", async () => {
+    const items = { locationWhenReporting: true, photosAttached: true, readNotice: true };
     await accepts("consents", { _id: "u1", version: 1, acceptedAt: ts, items, updatedAt: ts });
     await rejects("consents", { _id: "u2", version: 0, acceptedAt: ts, items, updatedAt: ts });
     await rejects("consents", { _id: "u3", version: 1, acceptedAt: ts, items: { ...items, marketing: true }, updatedAt: ts });
     await rejects("consents", { _id: "u4", version: 1, acceptedAt: ts, items: { ...items, readNotice: "yes" }, updatedAt: ts });
+    await rejects("consents", { _id: "u5", version: 1, acceptedAt: ts, items: { ...items, phoneForLogin: true }, updatedAt: ts });
   });
 
   test("refresh tokens hold a hash, never the token, and expire", async () => {

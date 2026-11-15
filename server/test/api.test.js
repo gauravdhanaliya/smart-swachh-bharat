@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import { migrateLegacyBins } from "../src/db.js";
 import { seedIfEmpty } from "../src/seed.js";
 import { signAccessToken } from "../src/tokens.js";
-import { idToken, phoneFor, startTestServer } from "./helpers.js";
+import { emailFor, idToken, startTestServer } from "./helpers.js";
 import { createApp } from "../src/app.js";
 import { createFirebaseVerifier } from "../src/firebase.js";
 import { MAX_PHOTO_BYTES } from "../src/validate.js";
-import { hashPhone } from "../src/phone.js";
+import crypto from "node:crypto";
 
 let t; // the running test server
 let base;
@@ -59,13 +59,14 @@ const WEB = { "x-ecosetu-client": "web" };
 
 // Signs a user in the way the app does: a Firebase ID token to
 // /auth/firebase-login. The role is NOT sent: like in production it is granted
-// beforehand in the database (what `npm run grant-role` does).
-// Each role/phone gets its own Firebase uid.
-async function loginFull(role, { phone, workerId } = {}) {
-  const uid = `u-${role}${phone ? `-${phone}` : ""}`;
-  const number = phone ?? phoneFor(uid);
-  if (role !== "citizen") await t.repo.grantRole({ phone: number.slice(-10), role, workerId: workerId ?? null });
-  const token = await idToken({ uid, phone: number });
+// beforehand in the database (what `npm run grant-role` does), to the email of
+// a saved account. A citizen signs in anonymously.
+// Each role/tag gets its own Firebase uid.
+const tokenFor = (uid, role) => (role === "citizen" ? idToken({ uid }) : idToken({ uid, provider: "password" }));
+async function loginFull(role, { tag, workerId } = {}) {
+  const uid = `u-${role}${tag ? `-${tag}` : ""}`;
+  if (role !== "citizen") await t.repo.grantRole({ email: emailFor(uid), role, workerId: workerId ?? null });
+  const token = await tokenFor(uid, role);
   const res = await call("POST", "/api/auth/firebase-login", { body: { idToken: token } });
   assert.equal(res.status, 200, JSON.stringify(res.json));
   assert.equal(res.json.user.role, role);
@@ -133,28 +134,28 @@ describe("authentication", () => {
   });
 
   test("a role granted in the database is returned at login and survives later sign-ins", async () => {
-    const res = await loginFull("worker", { phone: "+919000011112", workerId: "w1" });
+    const res = await loginFull("worker", { tag: "keep", workerId: "w1" });
     assert.equal(res.json.user.wid, "w1");
-    const token = await idToken({ uid: "u-worker-+919000011112", phone: "+919000011112" });
+    const token = await tokenFor("u-worker-keep", "worker");
     assert.equal((await call("POST", "/api/auth/firebase-login", { body: { idToken: token, role: "citizen" } })).status, 400);
     const again = await call("POST", "/api/auth/firebase-login", { body: { idToken: token } });
     assert.equal(again.json.user.role, "worker", "the role granted in the database stays");
   });
 
   test("a role granted before the first sign-in is pending, then applied once", async () => {
-    const phone = "+919000012345";
-    const granted = await t.repo.grantRole({ phone: phone.slice(-10), role: "official" });
+    const email = "late.joiner@example.test";
+    const granted = await t.repo.grantRole({ email, role: "official" });
     assert.equal(granted.status, "pending");
-    const pendingKey = hashPhone(phone.slice(-10), t.config.phoneHashSecret);
+    const pendingKey = crypto.createHmac("sha256", t.config.identityHashSecret).update(email).digest("hex");
     assert.equal(await t.db.collection("pending_roles").countDocuments({ _id: pendingKey }), 1);
-    assert.equal(await t.db.collection("pending_roles").countDocuments({ _id: phone.slice(-10) }), 0, "never keyed by the number itself");
-    const token = await idToken({ uid: "late-joiner", phone });
+    assert.equal(await t.db.collection("pending_roles").countDocuments({ _id: email }), 0, "never keyed by the address itself");
+    const token = await idToken({ uid: "late-joiner", provider: "password", email });
     const res = await call("POST", "/api/auth/firebase-login", { body: { idToken: token } });
     assert.equal(res.json.user.role, "official");
     assert.equal(await t.db.collection("pending_roles").countDocuments({ _id: pendingKey }), 0, "pending record is consumed");
     assert.equal((await call("GET", "/api/locations/removed", { token: res.json.accessToken })).status, 200);
     // and now that the user exists, granting again updates them directly
-    assert.equal((await t.repo.grantRole({ phone: phone.slice(-10), role: "worker" })).status, "updated");
+    assert.equal((await t.repo.grantRole({ email, role: "worker" })).status, "updated");
     assert.equal((await t.repo.getUserByUid("late-joiner")).role, "worker");
   });
 
@@ -165,18 +166,18 @@ describe("authentication", () => {
       assert.equal((await call("POST", "/api/auth/firebase-login", { body })).status, 400, JSON.stringify(body).slice(0, 60));
     }
     assert.equal((await call("POST", "/api/auth/firebase-login", { body: [] })).status, 400);
-    const noPhone = await idToken({ uid: "r2", phone: "" });
-    assert.equal((await call("POST", "/api/auth/firebase-login", { body: { idToken: noPhone } })).status, 400);
+    const noEmail = await idToken({ uid: "r2", provider: "password", email: null });
+    assert.equal((await call("POST", "/api/auth/firebase-login", { body: { idToken: noEmail } })).status, 400);
   });
 
-  test("login needs a genuine Firebase token; the phone number comes from it", async () => {
+  test("login needs a genuine Firebase token; the email comes from it", async () => {
     assert.equal((await call("POST", "/api/auth/firebase-login", { body: { idToken: "nope" } })).status, 401);
     const forged = await idToken({ uid: "f1", forged: true });
     assert.equal((await call("POST", "/api/auth/firebase-login", { body: { idToken: forged } })).status, 401);
-    const token = await idToken({ uid: "m1", phone: "+919000011111" });
-    assert.equal((await call("POST", "/api/auth/firebase-login", { body: { mobile: "1111111111", idToken: token } })).status, 400, "a client-sent number is refused");
+    const token = await idToken({ uid: "m1", provider: "password", email: "mira@example.test" });
+    assert.equal((await call("POST", "/api/auth/firebase-login", { body: { email: "boss@example.test", idToken: token } })).status, 400, "a client-sent email is refused");
     const res = await call("POST", "/api/auth/firebase-login", { body: { idToken: token } });
-    assert.equal(res.json.user.phone, "+91 90XXXXXX11");
+    assert.equal(res.json.user.account.email, "mi***@e***.test");
   });
 
   test("tampered, expired and wrong-secret access tokens are rejected", async () => {
@@ -199,27 +200,20 @@ describe("authentication", () => {
   });
 
   test("a role change invalidates old access tokens until the client refreshes", async () => {
-    const token = await idToken({ uid: "chg", phone: "+919000033333" });
+    const token = await idToken({ uid: "chg", provider: "password", email: "chg@example.test" });
     const first = await call("POST", "/api/auth/firebase-login", { body: { idToken: token } });
     assert.equal((await call("GET", "/api/auth/me", { token: first.json.accessToken })).status, 200);
-    await t.repo.grantRole({ phone: "9000033333", role: "official" });
+    await t.repo.grantRole({ email: "chg@example.test", role: "official" });
     assert.equal((await call("GET", "/api/auth/me", { token: first.json.accessToken })).status, 401);
     const again = await call("POST", "/api/auth/firebase-login", { body: { idToken: token } });
     assert.equal(again.json.user.role, "official");
     assert.equal((await call("GET", "/api/auth/me")).status, 401);
   });
-
-  test("two accounts cannot share a mobile number", async () => {
-    const a = await idToken({ uid: "dup-a", phone: "+919000044444" });
-    const b = await idToken({ uid: "dup-b", phone: "+919000044444" });
-    assert.equal((await call("POST", "/api/auth/firebase-login", { body: { idToken: a } })).status, 200);
-    assert.equal((await call("POST", "/api/auth/firebase-login", { body: { idToken: b } })).status, 409);
-  });
 });
 
 describe("refresh and logout", () => {
   test("refresh rotates the token; the old one stops working and replaying it revokes the rest", async () => {
-    const first = await loginFull("citizen", { phone: "+919000055555" });
+    const first = await loginFull("citizen", { tag: "9000055555" });
     const c1 = refreshCookie(first);
 
     const second = await call("POST", "/api/auth/refresh", { headers: { ...WEB, cookie: c1 } });
@@ -236,8 +230,8 @@ describe("refresh and logout", () => {
 
   test("reusing a revoked refresh token signs the user out on every device, even straight away", async () => {
     // the same person signed in on a phone and a laptop
-    const phone = await loginFull("citizen", { phone: "+919000055556" });
-    const laptopToken = await idToken({ uid: "u-citizen-+919000055556", phone: "+919000055556" });
+    const phone = await loginFull("citizen", { tag: "9000055556" });
+    const laptopToken = await idToken({ uid: "u-citizen-9000055556" });
     const laptop = await call("POST", "/api/auth/firebase-login", { body: { idToken: laptopToken } });
     const phoneOld = refreshCookie(phone);
     const laptopCookie = refreshCookie(laptop);
@@ -250,14 +244,14 @@ describe("refresh and logout", () => {
     assert.equal((await call("POST", "/api/auth/refresh", { headers: { ...WEB, cookie: phoneOld } })).status, 401);
     assert.equal((await call("POST", "/api/auth/refresh", { headers: { ...WEB, cookie: phoneNew } })).status, 401, "the phone's new token is revoked");
     assert.equal((await call("POST", "/api/auth/refresh", { headers: { ...WEB, cookie: laptopCookie } })).status, 401, "the laptop is signed out too");
-    const live = await t.db.collection("refresh_tokens").countDocuments({ uid: "u-citizen-+919000055556", revokedAt: null });
+    const live = await t.db.collection("refresh_tokens").countDocuments({ uid: "u-citizen-9000055556", revokedAt: null });
     assert.equal(live, 0);
   });
 
   test("reusing a token revoked by logout also revokes the user's other sessions", async () => {
-    const a = await loginFull("citizen", { phone: "+919000055557" });
+    const a = await loginFull("citizen", { tag: "9000055557" });
     const second = await call("POST", "/api/auth/firebase-login", {
-      body: { idToken: await idToken({ uid: "u-citizen-+919000055557", phone: "+919000055557" }) },
+      body: { idToken: await idToken({ uid: "u-citizen-9000055557" }) },
     });
     await call("POST", "/api/auth/logout", { headers: { ...WEB, cookie: refreshCookie(a) } });
     assert.equal((await call("POST", "/api/auth/refresh", { headers: { ...WEB, cookie: refreshCookie(a) } })).status, 401);
@@ -265,7 +259,7 @@ describe("refresh and logout", () => {
   });
 
   test("refresh stores only a hash, and fails without a valid cookie", async () => {
-    const res = await loginFull("citizen", { phone: "+919000066666" });
+    const res = await loginFull("citizen", { tag: "9000066666" });
     const raw = decodeURIComponent(refreshCookie(res).split("=")[1]);
     const rows = await t.db.collection("refresh_tokens").find({}).toArray();
     assert.ok(rows.length > 0);
@@ -278,7 +272,7 @@ describe("refresh and logout", () => {
   });
 
   test("refresh and logout refuse requests without the web-client header or from a foreign origin", async () => {
-    const res = await loginFull("citizen", { phone: "+919000077777" });
+    const res = await loginFull("citizen", { tag: "9000077777" });
     const cookie = refreshCookie(res);
     assert.equal((await call("POST", "/api/auth/refresh", { headers: { cookie } })).status, 403);
     assert.equal((await call("POST", "/api/auth/refresh", { headers: { ...WEB, cookie, origin: "https://evil.example.com" } })).status, 403);
@@ -287,7 +281,7 @@ describe("refresh and logout", () => {
   });
 
   test("logout revokes the refresh token and clears the cookie", async () => {
-    const res = await loginFull("worker", { phone: "+919000088888" });
+    const res = await loginFull("worker", { tag: "9000088888" });
     const cookie = refreshCookie(res);
     const out = await call("POST", "/api/auth/logout", { headers: { ...WEB, cookie } });
     assert.equal(out.status, 200);
@@ -674,8 +668,8 @@ describe("worker request → official approval workflow", () => {
   });
 
   test("a worker only sees their own requests; officials see all", async () => {
-    const a = await login("worker", { phone: "+919000000001", workerId: "w1" });
-    const b = await login("worker", { phone: "+919000000002", workerId: "w2" });
+    const a = await login("worker", { tag: "9000000001", workerId: "w1" });
+    const b = await login("worker", { tag: "9000000002", workerId: "w2" });
     const official = await login("official");
     const idA = (await call("POST", "/api/facility-requests", { token: a, body: { ...REQ, suggestedName: "A's Bin" } })).json.request.id;
     const idB = (await call("POST", "/api/facility-requests", { token: b, body: { ...REQ, suggestedName: "B's Bin" } })).json.request.id;

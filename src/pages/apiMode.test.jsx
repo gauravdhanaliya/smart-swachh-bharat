@@ -29,10 +29,10 @@ import { reset as resetNotifications } from "../services/notificationRemote";
 import { DEMO_BINS, DEMO_TOILETS } from "../../server/src/seed-data.js";
 import { resetRatingCache } from "../services/toiletRatingService";
 import { startLiveServer } from "../test/liveServer";
-import { LOCAL_CONSENT_KEY, acceptConsentLocally } from "../test/consent";
-import { demoLogin } from "../test/loginPage";
+import { LOCAL_CONSENT_KEY, acceptConsentLocally, firstVisit } from "../test/consent";
+import { DEFAULT_CONSENT_VERSION } from "../../server/src/constants.js";
 
-const DEMO_CONSENT = { phoneForLogin: false, locationWhenReporting: true, photosAttached: true, readNotice: true };
+const DEMO_CONSENT = { locationWhenReporting: true, photosAttached: true, readNotice: true };
 
 const DEMO_NAMES = { citizen: "Demo Citizen", worker: "Vikash Kumar", official: "Demo Official" };
 const GENERAL = {
@@ -78,7 +78,7 @@ describe.each([
     if (useApi) {
       await getSessionClient().loginDemo(role);
       // the consent screen has its own journey below; here the account has agreed
-      await getSessionClient().request("/api/me/consent", { method: "PUT", body: { version: 1, items: DEMO_CONSENT } });
+      await getSessionClient().request("/api/me/consent", { method: "PUT", body: { version: DEFAULT_CONSENT_VERSION, items: DEMO_CONSENT } });
     } else {
       acceptConsentLocally(startSession(role, DEMO_NAMES[role]));
     }
@@ -109,23 +109,27 @@ describe.each([
     vi.unstubAllGlobals();
   });
 
-  it("login: the demo card asks for consent once, then opens the citizen dashboard", async () => {
+  it("an account without an agreement is asked for consent once, then the citizen dashboard opens", async () => {
+    firstVisit(); // nothing agreed on the start screen either (e.g. signed in by an earlier build)
+    // Signed in outside the UI: the silent anonymous sign-in itself is covered by
+    // server/test/citizen-auth.test.js (real tokens) and apiAuth.test.jsx.
     if (useApi) {
-      // a demo account may already have agreed in an earlier test: ask again
       await getSessionClient().loginDemo("citizen");
+      // a demo account may already have agreed in an earlier test: ask again
       await getSessionClient().request("/api/me/consent/reset-demo", { method: "POST" });
-      await getSessionClient().logout();
-      live.clearCookies();
+    } else {
+      startSession("citizen", DEMO_NAMES.citizen);
     }
+    resetStore();
     const user = userEvent.setup();
-    renderAt("/login");
-    await demoLogin(user, /^citizen/i);
+    renderAt("/citizen");
     expect(await screen.findByRole("heading", { level: 1, name: "Before you start" })).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(3);
     for (const name of [/location access/i, /photos i upload/i, /read the privacy notice/i]) {
       await user.click(screen.getByRole("checkbox", { name }));
     }
     await user.click(screen.getByRole("button", { name: "Agree and continue" }));
-    expect(await screen.findByRole("heading", { name: /citizen!/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: /^Hello/ })).toBeInTheDocument();
     if (useApi) expect(live.calls.some((c) => c.method === "PUT" && c.path === "/api/me/consent")).toBe(true);
     else expect(JSON.parse(localStorage.getItem(LOCAL_CONSENT_KEY))["demo-citizen"]).toMatchObject({ items: DEMO_CONSENT });
   });
@@ -228,7 +232,8 @@ describe.each([
 
   it("notifications: the citizen sees their complaint's assignment in their notifications", async () => {
     await signInAs("citizen");
-    const complaint = await createComplaint(GENERAL);
+    // Through the API the server records who filed it; the browser-only build takes it from the form.
+    const complaint = await createComplaint(useApi ? GENERAL : { ...GENERAL, citizenId: "demo-citizen" });
     await signInAs("official");
     await refreshComplaints();
     await assignComplaint(complaint.id, "w1", "Vikash Kumar");
@@ -246,11 +251,15 @@ describe.each([
   it("workers: an official adds a worker and sees them in the directory", async () => {
     await signInAs("official");
     const name = `Meena ${useApi ? "api" : "local"}`;
-    await addWorker({ name, area: "Ganeshpur", phone: "9876543210", status: "Available" });
+    const email = useApi ? "meena.api@example.test" : "meena.local@example.test";
+    await addWorker({ name, email, area: "Ganeshpur", status: "Available" });
     await refreshWorkers();
     renderAt("/official/workers");
     expect(await screen.findByText(name)).toBeInTheDocument();
     expect(screen.getByText("Vikash Kumar")).toBeInTheDocument();
+    expect(screen.getAllByText("me***@e***.test").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Waiting for sign-up").length).toBeGreaterThan(0);
+    expect(JSON.stringify({ ...localStorage })).not.toContain(email);
     if (useApi) expect(live.calls.some((c) => c.method === "POST" && c.path === "/api/workers")).toBe(true);
   });
 
@@ -348,7 +357,8 @@ describe.each([
 
   it.runIf(useApi)("a refused write rejects with the server's reason, and nothing changes", async () => {
     await signInAs("citizen");
-    const complaint = await createComplaint(GENERAL);
+    // Through the API the server records who filed it; the browser-only build takes it from the form.
+    const complaint = await createComplaint(useApi ? GENERAL : { ...GENERAL, citizenId: "demo-citizen" });
     await signInAs("official");
     await act(() => refreshComplaints());
     await expect(assignComplaint(complaint.id, "w99", "Nobody")).rejects.toMatchObject({

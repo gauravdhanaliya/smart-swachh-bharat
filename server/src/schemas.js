@@ -19,6 +19,7 @@ import {
   REQUEST_STATUS,
   ROLES,
   SOURCES,
+  AUTH_PROVIDERS,
   STATUS_BY_TYPE,
 } from "./constants.js";
 
@@ -55,12 +56,21 @@ export const NOTIFICATION_KINDS = ["complaint", "facility_request", "system"];
 const ALL_LOCATION_STATUSES = [...new Set(Object.values(STATUS_BY_TYPE).flat())];
 
 export const SCHEMAS = {
-  users: object(["uid", "role", "name", "phoneHash", "phoneMasked", "workerId", "isDemo", "createdAt", "updatedAt"], {
+  users: object(["uid", "role", "name", "workerId", "isDemo", "createdAt", "updatedAt"], {
     _id: { bsonType: "objectId" },
-    uid: str(128, { minLength: 1 }),
-    // HMAC of the phone number (see phone.js). Demo users have no phone.
+    uid: str(128, { minLength: 1 }), // the Firebase uid (or a seeded demo id)
+    // How the account signs in: "anonymous" (a citizen who never saved an
+    // account), "password" (saved with email + password), "phone" (made by
+    // the old phone sign-in), "demo" (the seeded demo accounts).
+    authProvider: { enum: AUTH_PROVIDERS },
+    // Saved accounts only: HMAC of the lowercased email (see identity.js) and
+    // a masked copy. The address itself is never stored.
+    emailHash: nullable(str(64, { pattern: HEX64 })),
+    emailMasked: nullable(str(80)),
+    emailVerified: bool,
+    // Left by the old phone sign-in until `npm run migrate` removes them.
     phoneHash: nullable(str(64, { pattern: HEX64 })),
-    phoneMasked: nullable(str(20, { pattern: "^\\+91 \\d{2}X{6}\\d{2}$" })),
+    phoneMasked: nullable(str(20)),
     role: { enum: ROLES },
     name: str(80),
     workerId: nullable(str(24)),
@@ -73,7 +83,10 @@ export const SCHEMAS = {
   }),
 
   pending_roles: object(["_id", "role", "createdAt", "updatedAt"], {
-    _id: str(64), // the phone hash of someone who hasn't signed in yet
+    _id: str(64), // the email hash of an account not yet signed in with that email verified
+    // "email" for every role granted now. Older rows (granted to a phone
+    // number) have none, and `npm run migrate` removes them.
+    kind: { enum: ["email"] },
     role: { enum: ROLES },
     workerId: nullable(str(24)),
     createdAt: iso,
@@ -237,6 +250,10 @@ export const SCHEMAS = {
     area: str(120),
     status: { enum: ["Available", "On Duty"] },
     phoneMasked: nullable(str(20, { pattern: "^\\+91 \\d{2}X{6}\\d{2}$" })),
+    // Workers added by an official: the email they will sign up with, as a
+    // keyed hash (to find their account) and a masked copy. Never the address.
+    emailHash: nullable(str(64, { pattern: HEX64 })),
+    emailMasked: nullable(str(80)),
     source: { enum: ["DEMO", "GOVERNMENT"] },
     createdAt: iso,
     createdBy: str(120),
@@ -308,8 +325,8 @@ export const SCHEMAS = {
 export const INDEXES = {
   users: [
     { key: { uid: 1 }, unique: true, name: "uid_unique" },
-    // Partial, so the phoneless demo users don't collide on null.
-    { key: { phoneHash: 1 }, unique: true, name: "phoneHash_unique", partialFilterExpression: { phoneHash: { $type: "string" } } },
+    // Partial, so the many accounts without an email don't collide on null.
+    { key: { emailHash: 1 }, unique: true, name: "emailHash_unique", partialFilterExpression: { emailHash: { $type: "string" } } },
     { key: { role: 1 }, name: "role" },
     { key: { createdAt: -1 }, name: "createdAt" },
   ],

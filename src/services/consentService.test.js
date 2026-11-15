@@ -2,16 +2,16 @@
 // tested in server/test/privacy.test.js and demo-login.test.js).
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { startOtpSession, startSession } from "./authSession";
-import { acceptConsent, deleteMyData, getConsentStatus, resetDemoConsent, withdrawConsent } from "./consentService";
+import { startEmailSession, startSession } from "./authSession";
+import { acceptConsent, clearDeviceConsent, consentKnownAccepted, deleteMyData, deviceConsent, getConsentStatus, resetDemoConsent, saveDeviceConsent, withdrawConsent } from "./consentService";
 import { createFacilityComplaint, getComplaints } from "./complaintService";
 import { saveRating } from "./toiletRatingService";
 import { DEFAULT_CONSENT_VERSION } from "../../server/src/constants.js";
 import { LEGACY_BINS, LOCAL_API_KEY, TOILETS, seedLocalApi } from "../test/fixtures";
-import { LOCAL_CONSENT_KEY } from "../test/consent";
+import { LOCAL_CONSENT_KEY, firstVisit } from "../test/consent";
 
-const ALL = { phoneForLogin: true, locationWhenReporting: true, photosAttached: true, readNotice: true };
-const otp = (uid) => startOtpSession({ uid, phone: "9876543210" });
+const ALL = { locationWhenReporting: true, photosAttached: true, readNotice: true };
+const otp = (uid) => startEmailSession({ uid, email: "citizen@example.test" }); // an (anonymous) citizen
 const TOILET = { id: "PT-001", type: "toilet", name: "Main Gate Toilet", address: "Main Gate", latitude: 29.8884, longitude: 77.9589 };
 
 beforeEach(() => seedLocalApi({ locations: [...LEGACY_BINS, ...TOILETS] }));
@@ -32,17 +32,14 @@ describe("consent", () => {
     expect((await getConsentStatus()).upToDate).toBe(false);
   });
 
-  it("required boxes: notice, location, photos — and the phone box for phone-login users only", async () => {
+  it("required boxes: notice, location, photos; the old phone box is gone", async () => {
     otp("c1");
-    await expect(acceptConsent(DEFAULT_CONSENT_VERSION, { ...ALL, phoneForLogin: false })).rejects.toMatchObject({
-      status: 400,
-      fields: { phoneForLogin: expect.any(String) },
-    });
     for (const key of ["readNotice", "locationWhenReporting", "photosAttached"]) {
       await expect(acceptConsent(DEFAULT_CONSENT_VERSION, { ...ALL, [key]: false })).rejects.toMatchObject({ fields: { [key]: expect.any(String) } });
     }
+    await expect(acceptConsent(DEFAULT_CONSENT_VERSION, { ...ALL, phoneForLogin: true })).rejects.toMatchObject({ status: 400, fields: { phoneForLogin: expect.any(String) } });
     startSession("citizen", "");
-    await expect(acceptConsent(DEFAULT_CONSENT_VERSION, { ...ALL, phoneForLogin: false })).resolves.toMatchObject({ upToDate: true });
+    await expect(acceptConsent(DEFAULT_CONSENT_VERSION, ALL)).resolves.toMatchObject({ upToDate: true });
   });
 
   it("an old notice version is refused, and an old acceptance counts as not up to date", async () => {
@@ -70,7 +67,7 @@ describe("reset demo consent", () => {
     await acceptConsent(DEFAULT_CONSENT_VERSION, ALL);
     for (const role of ["citizen", "official"]) {
       startSession(role, "");
-      await acceptConsent(DEFAULT_CONSENT_VERSION, { ...ALL, phoneForLogin: false });
+      await acceptConsent(DEFAULT_CONSENT_VERSION, ALL);
     }
     expect(await resetDemoConsent()).toEqual({ reset: 2 });
     expect((await getConsentStatus()).upToDate).toBe(false);
@@ -91,7 +88,8 @@ describe("delete my data", () => {
     await saveRating("PT-001", { stars: 2, comment: "Smelly" });
     const mine = await createFacilityComplaint({ facility: TOILET, category: "Dirty" });
     localStorage.setItem("ssb_citizen_prefs_v1", JSON.stringify({ sms: true }));
-    localStorage.setItem("ssb_citizen_notifications_seen_v1", "2026-11-01T00:00:00Z");
+    localStorage.setItem("ssb_citizen_notifications_seen_v1:erase-me", "2026-11-01T00:00:00Z");
+    sessionStorage.setItem("ssb_verify_banner_dismissed_erase-me", "1");
     sessionStorage.setItem("ssb_geo_cache_v1", "[]");
 
     otp("bystander");
@@ -115,7 +113,9 @@ describe("delete my data", () => {
     }
     // what only this device remembered for the citizen goes too
     expect(localStorage.getItem("ssb_citizen_prefs_v1")).toBeNull();
-    expect(localStorage.getItem("ssb_citizen_notifications_seen_v1")).toBeNull();
+    expect(localStorage.getItem("ssb_citizen_notifications_seen_v1:erase-me")).toBeNull();
+    expect(sessionStorage.getItem("ssb_verify_banner_dismissed_erase-me")).toBeNull();
+    for (let i = 0; i < localStorage.length; i++) expect(localStorage.key(i)).not.toContain("erase-me");
     expect(sessionStorage.getItem("ssb_geo_cache_v1")).toBeNull();
     // shared data stays
     expect(db.locations.length).toBeGreaterThan(0);
@@ -125,4 +125,34 @@ describe("delete my data", () => {
     startSession("citizen", "");
     await expect(deleteMyData()).rejects.toMatchObject({ status: 403 });
   });
+});
+
+describe("consent given before signing in (on this device)", () => {
+  beforeEach(() => firstVisit());
+
+  it("is kept on the device, and is not on the server by itself", async () => {
+    expect(deviceConsent()).toBeNull();
+    saveDeviceConsent({ version: DEFAULT_CONSENT_VERSION, items: ALL });
+    expect(deviceConsent()).toMatchObject({ version: DEFAULT_CONSENT_VERSION, items: ALL, acceptedAt: expect.any(String) });
+    startEmailSession({ uid: "pre-1", email: "citizen@example.test" });
+    expect((await getConsentStatus()).upToDate).toBe(false); // the consent gate records it (ConsentGate tests)
+    expect(consentKnownAccepted("pre-1")).toBe(false);
+  });
+
+  it("an old notice version on the device doesn't count", () => {
+    saveDeviceConsent({ version: DEFAULT_CONSENT_VERSION - 1, items: ALL });
+    expect(deviceConsent()).toBeNull();
+  });
+
+  it("only all three boxes count", () => {
+    saveDeviceConsent({ version: DEFAULT_CONSENT_VERSION, items: { ...ALL, photosAttached: false } });
+    expect(deviceConsent()).toBeNull();
+  });
+
+  it("clearDeviceConsent forgets it (logging out, withdrawing, deleting)", () => {
+    saveDeviceConsent({ version: DEFAULT_CONSENT_VERSION, items: ALL });
+    clearDeviceConsent();
+    expect(deviceConsent()).toBeNull();
+  });
+
 });

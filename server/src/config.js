@@ -1,5 +1,5 @@
 // Runtime configuration, read from environment variables only.
-// Secrets (Mongo URI, JWT secrets, phone-hash key) never live in source
+// Secrets (Mongo URI, JWT secrets, email-hash key) never live in source
 // control — copy .env.example to .env and fill them in. Values are never
 // logged.
 //
@@ -12,14 +12,14 @@
 import crypto from "node:crypto";
 import { DEFAULT_CONSENT_VERSION } from "./constants.js";
 import { TOKEN_ENVS } from "./tokens.js";
-import { MIN_PHONE_SECRET_LENGTH } from "./phone.js";
+import { MIN_IDENTITY_SECRET_LENGTH } from "./identity.js";
 
 const MIN_SECRET_LENGTH = 32;
 
-// Development only. Phone hashes must stay the same across restarts (they are
-// how a returning user's number is recognised), so unlike the JWT secrets this
-// fallback is fixed rather than random.
-const DEV_PHONE_HASH_SECRET = "ecosetu-development-only-phone-hash-secret";
+// Development only. Email hashes must stay the same across restarts (they are
+// how a saved account is found when an official grants it a role), so unlike
+// the JWT secrets this fallback is fixed rather than random.
+const DEV_IDENTITY_HASH_SECRET = "ecosetu-development-only-phone-hash-secret";
 
 const MONGO_URI = /^mongodb(\+srv)?:\/\/[^/\s]+/;
 
@@ -52,7 +52,7 @@ export function loadConfig(env = process.env) {
 
   const firebaseProjectId = (env.ECOSETU_FIREBASE_PROJECT_ID ?? "").trim();
   if (!firebaseProjectId) {
-    throw new Error("ECOSETU_FIREBASE_PROJECT_ID must be set (sign-in uses Firebase Phone Auth).");
+    throw new Error("ECOSETU_FIREBASE_PROJECT_ID must be set (sign-in uses Firebase Authentication).");
   }
 
   const mongoUri = (env.MONGODB_URI ?? "").trim();
@@ -80,12 +80,14 @@ export function loadConfig(env = process.env) {
 
   const jwtSecret = secret(["ECOSETU_JWT_SECRET", "JWT_ACCESS_SECRET"]);
   const jwtRefreshSecret = secret(["ECOSETU_JWT_REFRESH_SECRET", "JWT_REFRESH_SECRET"]);
-  const phoneHashSecret = secret(["PHONE_HASH_SECRET"], {
-    minLength: MIN_PHONE_SECRET_LENGTH,
-    devFallback: DEV_PHONE_HASH_SECRET,
+  // Keys the email hash of saved accounts. The variable kept the name it had
+  // when sign-in was by phone, so existing deployments need no change.
+  const identityHashSecret = secret(["PHONE_HASH_SECRET"], {
+    minLength: MIN_IDENTITY_SECRET_LENGTH,
+    devFallback: DEV_IDENTITY_HASH_SECRET,
   });
-  if (new Set([jwtSecret, jwtRefreshSecret, phoneHashSecret]).size !== 3) {
-    throw new Error("The access-token, refresh-token and phone-hash secrets must all be different.");
+  if (new Set([jwtSecret, jwtRefreshSecret, identityHashSecret]).size !== 3) {
+    throw new Error("The access-token, refresh-token and PHONE_HASH_SECRET secrets must all be different.");
   }
 
   // Photos: a PRIVATE Vercel Blob store. On Vercel, connecting the store to
@@ -127,7 +129,7 @@ export function loadConfig(env = process.env) {
     mongoDbName,
     jwtSecret,
     jwtRefreshSecret,
-    phoneHashSecret,
+    identityHashSecret,
     tokenEnv,
     accessTtlSeconds: 15 * 60,
     refreshTtlSeconds: 7 * 24 * 60 * 60,
@@ -166,6 +168,36 @@ export function loadConfig(env = process.env) {
     complaintRateLimit: {
       max: num(env.ECOSETU_COMPLAINT_RATE_MAX, 10),
       windowMs: num(env.ECOSETU_COMPLAINT_RATE_WINDOW_MS, 60 * 60_000),
+    },
+    // ...and per IP, since a new account costs little. Sized for a
+    // campus or hackathon hall behind one public IP, not for one person.
+    complaintIpRateLimit: {
+      max: num(env.ECOSETU_COMPLAINT_IP_RATE_MAX, 30),
+      windowMs: num(env.ECOSETU_COMPLAINT_RATE_WINDOW_MS, 60 * 60_000),
+    },
+    // Sign-ups per IP: an email account's first sign-in. Returning accounts
+    // are never counted. Sized for a campus behind one public IP.
+    signupRateLimit: {
+      max: num(env.ECOSETU_SIGNUP_RATE_MAX, 20),
+      windowMs: num(env.ECOSETU_SIGNUP_RATE_WINDOW_MS, 60 * 60_000),
+    },
+    // Toilet ratings (each user has one per toilet; changing it counts too).
+    ratingRateLimit: {
+      max: num(env.ECOSETU_RATING_RATE_MAX, 20),
+      windowMs: num(env.ECOSETU_RATING_RATE_WINDOW_MS, 60 * 60_000),
+    },
+    ratingIpRateLimit: {
+      max: num(env.ECOSETU_RATING_IP_RATE_MAX, 60),
+      windowMs: num(env.ECOSETU_RATING_RATE_WINDOW_MS, 60 * 60_000),
+    },
+    // Up/down votes on complaints (setting, changing or removing one).
+    voteRateLimit: {
+      max: num(env.ECOSETU_VOTE_RATE_MAX, 60),
+      windowMs: num(env.ECOSETU_VOTE_RATE_WINDOW_MS, 60 * 60_000),
+    },
+    voteIpRateLimit: {
+      max: num(env.ECOSETU_VOTE_IP_RATE_MAX, 200),
+      windowMs: num(env.ECOSETU_VOTE_RATE_WINDOW_MS, 60 * 60_000),
     },
     // Place search / street-address lookups (OpenStreetMap Nominatim), per
     // signed-in user. Nominatim itself is called at most once a second for

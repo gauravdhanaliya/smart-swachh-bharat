@@ -1,5 +1,6 @@
 // Notifications, consent, and "delete my data".
 
+import { DEFAULT_CONSENT_VERSION } from "../src/constants.js";
 import { test, before, after, describe } from "node:test";
 import assert from "node:assert/strict";
 import { seedAll } from "../src/seed.js";
@@ -22,7 +23,8 @@ before(async () => {
 after(() => t.stop());
 
 const GENERAL = { issueType: "Dirty Area", description: "Rubbish near the canteen", location: { address: "Canteen", latitude: 29.8905, longitude: 77.9616 } };
-const ITEMS = { phoneForLogin: true, locationWhenReporting: true, photosAttached: true, readNotice: true };
+const ITEMS = { locationWhenReporting: true, photosAttached: true, readNotice: true };
+const CURRENT = DEFAULT_CONSENT_VERSION; // the notice version a server uses by default
 
 describe("notifications", () => {
   test("the server notifies the owner at each status change; nobody else sees them", async () => {
@@ -85,13 +87,13 @@ describe("consent", () => {
   test("is versioned: none at first, saved with the current version, stale versions refused", async () => {
     const c = await api.signIn("consent-c1");
     let res = await api.call("GET", "/api/me/consent", { token: c.token });
-    assert.deepEqual(res.json, { version: 1, consent: null, upToDate: false });
+    assert.deepEqual(res.json, { version: CURRENT, consent: null, upToDate: false });
 
     assert.equal((await api.call("PUT", "/api/me/consent", { token: c.token, body: { version: 0, items: ITEMS } })).status, 409);
-    res = await api.call("PUT", "/api/me/consent", { token: c.token, body: { version: 1, items: ITEMS } });
+    res = await api.call("PUT", "/api/me/consent", { token: c.token, body: { version: CURRENT, items: ITEMS } });
     assert.equal(res.status, 200, JSON.stringify(res.json));
     assert.equal(res.json.upToDate, true);
-    assert.equal(res.json.consent.version, 1);
+    assert.equal(res.json.consent.version, CURRENT);
     assert.ok(res.json.consent.acceptedAt);
   });
 
@@ -101,31 +103,31 @@ describe("consent", () => {
       { ...ITEMS, readNotice: false },
       { ...ITEMS, locationWhenReporting: false },
       { ...ITEMS, photosAttached: false },
-      { ...ITEMS, phoneForLogin: false },
+      { ...ITEMS, phoneForLogin: true }, // the old phone item is gone
       { ...ITEMS, marketing: true },
       { ...ITEMS, readNotice: "yes" },
     ]) {
-      assert.equal((await api.call("PUT", "/api/me/consent", { token: c.token, body: { version: 1, items } })).status, 400, JSON.stringify(items));
+      assert.equal((await api.call("PUT", "/api/me/consent", { token: c.token, body: { version: CURRENT, items } })).status, 400, JSON.stringify(items));
     }
-    assert.equal((await api.call("PUT", "/api/me/consent", { token: c.token, body: { version: 1, items: ITEMS, acceptedAt: "2020-01-01" } })).status, 400);
+    assert.equal((await api.call("PUT", "/api/me/consent", { token: c.token, body: { version: CURRENT, items: ITEMS, acceptedAt: "2020-01-01" } })).status, 400);
   });
 
-  test("a demo login has no phone, so the phone box is not required", async () => {
+  test("a demo login accepts the same three boxes", async () => {
     const demo = await api.call("POST", "/api/auth/demo", { body: { role: "citizen" } });
-    const res = await api.call("PUT", "/api/me/consent", { token: demo.json.accessToken, body: { version: 1, items: { ...ITEMS, phoneForLogin: false } } });
+    const res = await api.call("PUT", "/api/me/consent", { token: demo.json.accessToken, body: { version: CURRENT, items: ITEMS } });
     assert.equal(res.status, 200, JSON.stringify(res.json));
   });
 
   test("a newer notice version makes an older consent out of date", async () => {
-    const v2 = await startTestServer({ ECOSETU_CONSENT_VERSION: "2" });
+    const v2 = await startTestServer({ ECOSETU_CONSENT_VERSION: String(CURRENT + 1) });
     try {
       const a = apiClient(v2);
       const c = await a.signIn("consent-v2");
-      await v2.db.collection("consents").insertOne({ _id: "consent-v2", version: 1, acceptedAt: "2026-01-01T00:00:00.000Z", items: ITEMS, updatedAt: "2026-01-01T00:00:00.000Z" });
+      await v2.db.collection("consents").insertOne({ _id: "consent-v2", version: CURRENT, acceptedAt: "2026-01-01T00:00:00.000Z", items: ITEMS, updatedAt: "2026-01-01T00:00:00.000Z" });
       const res = await a.call("GET", "/api/me/consent", { token: c.token });
-      assert.deepEqual([res.json.version, res.json.upToDate, res.json.consent.version], [2, false, 1]);
-      assert.equal((await a.call("PUT", "/api/me/consent", { token: c.token, body: { version: 1, items: ITEMS } })).status, 409);
-      assert.equal((await a.call("PUT", "/api/me/consent", { token: c.token, body: { version: 2, items: ITEMS } })).status, 200);
+      assert.deepEqual([res.json.version, res.json.upToDate, res.json.consent.version], [CURRENT + 1, false, CURRENT]);
+      assert.equal((await a.call("PUT", "/api/me/consent", { token: c.token, body: { version: CURRENT, items: ITEMS } })).status, 409);
+      assert.equal((await a.call("PUT", "/api/me/consent", { token: c.token, body: { version: CURRENT + 1, items: ITEMS } })).status, 200);
     } finally {
       await v2.stop();
     }
@@ -133,7 +135,7 @@ describe("consent", () => {
 
   test("withdrawing consent removes it and signs the user out at once", async () => {
     const c = await api.signIn("consent-withdraw");
-    await api.call("PUT", "/api/me/consent", { token: c.token, body: { version: 1, items: ITEMS } });
+    await api.call("PUT", "/api/me/consent", { token: c.token, body: { version: CURRENT, items: ITEMS } });
     const res = await api.call("DELETE", "/api/me/consent", { token: c.token });
     assert.equal(res.status, 200);
     assert.equal(res.json.signedOut, true);
@@ -161,7 +163,7 @@ describe("delete my data", () => {
     await api.call("POST", `/api/complaints/${c2}/vote`, { token: me.token, body: { direction: "up" } });
     await api.call("POST", `/api/complaints/${c2}/assign`, { token: official.token, body: { workerId: "w1" } }); // a notification
     await api.call("PUT", `/api/toilets/${DEMO_TOILETS[0].id}/rating`, { token: me.token, body: { stars: 5, comment: "Great" } });
-    await api.call("PUT", "/api/me/consent", { token: me.token, body: { version: 1, items: ITEMS } });
+    await api.call("PUT", "/api/me/consent", { token: me.token, body: { version: CURRENT, items: ITEMS } });
     assert.equal((await api.call("GET", "/api/geo/search?q=Roorkee", { token: me.token })).status, 200); // a per-user search counter
     await api.call("POST", "/api/complaints", { token: someone.token, body: GENERAL });
     const complaintsBefore = await t.db.collection("complaints").countDocuments();
