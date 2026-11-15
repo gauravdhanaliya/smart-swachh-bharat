@@ -26,6 +26,8 @@ import { useCity } from "../hooks/useCity";
 import { inCity } from "../data/cities";
 import IndiaLocationPicker from "../components/IndiaLocationPicker";
 import { TAP_LINK } from "../components/buttonStyles";
+import Glyph from "../components/Glyph";
+import Icon from "../components/Icon";
 
 // FIX — this screen previously rendered its map with SimpleMap, a plain
 // OpenStreetMap iframe embed that can only ever show ONE fixed marker.
@@ -123,7 +125,7 @@ function NearbyRow({ kind, item, onSelect, rating }) {
       onClick={onSelect}
       className="flex w-full items-center gap-3 rounded-2xl border border-emerald-100 bg-white px-3.5 py-3 text-left hover:bg-emerald-50"
     >
-      <span className="text-lg">{isBin ? "🗑️" : isBuilding ? item.icon : "🚻"}</span>
+      <Glyph value={isBin ? "🗑️" : isBuilding ? item.icon : "🚻"} />
       <span className="min-w-0 flex-1">
         <span className="flex items-center justify-between gap-2">
           {/* USABILITY AUDIT FIX (issues 3 & 4 — "text is truncated"): a
@@ -472,12 +474,12 @@ export default function MapScreen() {
           />
 
           {places.status === "error" && (
-            <p role="alert" className="rounded-2xl bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900 shadow-sm">
+            <p role="alert" className="rounded-2xl bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-900">
               {places.error}
             </p>
           )}
           {places.status === "done" && places.results.length === 0 && (
-            <p role="status" className="rounded-2xl bg-white px-4 py-2.5 text-xs text-emerald-800/70 shadow-sm">
+            <p role="status" className="rounded-2xl bg-white px-4 py-2.5 text-xs text-emerald-800/70 border border-line">
               No places found for “{places.query}”.
             </p>
           )}
@@ -512,7 +514,7 @@ export default function MapScreen() {
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-emerald-50"
                 >
                   <span className="text-base">
-                    {result.kind === "bin" ? "🗑️" : result.kind === "toilet" ? "🚻" : result.icon}
+                    <Glyph value={result.kind === "bin" ? "🗑️" : result.kind === "toilet" ? "🚻" : result.icon} className="h-4 w-4" />
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium text-emerald-950">
@@ -528,7 +530,7 @@ export default function MapScreen() {
           )}
 
           {sync.error && (
-            <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700 shadow-sm">
+            <div role="alert" className="flex items-center justify-between gap-3 rounded-2xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
               <span>{sync.error.message}</span>
               <button type="button" onClick={sync.retry} className="shrink-0 rounded-full bg-white px-3 py-1 font-semibold text-red-700 shadow-sm">
                 Retry
@@ -536,7 +538,7 @@ export default function MapScreen() {
             </div>
           )}
 
-          <div className="inline-flex w-fit rounded-full bg-white p-1 shadow-md shadow-emerald-900/10" role="tablist" aria-label="Map or list view">
+          <div className="inline-flex w-fit rounded-full bg-white p-1 shadow-md" role="tablist" aria-label="Map or list view">
             {[
               ["map", "Map"],
               ["list", "List"],
@@ -547,9 +549,7 @@ export default function MapScreen() {
                 role="tab"
                 aria-selected={view === id}
                 onClick={() => setView(id)}
-                className={`rounded-full px-4 py-1.5 text-xs font-semibold ${
-                  view === id ? "bg-emerald-700 text-white" : "text-emerald-800"
-                }`}
+                className={`rounded-xl px-4 py-1.5 text-xs font-semibold ${ view === id ? "bg-emerald-700 text-white" : "text-emerald-800" }`}
               >
                 {label}
               </button>
@@ -561,21 +561,21 @@ export default function MapScreen() {
             <button
               type="button"
               onClick={gps.request}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-md"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 border border-line"
             >
               {gpsStatus === "locating" ? (
                 <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 animate-spin" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <path d="M21 12a9 9 0 11-9-9" />
                 </svg>
               ) : (
-                "📍"
+                <Icon name="pin" className="h-3.5 w-3.5" />
               )}
               Use My Location
             </button>
             <button
               type="button"
               onClick={() => setShowAreaPicker((v) => !v)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-md"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 border border-line"
             >
               Set area manually
             </button>
@@ -593,7 +593,7 @@ export default function MapScreen() {
           </div>
 
           {outOfRange && nearestFacility && (
-            <p className="rounded-2xl bg-white px-3 py-2 text-xs font-medium text-emerald-800/70 shadow-sm">
+            <p className="rounded-2xl bg-white px-3 py-2 text-xs font-medium text-emerald-800/70 border border-line">
               Nothing within {RADIUS_OPTIONS.find((o) => o.value === radiusM)?.label} of this point — the
               nearest {nearestFacility.type ? "bin" : "toilet"} is {nearestFacility.distance} away. Showing the
               closest ones instead.
@@ -613,10 +613,10 @@ export default function MapScreen() {
             <GpsAlert tone="error">
               <p>{gpsError}</p>
               <div className="mt-1.5 flex gap-4">
-                <button type="button" onClick={gps.request} className="font-semibold underline">
+                <button type="button" onClick={gps.request} className="font-semibold">
                   Try again
                 </button>
-                <button type="button" onClick={() => setShowAreaPicker(true)} className="font-semibold underline">
+                <button type="button" onClick={() => setShowAreaPicker(true)} className="font-semibold">
                   Enter manually
                 </button>
               </div>
@@ -626,14 +626,14 @@ export default function MapScreen() {
           {lowAccuracy && !gpsError && <GpsAlert>{lowAccuracy}</GpsAlert>}
 
           {gpsStatus === "locating" && (
-            <p className="rounded-2xl bg-white px-3 py-2 text-xs font-medium text-emerald-800/70 shadow-sm">
+            <p className="rounded-2xl bg-white px-3 py-2 text-xs font-medium text-emerald-800/70 border border-line">
               Getting a GPS fix… the first reading may be a rough network guess and will sharpen in a few
               seconds.
             </p>
           )}
 
           {showAreaPicker && (
-            <div className="rounded-2xl bg-white px-3 py-3 shadow-sm">
+            <div className="rounded-2xl bg-white px-3 py-3 border border-line">
               <p className="mb-2 text-xs font-semibold text-emerald-950">Set your area manually</p>
               <IndiaLocationPicker
                 id="map-area"
@@ -699,7 +699,7 @@ export default function MapScreen() {
             href={googleMapsSearchUrl(mapCenter.latitude, mapCenter.longitude)}
             target="_blank"
             rel="noreferrer"
-            className="-mt-1 self-end text-xs font-semibold text-emerald-700 underline"
+            className="-mt-1 self-end text-xs font-semibold text-emerald-700"
           >
             Open this area in Google Maps
           </a>
@@ -717,13 +717,13 @@ export default function MapScreen() {
           )}
 
           {!selected && emptyCity && (
-            <p className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-emerald-900 shadow-sm">
+            <p className="rounded-2xl bg-white px-4 py-3 text-sm font-medium text-emerald-900 border border-line">
               No bins or toilets are mapped in {city.name} yet. Choose another city on Home, search for a place, or use
               your location.
             </p>
           )}
           {!selected && !emptyCity && (
-            <p className="rounded-2xl bg-white px-4 py-3 text-xs text-emerald-800/60 shadow-sm">
+            <p className="rounded-2xl bg-white px-4 py-3 text-xs text-emerald-800/60 border border-line">
               Showing {followingCity ? cityView.label : "your location"}. Search, or pick a bin/toilet from the list
               below, to see its exact location and open it in Google Maps.
             </p>

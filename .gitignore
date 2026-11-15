@@ -13,3 +13,6 @@ coverage
 
 *.log
 .DS_Store
+
+# Layout check screenshots for review
+shots-review/

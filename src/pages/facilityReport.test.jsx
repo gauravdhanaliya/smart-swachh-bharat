@@ -9,7 +9,7 @@ vi.mock("../components/FacilityMap", () => ({ default: () => <div data-testid="f
 
 import App from "../App";
 import FacilityPopupContent from "../components/FacilityPopupContent";
-import { startOtpSession, startSession } from "../services/authSession";
+import { startEmailSession, startSession } from "../services/authSession";
 import { createFacilityComplaint, assignComplaint } from "../services/complaintService";
 import { LEGACY_BINS, TOILETS, seedLocalApi } from "../test/fixtures";
 import { acceptConsentLocally } from "../test/consent";
@@ -25,7 +25,7 @@ function renderApp(path) {
 }
 
 const citizen = (uid = "fac-reporter") => {
-  const user = startOtpSession({ uid, phone: "9876543210" });
+  const user = startEmailSession({ uid, email: "citizen@example.test" });
   acceptConsentLocally(user);
   return user;
 };

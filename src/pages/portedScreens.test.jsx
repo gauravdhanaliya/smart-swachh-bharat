@@ -20,7 +20,7 @@ vi.mock("react-leaflet", () => ({
 vi.mock("../services/geocode", () => ({ reverseGeocode: vi.fn(async () => "12 Main Road, Roorkee") }));
 
 import App from "../App";
-import { startOtpSession, startSession } from "../services/authSession";
+import { startEmailSession, startSession } from "../services/authSession";
 import { addWorker, removeWorker } from "../services/workerService";
 import { assignComplaint, createComplaint, getComplaints, updateComplaintStatus } from "../services/complaintService";
 import { deleteMyData } from "../services/consentService";
@@ -48,7 +48,9 @@ function emptyData() {
 }
 
 // A StatTile's value sits just before its label (a status badge with the same text has no sibling).
-const tile = (label) => screen.getAllByText(label).find((el) => el.previousElementSibling)?.previousElementSibling.textContent;
+// A stat tile's number, found by its exact label inside [data-kpi-card].
+const tile = (label) =>
+  [...document.querySelectorAll("[data-kpi-card]")].find((card) => [...card.querySelectorAll("span")].some((el) => el.textContent === label && !el.children.length))?.querySelector(".tabular-nums")?.textContent;
 
 const complaint = (overrides = {}) => ({
   citizenName: "Asha",
@@ -81,20 +83,18 @@ describe("empty states with no data", () => {
     await waitFor(() => expect(path()).toBe("/citizen/report"));
   });
 
-  it("citizen home shows zero counts and says the city has nothing mapped yet", async () => {
+  it("citizen home says there are no reports yet and the city has no toilets mapped yet", async () => {
     startSession("citizen", "Asha");
     renderApp("/citizen");
-    expect(await screen.findByText(/No bins or toilets are mapped in .+ yet/)).toBeInTheDocument();
-    for (const label of ["Bins Need Collection", "Overflowing Bins", "Complaints Resolved", "Total Complaints"]) {
-      expect(tile(label)).toBe("0");
-    }
+    expect(await screen.findByText(/No public toilets are mapped in .+ yet/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "My reports: no reports yet" })).toBeInTheDocument();
   });
 
   it("worker dashboard shows 0 and says no tasks are assigned; so does the task list", async () => {
     startSession("worker", "");
     const { unmount } = renderApp("/worker");
     await screen.findByRole("heading", { name: "Dashboard" });
-    for (const label of ["Assigned Tasks", "New Tasks", "In Progress", "Completed"]) expect(tile(label)).toBe("0");
+    for (const label of ["Assigned", "New", "In progress", "Completed", "High priority"]) expect(tile(label)).toBe("0");
     expect(screen.getByText("No tasks assigned yet.")).toBeInTheDocument();
     unmount();
 
@@ -162,7 +162,7 @@ describe("lists with data keep their filter messages", () => {
 });
 
 describe("worker dashboard counts", () => {
-  it("'Assigned Tasks' is every task given to the worker, with in-progress ones counted once", async () => {
+  it("'Assigned' is every task given to the worker, with in-progress ones counted once", async () => {
     localStorage.setItem("ssb_complaints_v1", "[]");
     const ids = [createComplaint(complaint()), createComplaint(complaint()), createComplaint(complaint({ priority: "HIGH" }))].map((c) => c.id);
     for (const id of ids) assignComplaint(id, "w1", "Vikash Kumar");
@@ -171,9 +171,9 @@ describe("worker dashboard counts", () => {
     startSession("worker", "");
     renderApp("/worker");
     await screen.findByRole("heading", { name: "Dashboard" });
-    expect(tile("Assigned Tasks")).toBe("3");
-    expect(tile("New Tasks")).toBe("1");
-    expect(tile("In Progress")).toBe("1");
+    expect(tile("Assigned")).toBe("3");
+    expect(tile("New")).toBe("1");
+    expect(tile("In progress")).toBe("1");
     expect(tile("Completed")).toBe("1");
     // All active tasks are listed (the list scrolls on its own), not just the first four.
     expect(screen.queryByText("No tasks assigned yet.")).toBeNull();
@@ -192,7 +192,7 @@ describe("worker dashboard counts", () => {
 
 describe("assigning a complaint uses the live worker directory", () => {
   it("offers a worker the official added, not one they removed, and assigns the new one", async () => {
-    const added = addWorker({ name: "Sunita Devi", area: "Ward 9" });
+    const added = addWorker({ name: "Sunita Devi", email: "sunita@example.test", area: "Ward 9" });
     removeWorker("w2");
     const c = createComplaint(complaint());
     startSession("official", "");
@@ -225,7 +225,7 @@ describe("delete my data reaches reports filed from the Report Issue screen", ()
         getCurrentPosition: (ok) => ok({ coords: { latitude: 29.8543, longitude: 77.888, accuracy: 5 } }),
       },
     });
-    const session = startOtpSession({ uid: "fb-uid-7", phone: "9876543210" });
+    const session = startEmailSession({ uid: "fb-uid-7", email: "citizen@example.test" });
     acceptConsentLocally(session);
     const user = userEvent.setup();
     renderApp("/citizen/report");

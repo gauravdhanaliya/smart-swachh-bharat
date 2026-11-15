@@ -6,6 +6,7 @@ import { BIN_STATUS_HINTS } from "../data/bins";
 import { useLocationDetail } from "../hooks/useLocationDetail";
 import { locationToBin } from "../services/locationAdapters";
 import { OpenReportsNote, ReportFacilitySheet, useReportSheet } from "../components/FacilityReportControls";
+import Icon from "../components/Icon";
 
 export default function BinDetails() {
   const { id } = useParams();
@@ -45,7 +46,7 @@ export default function BinDetails() {
           <button
             type="button"
             onClick={() => navigate("/citizen/map")}
-            className="mt-2 rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white"
+            className="mt-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white"
           >
             Back to Map
           </button>
@@ -71,10 +72,10 @@ export default function BinDetails() {
       </div>
 
       <div className="px-5 pb-6">
-        <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-emerald-100 bg-white p-5">
           <div className="flex items-start gap-3">
             <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-2xl">
-              🗑️
+              <Icon name="bin" className="h-7 w-7" />
             </span>
             <div>
               <h2 className="text-lg font-bold text-emerald-950">{bin.type} Bin</h2>
@@ -124,7 +125,7 @@ export default function BinDetails() {
             href={`https://www.google.com/maps/dir/?api=1&destination=${bin.latitude},${bin.longitude}`}
             target="_blank"
             rel="noreferrer"
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-900/20"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 11l19-9-9 19-2-8-8-2z" />
@@ -134,7 +135,7 @@ export default function BinDetails() {
           <button
             type="button"
             onClick={report.show}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 9v4M12 17h.01M10.3 4.3L2.7 18.7A1 1 0 003.6 20h16.8a1 1 0 00.9-1.3L13.7 4.3a1 1 0 00-1.7 0z" />

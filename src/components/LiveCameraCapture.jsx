@@ -126,7 +126,7 @@ export default function LiveCameraCapture({ photo, onCapture, onRetake }) {
           <button
             type="button"
             onClick={cancel}
-            className="flex-1 rounded-full border border-emerald-200 py-2 text-xs font-semibold text-emerald-700"
+            className="flex-1 rounded-xl border border-emerald-200 py-2 text-xs font-semibold text-emerald-700"
           >
             Cancel
           </button>
@@ -134,7 +134,7 @@ export default function LiveCameraCapture({ photo, onCapture, onRetake }) {
             type="button"
             onClick={capture}
             disabled={!ready}
-            className="flex-1 rounded-full bg-emerald-700 py-2 text-xs font-semibold text-white btn-disabled"
+            className="flex-1 rounded-xl bg-emerald-700 py-2 text-xs font-semibold text-white btn-disabled"
           >
             {ready ? "Capture" : "Starting camera…"}
           </button>
@@ -149,7 +149,7 @@ export default function LiveCameraCapture({ photo, onCapture, onRetake }) {
         type="button"
         onClick={startCamera}
         disabled={starting}
-        className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-emerald-200 text-emerald-600 hover:bg-emerald-50 btn-disabled-quiet"
+        className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 btn-disabled-quiet"
         aria-label="Take a photo"
       >
         <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

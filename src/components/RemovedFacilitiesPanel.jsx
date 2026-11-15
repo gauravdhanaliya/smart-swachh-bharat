@@ -50,7 +50,7 @@ export default function RemovedFacilitiesPanel({
             <button
               type="button"
               onClick={onUndo}
-              className="rounded-full bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-700"
+              className="rounded-xl bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-700"
             >
               Undo
             </button>
@@ -58,7 +58,7 @@ export default function RemovedFacilitiesPanel({
               type="button"
               onClick={onDismissUndo}
               aria-label="Dismiss"
-              className="rounded-full border border-amber-300 px-3 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+              className="rounded-xl border border-amber-300 px-3 py-1.5 text-sm font-semibold text-amber-800 hover:bg-amber-100"
             >
               Dismiss
             </button>
@@ -67,7 +67,7 @@ export default function RemovedFacilitiesPanel({
       )}
 
       {removed.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="rounded-2xl border border-line bg-white">
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -80,23 +80,23 @@ export default function RemovedFacilitiesPanel({
                 {removed.length}
               </span>
             </span>
-            <span className="text-xs font-medium text-slate-400">
+            <span className="text-xs font-medium text-muted">
               {open ? "Hide" : "Show"}
             </span>
           </button>
 
           {open && (
-            <div className="border-t border-slate-100 px-4 py-3">
-              <ul className="flex flex-col divide-y divide-slate-100">
+            <div className="border-t border-line px-4 py-3">
+              <ul className="flex flex-col divide-y divide-line">
                 {removed.map((item) => (
                   <li
                     key={item.id}
                     className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-slate-400">{item.id}</p>
+                      <p className="text-xs font-medium text-muted">{item.id}</p>
                       <p className="truncate text-sm font-semibold text-slate-800">{item.name}</p>
-                      <p className="mt-0.5 truncate text-xs text-slate-500">
+                      <p className="mt-0.5 truncate text-xs text-muted">
                         {item.reason}
                         {formatWhen(item.removedAt) && ` · ${formatWhen(item.removedAt)}`}
                         {item.removedBy && ` · ${item.removedBy}`}
@@ -105,7 +105,7 @@ export default function RemovedFacilitiesPanel({
                     <button
                       type="button"
                       onClick={() => onRestore(item.id)}
-                      className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                      className="shrink-0 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
                     >
                       Restore
                     </button>
@@ -117,12 +117,12 @@ export default function RemovedFacilitiesPanel({
                 <button
                   type="button"
                   onClick={onRestoreAll}
-                  className="mt-3 text-xs font-semibold text-sky-700 hover:underline"
+                  className="mt-3 text-xs font-semibold text-brand"
                 >
                   Restore all {removed.length} removed {plural}
                 </button>
               )}
-              <p className="mt-2 text-[11px] text-slate-400">
+              <p className="mt-2 text-[11px] text-muted">
                 Restoring puts the {noun} back on the Government list and the Citizen map
                 immediately.
               </p>

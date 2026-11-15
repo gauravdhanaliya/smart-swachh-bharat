@@ -11,11 +11,11 @@ const ICON_BG = {
 // gap-3 / p-3.5) so two tiles fit side by side on a phone without the
 // label running under the chevron. Same border, radius, hover and focus.
 const INTERACTIVE_CARD =
-  "flex w-full items-center gap-2.5 rounded-2xl border border-emerald-100 bg-white p-3 text-left shadow-sm transition hover:bg-emerald-50 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
+  "flex w-full items-center gap-2.5 rounded-2xl border border-emerald-100 bg-white p-3 text-left transition hover:bg-emerald-50 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
 
 // Non-interactive tiles keep the plain card look: no hover, no chevron.
 const STATIC_CARD =
-  "flex items-center gap-2.5 rounded-2xl border border-emerald-100 bg-white p-3 text-left shadow-sm";
+  "flex items-center gap-2.5 rounded-2xl border border-emerald-100 bg-white p-3 text-left";
 
 // `compact` shrinks padding/icon/text for no-scroll dashboards (see
 // CitizenHome, WorkerDashboard) — same content, tighter footprint.

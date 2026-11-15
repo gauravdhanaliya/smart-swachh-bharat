@@ -28,14 +28,10 @@ export default function ToggleSwitch({ checked, onChange, label, description, di
 
       <span
         aria-hidden="true"
-        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
-          checked ? "bg-emerald-600" : "bg-emerald-100"
-        }`}
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${ checked ? "bg-emerald-600" : "bg-emerald-100" }`}
       >
         <span
-          className={`inline-block h-5 w-5 transform rounded-full bg-[#ffffff] shadow transition ${
-            checked ? "translate-x-[22px]" : "translate-x-[2px]"
-          }`}
+          className={`inline-block h-5 w-5 transform rounded-full bg-[#ffffff] shadow transition ${ checked ? "translate-x-[22px]" : "translate-x-[2px]" }`}
         />
       </span>
     </button>

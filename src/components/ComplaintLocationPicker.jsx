@@ -219,7 +219,7 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
           presetsLabel="Known areas"
           allowGps={false}
         />
-        <button type="button" onClick={switchToGps} className="self-start text-xs font-semibold text-emerald-700 underline">
+        <button type="button" onClick={switchToGps} className="self-start text-xs font-semibold text-emerald-700">
           Use my GPS location instead
         </button>
         <p className="text-[11px] text-emerald-800/50">
@@ -305,7 +305,7 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
         <button
           type="button"
           onClick={gps.request}
-          className="mt-2 min-h-[44px] w-full rounded-full bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white"
+          className="mt-2 min-h-[44px] w-full rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white"
         >
           Use my current location
         </button>
@@ -315,10 +315,10 @@ export default function ComplaintLocationPicker({ value, onChange, extra }) {
         <GpsAlert tone="error" className="mt-2">
           <p>{errorText}</p>
           <div className="mt-1.5 flex gap-4">
-            <button type="button" onClick={gps.request} className="font-semibold underline">
+            <button type="button" onClick={gps.request} className="font-semibold">
               Try again
             </button>
-            <button type="button" onClick={gps.decline} className="font-semibold underline">
+            <button type="button" onClick={gps.decline} className="font-semibold">
               Enter manually
             </button>
           </div>

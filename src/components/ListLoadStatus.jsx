@@ -10,7 +10,7 @@ export default function ListLoadStatus({ status, what }) {
         <span>
           We couldn&apos;t load your {what}. {status.error.message}
         </span>
-        <button type="button" onClick={() => status.retry()} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+        <button type="button" onClick={() => status.retry()} className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
           Try again
         </button>
       </div>

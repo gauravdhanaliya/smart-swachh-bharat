@@ -1,16 +1,15 @@
 import StatusBadge from "./StatusBadge";
+import Icon from "./Icon";
 
 export default function BinCard({ bin, onClick, compact = false }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-2xl border border-emerald-100 bg-white p-4 text-left shadow-sm transition hover:border-emerald-200 ${
-        compact ? "flex items-center gap-3" : ""
-      }`}
+      className={`w-full rounded-2xl border border-emerald-100 bg-white p-4 text-left transition hover:border-emerald-200 ${ compact ? "flex items-center gap-3" : "" }`}
     >
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-lg">
-        🗑️
+        <Icon name="bin" className="h-6 w-6" />
       </span>
 
       <span className="flex-1 min-w-0">

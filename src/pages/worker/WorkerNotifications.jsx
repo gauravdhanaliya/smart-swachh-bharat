@@ -14,7 +14,7 @@ export default function WorkerNotifications() {
     <WorkerShell title="Notifications">
       <div className="flex flex-col gap-2 px-5 py-4">
         {notifications.length === 0 && (
-          <p className="mt-6 text-center text-sm text-orange-900/50">
+          <p className="mt-6 text-center text-sm text-muted">
             You're all caught up — no notifications yet.
           </p>
         )}
@@ -24,13 +24,11 @@ export default function WorkerNotifications() {
             key={n.key}
             type="button"
             onClick={() => navigate(`/worker/tasks/${n.complaintId}`)}
-            className="flex items-start justify-between gap-3 rounded-2xl border border-orange-100 bg-white p-4 text-left shadow-sm transition hover:bg-orange-50/50"
+            className="flex items-start justify-between gap-3 rounded-2xl border border-line bg-white p-4 text-left transition hover:bg-section"
           >
             <div className="flex items-start gap-3">
               <span
-                className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
-                  n.unread ? "bg-orange-600" : "bg-slate-300"
-                }`}
+                className={`mt-1 h-2 w-2 shrink-0 rounded-full ${ n.unread ? "bg-brand" : "bg-slate-300" }`}
               />
               <div>
                 <p className="text-sm font-semibold text-slate-900">{n.message}</p>

@@ -128,12 +128,12 @@ export default function WorkerTaskDetails() {
   return (
     <WorkerShell title="Task Details" showBack onBack={() => navigate("/worker/tasks")}>
       <div className="flex flex-col gap-4 px-5 py-4">
-        <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-line bg-white p-4">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-medium text-slate-500">#{complaint.id}</p>
               <p className="text-lg font-bold text-slate-900">{complaint.issueType}</p>
-              {facilityLabel(complaint) && <p className="text-sm font-medium text-orange-800">{facilityLabel(complaint)}</p>}
+              {facilityLabel(complaint) && <p className="text-sm font-medium text-brand">{facilityLabel(complaint)}</p>}
             </div>
             <div className="flex flex-col items-end gap-1.5">
               <PriorityBadge priority={complaint.priority} />
@@ -174,7 +174,7 @@ export default function WorkerTaskDetails() {
               href={mapUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-section px-3 py-1.5 text-xs font-semibold text-brand"
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 11l19-9-9 19-2-8-8-2z" />
@@ -184,7 +184,7 @@ export default function WorkerTaskDetails() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-line bg-white p-4">
           <p className="mb-3 text-sm font-bold text-slate-900">Status Timeline</p>
           <ComplaintTimeline status={complaint.status} />
         </div>
@@ -194,14 +194,14 @@ export default function WorkerTaskDetails() {
             type="button"
             onClick={handleStartWork}
             disabled={busy}
-            className="w-full rounded-full bg-orange-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-900/10 transition active:scale-[0.98] btn-disabled"
+            className="w-full rounded-xl bg-brand px-4 py-3.5 text-sm font-semibold text-white transition active:scale-[0.98] btn-disabled"
           >
             {busy ? "Starting…" : "Start Work"}
           </button>
         )}
 
         {complaint.status === STATUS.IN_PROGRESS && (
-          <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-line bg-white p-4">
             <label htmlFor="resolutionNote" className="mb-1.5 block text-sm font-semibold text-slate-900">
               Resolution Note (Optional)
             </label>
@@ -215,7 +215,7 @@ export default function WorkerTaskDetails() {
                 if (noteError) setNoteError("");
               }}
               placeholder="What did you do to resolve this?"
-              className="w-full resize-none rounded-xl border border-slate-200 p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none"
+              className="w-full resize-none rounded-xl border border-slate-200 p-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-line focus:outline-none"
             />
             <div className="mt-1 flex items-center justify-between">
               {noteError ? (
@@ -250,7 +250,7 @@ export default function WorkerTaskDetails() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50"
+                  className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-line text-brand hover:bg-section"
                   aria-label={photoBusy ? "Preparing photo" : "Add photo"}
                   aria-busy={photoBusy}
                   disabled={photoBusy}
@@ -275,7 +275,7 @@ export default function WorkerTaskDetails() {
               type="button"
               onClick={handleMarkResolved}
               disabled={busy}
-              className="mt-4 w-full rounded-full bg-orange-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-900/10 transition active:scale-[0.98] btn-disabled"
+              className="mt-4 w-full rounded-xl bg-brand px-4 py-3.5 text-sm font-semibold text-white transition active:scale-[0.98] btn-disabled"
             >
               {busy ? "Saving…" : "Mark as Resolved"}
             </button>

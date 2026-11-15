@@ -130,7 +130,7 @@ export default function AddLocationDialog({ onCancel, onSave, initialName = "", 
             type="button"
             onClick={gps.request}
             disabled={!supported || status === "locating" || gps.asking}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white btn-disabled"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white btn-disabled"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="3" />
@@ -205,13 +205,13 @@ export default function AddLocationDialog({ onCancel, onSave, initialName = "", 
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 rounded-full border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700"
+            className="flex-1 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="flex-1 rounded-full bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white"
+            className="flex-1 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white"
           >
             Save location
           </button>

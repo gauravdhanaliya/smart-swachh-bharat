@@ -59,9 +59,9 @@ export default function GovComplaints() {
     <GovShell title="Complaints" subtitle="Manage citizen complaints across the city">
       <ListLoadStatus status={loadStatus} what="complaints" />
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:max-w-xs">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
               {GovNavIcons.search}
             </span>
             <input
@@ -69,7 +69,7 @@ export default function GovComplaints() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by complaint ID or location…"
-              className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+              className="w-full rounded-xl border border-line py-2.5 pl-9 pr-3 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
             />
           </div>
           <StatusFilterTabs options={filterOptions} value={filter} onChange={setFilter} />
@@ -79,7 +79,7 @@ export default function GovComplaints() {
           <select
             value={facility}
             onChange={(e) => setFacility(e.target.value)}
-            className="min-h-10 rounded-full border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:ring-2 focus:ring-sky-400 focus:outline-none"
+            className="min-h-10 rounded-xl border border-line bg-white px-3 text-sm text-slate-800 focus:ring-2 focus:ring-brand focus:outline-none"
           >
             {FACILITY_FILTERS.map((f) => (
               <option key={f.value} value={f.value}>

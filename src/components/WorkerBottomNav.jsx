@@ -59,7 +59,7 @@ export default function WorkerBottomNav({ notificationCount = 0 }) {
     path === "/worker" ? location.pathname === "/worker" : location.pathname.startsWith(path);
 
   return (
-    <nav className="relative z-10 shrink-0 flex items-end border-t border-orange-100 bg-white px-1 pb-2 pt-1 shadow-[0_-6px_16px_-8px_rgba(224,122,0,0.2)]">
+    <nav className="relative z-10 shrink-0 flex items-end border-t border-line bg-white px-1 pb-2 pt-1 shadow-[0_-6px_16px_-8px_rgba(224,122,0,0.2)]">
       {NAV_ITEMS.map((item) => {
         const active = isActive(item.path);
         return (
@@ -69,7 +69,7 @@ export default function WorkerBottomNav({ notificationCount = 0 }) {
             onClick={() => navigate(item.path)}
             className="relative flex flex-1 flex-col items-center gap-1 py-2"
           >
-            <span className={active ? "text-orange-600" : "text-orange-900/40"}>
+            <span className={active ? "text-brand" : "text-muted"}>
               {ICONS[item.id]}
             </span>
             {item.id === "notifications" && notificationCount > 0 && (
@@ -78,7 +78,7 @@ export default function WorkerBottomNav({ notificationCount = 0 }) {
               </span>
             )}
             <span
-              className={`text-[11px] font-medium ${active ? "text-orange-700" : "text-orange-900/40"}`}
+              className={`text-[11px] font-medium ${active ? "text-brand" : "text-muted"}`}
             >
               {item.label}
             </span>

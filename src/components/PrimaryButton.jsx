@@ -10,7 +10,7 @@ export default function PrimaryButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`w-full inline-flex items-center justify-center gap-2 rounded-full bg-emerald-700 px-6 py-3.5 text-base font-semibold text-white shadow-md shadow-emerald-900/20 transition active:scale-[0.98] hover:bg-emerald-800 btn-disabled ${className}`}
+      className={`inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-4 text-base font-semibold text-white transition-colors hover:bg-brand-hover btn-disabled ${className}`}
     >
       {children}
     </button>

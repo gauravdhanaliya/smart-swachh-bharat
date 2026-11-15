@@ -5,7 +5,7 @@
  * the inner auth screens. `subtitle` is an optional small line under the
  * compact wordmark (no ministry attribution: this is not a government service).
  */
-export default function BrandLogo({ size = "lg", subtitle = null }) {
+export default function BrandLogo({ size = "lg", subtitle = null, nameAs: Name = "h1" }) {
   const isLarge = size === "lg";
 
   return (
@@ -20,14 +20,9 @@ export default function BrandLogo({ size = "lg", subtitle = null }) {
         </div>
       ) : (
         <div className="text-left">
-          <h1 className="text-[19px] font-extrabold leading-tight tracking-tight">
-            {/* Spaces outside the coloured spans, so the heading reads "Smart Swachh Bharat", not "SmartSwachhBharat". */}
-            <span className="text-brand-green-800">Smart</span>{" "}
-            <span className="text-brand-green-500">Swachh</span>{" "}
-            <span className="text-brand-orange-500">Bharat</span>
-          </h1>
+          <Name className="text-lg leading-tight font-semibold tracking-tight text-ink">Smart Swachh Bharat</Name>
           {subtitle && (
-            <p data-one-line className="text-xs font-medium leading-tight text-brand-green-800">
+            <p data-one-line className="text-sm leading-tight text-muted">
               {subtitle}
             </p>
           )}

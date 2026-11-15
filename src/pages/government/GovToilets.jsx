@@ -39,13 +39,13 @@ function byRating(ratings, direction) {
 
 // Citizens' average rating, the number of ratings, and a "Low rated" tag.
 function ToiletRating({ summary }) {
-  if (!summary?.count) return <p className="mt-2 text-xs text-slate-400">No ratings yet</p>;
+  if (!summary?.count) return <p className="mt-2 text-xs text-muted">No ratings yet</p>;
   const low = isLowRated(summary);
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
       <RatingStars value={summary.average} className="h-4 w-4" />
-      <span className="font-semibold tabular-nums text-slate-900">{formatAverage(summary.average)}</span>
-      <span className="text-xs text-slate-500">{ratingCountLabel(summary.count)}</span>
+      <span className="font-semibold tabular-nums text-ink">{formatAverage(summary.average)}</span>
+      <span className="text-xs text-muted">{ratingCountLabel(summary.count)}</span>
       {low && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">Low rated</span>}
     </div>
   );
@@ -84,7 +84,7 @@ export default function GovToilets() {
           <button
             type="button"
             onClick={() => navigate("/official/add-facility?type=Public+Toilet")}
-            className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover"
           >
             + Add Facility
           </button>
@@ -92,19 +92,15 @@ export default function GovToilets() {
             type="button"
             onClick={removal.toggleRemoveMode}
             aria-pressed={removal.removeMode}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition ${
-              removal.removeMode
-                ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
-                : "border-red-200 bg-white text-red-600 hover:bg-red-50"
-            }`}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition ${ removal.removeMode ? "border-red-600 bg-red-600 text-white hover:bg-red-700" : "border-red-200 bg-white text-red-600 hover:bg-red-50" }`}
           >
             {removal.removeMode ? "Done" : "− Remove Facility"}
           </button>
         </>
       }
     >
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <p className="text-sm text-slate-500">{toilets.length} facilities tracked</p>
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 lg:flex-row lg:items-center lg:justify-between">
+        <p className="text-sm text-muted">{toilets.length} facilities tracked</p>
         <div className="flex flex-col gap-3 lg:items-end">
           <StatusFilterTabs options={filters} value={filter} onChange={setFilter} />
           <label className="flex items-center gap-2 text-sm text-slate-600">
@@ -112,7 +108,7 @@ export default function GovToilets() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value)}
-              className="min-h-10 rounded-full border border-slate-200 bg-white px-3 text-sm text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+              className="min-h-10 rounded-xl border border-line bg-white px-3 text-sm text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
             >
               {SORTS.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -125,7 +121,7 @@ export default function GovToilets() {
       </div>
 
       {filter === "low" && (
-        <p className="mb-4 text-sm text-slate-500">
+        <p className="mb-4 text-sm text-muted">
           Toilets averaging below {LOW_RATED_BELOW} stars from at least {LOW_RATED_MIN_COUNT} citizen ratings.
         </p>
       )}
@@ -158,15 +154,13 @@ export default function GovToilets() {
         {filtered.map((t) => (
           <article
             key={t.id}
-            className={`rounded-2xl border bg-white p-4 shadow-sm transition ${
-              removal.removeMode ? "border-red-200" : "border-slate-200"
-            }`}
+            className={`rounded-2xl border bg-white p-4 transition ${ removal.removeMode ? "border-red-200" : "border-line" }`}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs font-medium text-slate-400">{t.id}</p>
+                <p className="text-xs font-medium text-muted">{t.id}</p>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <h3 className="font-semibold text-slate-900">{t.name}</h3>
+                  <h3 className="font-semibold text-ink">{t.name}</h3>
                   {t.isDemo && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">DEMO</span>
                   )}
@@ -174,17 +168,17 @@ export default function GovToilets() {
               </div>
               <StatusBadge status={t.status} />
             </div>
-            <p className="mt-1 text-xs text-slate-500">{t.address}</p>
+            <p className="mt-1 text-xs text-muted">{t.address}</p>
             <ToiletRating summary={ratings.get(t.id)} />
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-muted">
               Facilities: <span className="font-medium text-slate-700">{t.facilities.join(", ")}</span>
             </p>
-            <p className="mt-1 text-xs text-slate-400">Updated {t.lastUpdated}</p>
+            <p className="mt-1 text-xs text-muted">Updated {t.lastUpdated}</p>
 
             <button
               type="button"
               onClick={() => navigate(`/official/add-facility?edit=${encodeURIComponent(t.id)}`)}
-              className="mt-3 w-full rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="mt-3 w-full rounded-xl border border-line px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-section"
             >
               Edit
             </button>
@@ -194,7 +188,7 @@ export default function GovToilets() {
                 type="button"
                 onClick={() => removal.requestRemove(t)}
                 aria-label={`Remove ${t.name}`}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M6 7h12l-1 13a1 1 0 01-1 1H8a1 1 0 01-1-1L6 7z" />
@@ -208,12 +202,12 @@ export default function GovToilets() {
       </div>
 
       {loaded && toilets.length === 0 && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-300 bg-white p-10 text-center">
           <p className="text-sm font-semibold text-slate-700">No public toilets added yet.</p>
           <button
             type="button"
             onClick={() => navigate("/official/add-facility?type=Public+Toilet")}
-            className="rounded-full bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+            className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover"
           >
             Add Facility
           </button>
@@ -221,9 +215,9 @@ export default function GovToilets() {
       )}
 
       {toilets.length > 0 && filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <div className="rounded-2xl border border-slate-300 bg-white p-10 text-center">
           <p className="text-sm font-semibold text-slate-700">No public toilets to show</p>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-muted">
             {filter === "low" ? "No toilet is rated low right now." : "Try a different filter."}
           </p>
         </div>

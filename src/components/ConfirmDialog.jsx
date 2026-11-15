@@ -50,16 +50,14 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, dang
             ref={cancelRef}
             type="button"
             onClick={onCancel}
-            className="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={`flex-1 rounded-full px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 ${
-              danger ? "bg-red-600 hover:bg-red-700 focus-visible:outline-red-600" : "bg-emerald-700 hover:bg-emerald-800 focus-visible:outline-emerald-700"
-            }`}
+            className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 ${ danger ? "bg-red-600 hover:bg-red-700 focus-visible:outline-red-600" : "bg-emerald-700 hover:bg-brand-hover focus-visible:outline-emerald-700" }`}
           >
             {confirmLabel}
           </button>

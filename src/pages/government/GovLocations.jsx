@@ -8,6 +8,7 @@ import { useLiveBuildings } from "../../hooks/useLiveBuildings";
 import { useFacilityRemoval } from "../../hooks/useFacilityRemoval";
 import { useSyncStatus } from "../../hooks/useSyncStatus";
 import { BUILDING_TYPES, BUILDING_TYPE_LABELS } from "../../services/locationAdapters";
+import Glyph from "../../components/Glyph";
 
 const FILTERS = [
   { value: "all", label: "All" },
@@ -36,7 +37,7 @@ export default function GovLocations() {
           <button
             type="button"
             onClick={() => navigate("/official/add-facility?type=Building")}
-            className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover"
           >
             + Add Building
           </button>
@@ -44,19 +45,15 @@ export default function GovLocations() {
             type="button"
             onClick={removal.toggleRemoveMode}
             aria-pressed={removal.removeMode}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition ${
-              removal.removeMode
-                ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
-                : "border-red-200 bg-white text-red-600 hover:bg-red-50"
-            }`}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition ${ removal.removeMode ? "border-red-600 bg-red-600 text-white hover:bg-red-700" : "border-red-200 bg-white text-red-600 hover:bg-red-50" }`}
           >
             {removal.removeMode ? "Done" : "− Remove"}
           </button>
         </>
       }
     >
-      <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-sm text-slate-500">
+      <div className="mb-4 rounded-2xl border border-line bg-white p-4">
+        <p className="text-sm text-muted">
           {buildings.length === 0 ? (
             loaded ? "No buildings added yet. Use + Add Building to put gates, hostels, libraries and other landmarks on the map." : "Loading buildings…"
           ) : demoCount > 0 ? (
@@ -93,28 +90,28 @@ export default function GovLocations() {
         {filtered.map((b) => (
           <div
             key={b.id}
-            className={`rounded-2xl border bg-white p-4 shadow-sm ${removal.removeMode ? "border-red-200" : "border-slate-200"}`}
+            className={`rounded-2xl border bg-white p-4 ${removal.removeMode ? "border-red-200" : "border-line"}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs font-medium text-slate-400">{b.id}</p>
-                <p className="font-semibold text-slate-900">
-                  {b.icon} {b.name}
+                <p className="text-xs font-medium text-muted">{b.id}</p>
+                <p className="font-semibold text-ink">
+                  <Glyph value={b.icon} className="inline h-4 w-4 align-[-2px]" /> {b.name}
                 </p>
               </div>
               {b.isDemo && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">DEMO</span>
               )}
             </div>
-            <p className="mt-1 text-xs text-slate-500">{b.typeLabel}</p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-muted">{b.typeLabel}</p>
+            <p className="mt-1 text-xs text-muted">
               {b.latitude.toFixed(6)}, {b.longitude.toFixed(6)}
             </p>
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
                 onClick={() => navigate(`/official/add-facility?edit=${encodeURIComponent(b.id)}`)}
-                className="flex-1 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="flex-1 rounded-xl border border-line px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-section"
               >
                 Edit
               </button>
@@ -123,7 +120,7 @@ export default function GovLocations() {
                   type="button"
                   onClick={() => removal.requestRemove(b)}
                   aria-label={`Remove ${b.name}`}
-                  className="flex-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                  className="flex-1 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
                 >
                   Remove
                 </button>
@@ -134,9 +131,9 @@ export default function GovLocations() {
       </div>
 
       {filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <div className="rounded-2xl border border-slate-300 bg-white p-10 text-center">
           <p className="text-sm font-semibold text-slate-700">No locations to show</p>
-          <p className="mt-1 text-sm text-slate-500">Try a different filter, or add a building.</p>
+          <p className="mt-1 text-sm text-muted">Try a different filter, or add a building.</p>
         </div>
       )}
 

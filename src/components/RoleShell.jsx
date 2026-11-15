@@ -34,7 +34,7 @@ export default function RoleShell({
 
   return (
     <>
-      <div className="min-h-dvh bg-emerald-50/40 sm:py-4">
+      <div className="min-h-dvh bg-section sm:py-4">
         <div className="device-frame device-frame--app">
           <div className={`${theme.bg} shrink-0 px-5 pb-4 pt-5 text-white`}>
             <div className="flex items-center justify-between">

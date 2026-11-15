@@ -4,6 +4,8 @@ import CitizenShell from "../components/CitizenShell";
 import EcoIllustration from "../components/EcoIllustration";
 import { CARD_BUTTON_FILLED, PILL_ACTIVE, PILL_INACTIVE } from "../components/buttonStyles";
 import { ECO_TIPS, ECO_TOPICS } from "../data/ecoGuide";
+import Glyph from "../components/Glyph";
+import Icon from "../components/Icon";
 
 // Static class strings so Tailwind can see them.
 const GROUP_STYLE = {
@@ -44,8 +46,8 @@ export default function CitizenEcoGuide() {
 
       <div className="px-5 pb-4">
         {/* Tip of the day */}
-        <div className="mt-2 flex items-start gap-3 rounded-2xl bg-emerald-700 p-4 text-white shadow-sm">
-          <span className="text-2xl" aria-hidden="true">🌿</span>
+        <div className="mt-2 flex items-start gap-3 rounded-2xl bg-emerald-700 p-4 text-white">
+          <Icon name="leaf" className="h-6 w-6 text-emerald-700" />
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Eco tip of the day</p>
             <p className="mt-0.5 text-sm font-semibold leading-snug">{tip}</p>
@@ -67,7 +69,7 @@ export default function CitizenEcoGuide() {
               onClick={() => setTopicId(t.id)}
               className={`shrink-0 whitespace-nowrap ${t.id === topic.id ? PILL_ACTIVE : PILL_INACTIVE}`}
             >
-              <span aria-hidden="true">{t.emoji}</span> {t.label}
+              <Glyph value={t.emoji} className="h-4 w-4" /> {t.label}
             </button>
           ))}
         </div>
@@ -104,7 +106,7 @@ export default function CitizenEcoGuide() {
           <h3 className="mt-4 text-sm font-semibold text-emerald-950">What you can do</h3>
           <ol className="mt-2 flex flex-col gap-2">
             {topic.steps.map((s, i) => (
-              <li key={s} className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm">
+              <li key={s} className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-white p-3">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700">
                   {i + 1}
                 </span>
@@ -114,7 +116,7 @@ export default function CitizenEcoGuide() {
           </ol>
 
           <div className="mt-3 rounded-2xl bg-amber-50 p-3 ring-1 ring-amber-200">
-            <p className="text-xs font-semibold text-amber-800">💡 Did you know?</p>
+            <p className="flex items-center gap-1 text-xs font-semibold text-amber-800"><Icon name="lightbulb" className="h-4 w-4" /> Did you know?</p>
             <p className="mt-0.5 text-xs leading-relaxed text-amber-900/80">{topic.fact}</p>
           </div>
         </article>
@@ -125,7 +127,7 @@ export default function CitizenEcoGuide() {
           onClick={() => navigate("/citizen/report")}
           className={`mt-4 ${CARD_BUTTON_FILLED}`}
         >
-          <span className="text-xl" aria-hidden="true">📣</span>
+          <Icon name="megaphone" className="h-5 w-5 text-emerald-700" />
           <span className="flex-1 text-sm font-semibold">
             Spot an overflowing bin?
             <span className="block text-xs font-normal text-white/80">Report it so it gets cleared sooner</span>

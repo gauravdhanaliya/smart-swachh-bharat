@@ -86,7 +86,7 @@ export default function WorkerTasks() {
           <select
             value={facility}
             onChange={(e) => setFacility(e.target.value)}
-            className="min-h-10 rounded-full border border-orange-200 bg-white px-3 text-sm text-slate-800 focus:ring-2 focus:ring-orange-400 focus:outline-none"
+            className="min-h-10 rounded-xl border border-line bg-white px-3 text-sm text-slate-800 focus:ring-2 focus:ring-brand focus:outline-none"
           >
             {FACILITY_FILTERS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -96,16 +96,16 @@ export default function WorkerTasks() {
           </select>
         </label>
 
-        <p className="text-xs text-orange-900/50">
+        <p className="text-xs text-muted">
           {visibleTasks.length} task{visibleTasks.length === 1 ? "" : "s"}
         </p>
 
         {loadStatus.loaded && myTasks.length === 0 && (
-          <p className="mt-6 text-center text-sm text-orange-900/50">No tasks assigned yet.</p>
+          <p className="mt-6 text-center text-sm text-muted">No tasks assigned yet.</p>
         )}
 
         {myTasks.length > 0 && visibleTasks.length === 0 && (
-          <p className="mt-6 text-center text-sm text-orange-900/50">
+          <p className="mt-6 text-center text-sm text-muted">
             No tasks in this view. Check back soon.
           </p>
         )}
@@ -115,19 +115,19 @@ export default function WorkerTasks() {
             key={c.id}
             type="button"
             onClick={() => navigate(`/worker/tasks/${c.id}`)}
-            className="flex flex-col gap-2 rounded-2xl border border-orange-100 bg-white p-4 text-left shadow-sm"
+            className="flex flex-col gap-2 rounded-2xl border border-line bg-white p-4 text-left"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-xs font-medium text-slate-500">#{c.id}</p>
                 <p className="font-semibold text-slate-900">{c.issueType}</p>
-                {facilityLabel(c) && <p className="text-xs font-medium text-orange-800">{facilityLabel(c)}</p>}
+                {facilityLabel(c) && <p className="text-xs font-medium text-brand">{facilityLabel(c)}</p>}
               </div>
               <PriorityBadge priority={c.priority} />
             </div>
             <p className="text-sm text-slate-600">{c.location.address}</p>
             <p className="line-clamp-2 text-xs text-slate-500">{c.description}</p>
-            <div className="flex items-center justify-between border-t border-orange-50 pt-2">
+            <div className="flex items-center justify-between border-t border-line pt-2">
               <span className="text-xs text-slate-500">
                 {c.status === STATUS.ASSIGNED ? "Assigned" : "Updated"}{" "}
                 {formatDateTime(c.updatedAt)}

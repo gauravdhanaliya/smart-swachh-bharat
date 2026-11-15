@@ -7,9 +7,9 @@
 // (active/selected vs. inactive/secondary). Centralizing those two
 // states here means every pill-shaped control can share one visual
 // language instead of inventing a new one.
-export const PILL = "rounded-full px-3.5 py-1.5 text-xs font-semibold transition";
-export const PILL_ACTIVE = `${PILL} bg-emerald-700 text-white shadow-sm`;
-export const PILL_INACTIVE = `${PILL} bg-white text-emerald-800/70 border border-emerald-100 hover:bg-emerald-50`;
+export const PILL = "rounded-lg px-3 py-1.5 text-xs font-semibold transition";
+export const PILL_ACTIVE = `${PILL} bg-brand text-white`;
+export const PILL_INACTIVE = `${PILL} bg-white text-ink border border-line hover:bg-section`;
 
 // USABILITY AUDIT FIX (issue 1, round 2): LocationCard's "me" variant had
 // its own one-off "Open ... in Google Maps" button in bg-sky-700 — a
@@ -17,7 +17,7 @@ export const PILL_INACTIVE = `${PILL} bg-white text-emerald-800/70 border border
 // a genuine duplicate of the ring-style ghost button already used twice
 // elsewhere in the same file. One shared token now backs all three.
 export const GHOST_RING =
-  "rounded-full bg-white px-3 py-2 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200";
+  "rounded-xl bg-white px-3 py-2 text-xs font-semibold text-brand ring-1 ring-line";
 
 // USABILITY AUDIT FIX (issue 3): "View all" / "Show less" were bare text
 // with no padding (~16px tall — well under the ~44px touch-target
@@ -30,7 +30,7 @@ export const GHOST_RING =
 // controls that were hand-rolling their own bare-text styles. Callers
 // that want an inline arrow just add `gap-1`.
 export const TAP_LINK =
-  "inline-flex min-h-[44px] items-center rounded-full px-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50";
+  "inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-brand hover:text-brand-hover";
 
 // USABILITY AUDIT FIX (round 2, issues 1 + 4): the Citizen Home screen
 // had three near-identical "card that is really a button" styles (Total
@@ -40,9 +40,9 @@ export const TAP_LINK =
 // hover / focus treatment; the filled variant only swaps the colours.
 // Pair either one with a trailing chevron so it reads as tappable.
 const CARD =
-  "flex w-full items-center gap-3 rounded-2xl p-3.5 text-left shadow-sm transition active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
-export const CARD_BUTTON = `${CARD} border border-emerald-100 bg-white hover:bg-emerald-50`;
-export const CARD_BUTTON_FILLED = `${CARD} border border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800`;
+  "flex w-full items-center gap-3 rounded-2xl p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+export const CARD_BUTTON = `${CARD} border border-line bg-white hover:bg-section`;
+export const CARD_BUTTON_FILLED = `${CARD} border border-brand bg-brand text-white hover:bg-brand-hover`;
 
 // Bottom-nav items (including the centre Quick Actions button) share one
 // class string so they compute to a single button style.

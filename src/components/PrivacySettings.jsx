@@ -5,7 +5,7 @@ import { LOGIN_METHOD, ROLE_HOME } from "../services/authSession";
 import { resetDemoConsent } from "../services/consentService";
 
 const LINK_BUTTON =
-  "inline-flex min-h-11 items-center justify-center rounded-full px-4 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none";
+  "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none";
 
 /**
  * "Privacy and data" in every profile: the privacy notice, withdraw consent
@@ -35,15 +35,15 @@ export default function PrivacySettings() {
 
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-3">
-      <h2 id={headingId} className="px-1 text-xs font-semibold tracking-wide text-emerald-700/70 uppercase">
+      <h2 id={headingId} className="px-1 text-xs font-semibold tracking-wide text-muted uppercase">
         Privacy and data
       </h2>
 
-      <Link to="/privacy" className={`${LINK_BUTTON} justify-start rounded-2xl border border-emerald-100 bg-white text-emerald-900 shadow-sm`}>
+      <Link to="/privacy" className={`${LINK_BUTTON} justify-start rounded-2xl border border-emerald-100 bg-white text-emerald-900`}>
         View the privacy notice
       </Link>
 
-      <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-emerald-100 bg-white p-4">
         <p className="text-sm font-semibold text-emerald-950">Withdraw consent</p>
         <p className="mt-1 text-xs text-emerald-800/75">
           Signs you out everywhere and stops new collection. Your data is kept; sign in and agree again to come back.
@@ -53,7 +53,7 @@ export default function PrivacySettings() {
         </Link>
       </div>
 
-      <div className="rounded-2xl border border-red-100 bg-red-50/40 p-4 shadow-sm">
+      <div className="rounded-2xl border border-red-100 bg-red-50/40 p-4">
         <p className="text-sm font-semibold text-red-900">Delete my data</p>
         {demo ? (
           <p className="mt-1 text-xs text-red-900/75">Demo accounts are shared by everyone trying the app, so they can&apos;t be deleted.</p>
@@ -70,7 +70,7 @@ export default function PrivacySettings() {
       </div>
 
       {demo && (
-        <div className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/60 p-4">
+        <div className="rounded-2xl border border-amber-300 bg-amber-50/60 p-4">
           <p className="text-sm font-semibold text-amber-950">For presentations</p>
           <p className="mt-1 text-xs text-amber-900/80">
             Clears the demo accounts&apos; agreement so the consent screen shows again. Only demo accounts can do this.

@@ -18,6 +18,8 @@ import {
 } from "../../data/facilityRequests";
 import { BUILDING_TYPES, BUILDING_TYPE_LABELS } from "../../services/locationAdapters";
 import { BIN_STATUS, BIN_STATUS_LABELS, normalizeBinStatus } from "../../data/bins";
+import Glyph from "../../components/Glyph";
+import Icon from "../../components/Icon";
 
 const BUILDING = "Building";
 const ALL_TYPES = [...FACILITY_TYPES, { id: BUILDING, label: "Building", icon: "🏫" }];
@@ -165,11 +167,11 @@ export default function GovAddFacility() {
       facilityType === FACILITY_TYPE.DUSTBIN ? "Bins" : facilityType === FACILITY_TYPE.TOILET ? "Toilets" : "Buildings";
     return (
       <GovShell title={editing ? "Edit Location" : "Add Facility"} subtitle="Dustbin, Public Toilet or campus building">
-        <div className="mx-auto flex max-w-lg flex-col items-center gap-4 rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">✅</span>
+        <div className="mx-auto flex max-w-lg flex-col items-center gap-4 rounded-2xl border border-line bg-white p-8 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft text-emerald-700"><Icon name="checkCircle" className="h-7 w-7" /></span>
           <div>
-            <p className="text-lg font-bold text-slate-900">{editing ? "Changes saved" : "Facility saved"}</p>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="text-lg font-bold text-ink">{editing ? "Changes saved" : "Facility saved"}</p>
+            <p className="mt-1 text-sm text-muted">
               {savedFacility.name} ({savedFacility.id}) has been {editing ? "updated" : "added"} and is visible on
               the Government {destLabel} page and on the Citizen Bin &amp; Toilet Map after their next refresh.
             </p>
@@ -178,7 +180,7 @@ export default function GovAddFacility() {
             <button
               type="button"
               onClick={() => navigate(destination)}
-              className="flex-1 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+              className="flex-1 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover"
             >
               View {destLabel}
             </button>
@@ -186,7 +188,7 @@ export default function GovAddFacility() {
               <button
                 type="button"
                 onClick={handleAddAnother}
-                className="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-section"
               >
                 Add Another
               </button>
@@ -208,8 +210,8 @@ export default function GovAddFacility() {
         </p>
       )}
       <form onSubmit={handleSubmit} className="mx-auto flex max-w-2xl flex-col gap-5">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-3 text-sm font-semibold text-slate-900">Facility Type</p>
+        <div className="rounded-2xl border border-line bg-white p-5">
+          <p className="mb-3 text-sm font-semibold text-ink">Facility Type</p>
           <div className="grid grid-cols-3 gap-3">
             {ALL_TYPES.map((t) => (
               <button
@@ -217,21 +219,17 @@ export default function GovAddFacility() {
                 type="button"
                 disabled={Boolean(editing)}
                 onClick={() => setFacilityType(t.id)}
-                className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
-                  facilityType === t.id
-                    ? "border-sky-500 bg-sky-50 text-sky-700"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                } btn-disabled-quiet`}
+                className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${ facilityType === t.id ? "border-line bg-sky-50 text-brand" : "border-line text-slate-600 hover:bg-section" } btn-disabled-quiet`}
               >
-                <span>{t.icon}</span>
+                <Glyph value={t.icon} />
                 {t.label}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <label className="block text-sm font-semibold text-slate-900" htmlFor="facility-name">
+        <div className="rounded-2xl border border-line bg-white p-5">
+          <label className="block text-sm font-semibold text-ink" htmlFor="facility-name">
             Name
           </label>
           <input
@@ -246,38 +244,34 @@ export default function GovAddFacility() {
                   ? "e.g. Library Public Toilet"
                   : "e.g. Central Library"
             }
-            className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+            className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
           />
           {errors.name && <p className="mt-1 text-xs font-medium text-red-600">{errors.name}</p>}
 
           {facilityType === FACILITY_TYPE.DUSTBIN ? (
             <div className="mt-4">
-              <p className="text-sm font-semibold text-slate-900">Waste Type</p>
+              <p className="text-sm font-semibold text-ink">Waste Type</p>
               <div className="mt-1.5 flex flex-wrap gap-2">
                 {BIN_TYPES.map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setBinType(t)}
-                    className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
-                      binType === t
-                        ? "border-sky-500 bg-sky-50 text-sky-700"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
+                    className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${ binType === t ? "border-line bg-sky-50 text-brand" : "border-line text-slate-600 hover:bg-section" }`}
                   >
                     {t}
                   </button>
                 ))}
               </div>
 
-              <label className="mt-4 block text-sm font-semibold text-slate-900" htmlFor="bin-status">
+              <label className="mt-4 block text-sm font-semibold text-ink" htmlFor="bin-status">
                 Status
               </label>
               <select
                 id="bin-status"
                 value={binStatus}
                 onChange={(e) => setBinStatus(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink focus:border-brand focus:outline-none"
               >
                 {Object.values(BIN_STATUS).map((st) => (
                   <option key={st} value={st}>
@@ -289,14 +283,14 @@ export default function GovAddFacility() {
             </div>
           ) : facilityType === BUILDING ? (
             <div className="mt-4">
-              <label className="block text-sm font-semibold text-slate-900" htmlFor="building-type">
+              <label className="block text-sm font-semibold text-ink" htmlFor="building-type">
                 Building type
               </label>
               <select
                 id="building-type"
                 value={buildingType}
                 onChange={(e) => setBuildingType(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink focus:border-brand focus:outline-none"
               >
                 {BUILDING_TYPES.map((t) => (
                   <option key={t} value={t}>
@@ -310,14 +304,14 @@ export default function GovAddFacility() {
             <div className="mt-4">
               {editing && (
                 <>
-                  <label className="block text-sm font-semibold text-slate-900" htmlFor="toilet-status">
+                  <label className="block text-sm font-semibold text-ink" htmlFor="toilet-status">
                     Status
                   </label>
                   <select
                     id="toilet-status"
                     value={toiletStatus}
                     onChange={(e) => setToiletStatus(e.target.value)}
-                    className="mb-4 mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
+                    className="mb-4 mt-1.5 w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink focus:border-brand focus:outline-none"
                   >
                     {["Open", "Closed", "Maintenance"].map((st) => (
                       <option key={st}>{st}</option>
@@ -325,7 +319,7 @@ export default function GovAddFacility() {
                   </select>
                 </>
               )}
-              <label className="block text-sm font-semibold text-slate-900" htmlFor="facility-hours">
+              <label className="block text-sm font-semibold text-ink" htmlFor="facility-hours">
                 Opening Hours
               </label>
               <input
@@ -334,21 +328,17 @@ export default function GovAddFacility() {
                 value={openingHours}
                 onChange={(e) => setOpeningHours(e.target.value)}
                 placeholder="e.g. 6:00 AM – 10:00 PM"
-                className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
               />
 
-              <p className="mt-4 text-sm font-semibold text-slate-900">Facilities</p>
+              <p className="mt-4 text-sm font-semibold text-ink">Facilities</p>
               <div className="mt-1.5 flex flex-wrap gap-2">
                 {TOILET_FACILITY_OPTIONS.map((option) => (
                   <button
                     key={option}
                     type="button"
                     onClick={() => toggleFacility(option)}
-                    className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
-                      facilities.includes(option)
-                        ? "border-sky-500 bg-sky-50 text-sky-700"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
+                    className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${ facilities.includes(option) ? "border-line bg-sky-50 text-brand" : "border-line text-slate-600 hover:bg-section" }`}
                   >
                     {option}
                   </button>
@@ -358,10 +348,10 @@ export default function GovAddFacility() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm font-semibold text-slate-900">Location</p>
+        <div className="rounded-2xl border border-line bg-white p-5">
+          <p className="text-sm font-semibold text-ink">Location</p>
 
-          <p className="mt-3 text-xs font-medium text-slate-500">
+          <p className="mt-3 text-xs font-medium text-muted">
             Tap the map to place the pin, or enter exact coordinates below
           </p>
           <PickLocationMap
@@ -376,7 +366,7 @@ export default function GovAddFacility() {
             className="mt-2 h-64"
           />
 
-          <p className="mt-4 text-xs font-medium text-slate-500">Or search another place in India</p>
+          <p className="mt-4 text-xs font-medium text-muted">Or search another place in India</p>
           <div className="mt-1.5">
             <IndiaLocationPicker
               id="gov-facility-location"
@@ -388,7 +378,7 @@ export default function GovAddFacility() {
             />
           </div>
 
-          <label className="mt-4 block text-xs font-medium text-slate-500" htmlFor="facility-address">
+          <label className="mt-4 block text-xs font-medium text-muted" htmlFor="facility-address">
             Address
           </label>
           <input
@@ -397,13 +387,13 @@ export default function GovAddFacility() {
             value={addressText}
             onChange={(e) => setAddressText(e.target.value)}
             placeholder="e.g. COER University, Roorkee"
-            className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+            className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
           />
           {errors.address && <p className="mt-1 text-xs font-medium text-red-600">{errors.address}</p>}
 
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-500" htmlFor="facility-lat">
+              <label className="block text-xs font-medium text-muted" htmlFor="facility-lat">
                 Latitude
               </label>
               <input
@@ -416,11 +406,11 @@ export default function GovAddFacility() {
                   if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                 }}
                 placeholder="29.8905551"
-                className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500" htmlFor="facility-lng">
+              <label className="block text-xs font-medium text-muted" htmlFor="facility-lng">
                 Longitude
               </label>
               <input
@@ -433,13 +423,13 @@ export default function GovAddFacility() {
                   if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                 }}
                 placeholder="77.9601633"
-                className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
               />
             </div>
           </div>
           {errors.location && <p className="mt-2 text-xs font-medium text-red-600">{errors.location}</p>}
 
-          <label className="mt-4 block text-xs font-medium text-slate-500" htmlFor="facility-description">
+          <label className="mt-4 block text-xs font-medium text-muted" htmlFor="facility-description">
             Notes (optional)
           </label>
           <input
@@ -448,7 +438,7 @@ export default function GovAddFacility() {
             maxLength={300}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 focus:border-sky-400 focus:outline-none"
+            className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-ink focus:border-brand focus:outline-none"
           />
         </div>
 
@@ -462,14 +452,14 @@ export default function GovAddFacility() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-section"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="flex-1 rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 btn-disabled"
+            className="flex-1 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover btn-disabled"
           >
             {saving ? "Saving…" : editing ? "Save Changes" : "Save Facility"}
           </button>

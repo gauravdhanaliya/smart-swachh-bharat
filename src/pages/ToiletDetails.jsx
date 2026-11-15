@@ -7,6 +7,7 @@ import { locationToToilet } from "../services/locationAdapters";
 import { useAuth } from "../context/AuthContext";
 import ToiletRatingPanel from "../components/ToiletRatingPanel";
 import { OpenReportsNote, ReportFacilitySheet, useReportSheet } from "../components/FacilityReportControls";
+import Icon from "../components/Icon";
 
 export default function ToiletDetails() {
   const { id } = useParams();
@@ -47,7 +48,7 @@ export default function ToiletDetails() {
           <button
             type="button"
             onClick={() => navigate("/citizen/map")}
-            className="mt-2 rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white"
+            className="mt-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white"
           >
             Back to Map
           </button>
@@ -73,10 +74,10 @@ export default function ToiletDetails() {
       </div>
 
       <div className="px-5 pb-6">
-        <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-emerald-100 bg-white p-5">
           <div className="flex items-start gap-3">
             <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-sky-100 text-2xl">
-              🚻
+              <Icon name="toilet" className="h-7 w-7" />
             </span>
             <div>
               <h2 className="text-lg font-bold text-emerald-950">{toilet.name}</h2>
@@ -88,7 +89,7 @@ export default function ToiletDetails() {
             <StatusBadge status={toilet.status} />
             {toilet.source === "osm" && (
               <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
-                🌐 Live · OpenStreetMap
+                <Icon name="globe" className="inline h-3.5 w-3.5 align-[-2px]" /> Live · OpenStreetMap
               </span>
             )}
           </div>
@@ -122,7 +123,7 @@ export default function ToiletDetails() {
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+        <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-5">
           <p className="text-sm font-semibold text-emerald-950">Facilities</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {toilet.facilities.map((facility) => (
@@ -146,7 +147,7 @@ export default function ToiletDetails() {
             href={`https://www.google.com/maps/dir/?api=1&destination=${toilet.latitude},${toilet.longitude}`}
             target="_blank"
             rel="noreferrer"
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-900/20"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 11l19-9-9 19-2-8-8-2z" />
@@ -156,7 +157,7 @@ export default function ToiletDetails() {
           <button
             type="button"
             onClick={report.show}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold text-emerald-800"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 9v4M12 17h.01M10.3 4.3L2.7 18.7A1 1 0 003.6 20h16.8a1 1 0 00.9-1.3L13.7 4.3a1 1 0 00-1.7 0z" />

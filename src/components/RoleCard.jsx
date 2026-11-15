@@ -21,16 +21,17 @@ const ICONS = {
   ),
 };
 
+// Neutral, like every other icon tile: colour is kept for status.
 const ICON_THEME = {
-  citizen: "bg-emerald-500 text-white",
-  official: "bg-sky-500 text-white",
-  worker: "bg-orange-500 text-white",
+  citizen: "bg-section text-ink",
+  official: "bg-section text-ink",
+  worker: "bg-section text-ink",
 };
 
 /** The round, coloured icon for a role. */
 export function RoleIcon({ id, className = "h-10 w-10" }) {
   return (
-    <span className={`flex shrink-0 items-center justify-center rounded-full ${ICON_THEME[id]} ${className}`} aria-hidden="true">
+    <span className={`flex shrink-0 items-center justify-center rounded-xl ${ICON_THEME[id]} ${className}`} aria-hidden="true">
       {ICONS[id]}
     </span>
   );
@@ -42,7 +43,7 @@ export default function RoleCard({ id, title, description, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(id)}
-      className="group flex w-full items-center gap-3 rounded-2xl border border-emerald-100 bg-white px-3.5 py-2.5 text-left shadow-[0_6px_20px_-12px_rgba(15,110,58,0.35)] transition hover:border-emerald-300 hover:bg-emerald-50/60 hover:shadow-[0_10px_24px_-12px_rgba(15,110,58,0.45)] active:scale-[0.98] active:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+      className="group flex w-full items-center gap-3 rounded-2xl border border-emerald-100 bg-white px-3.5 py-2.5 text-left transition hover:border-emerald-300 hover:bg-emerald-50/60 active:scale-[0.98] active:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
     >
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${ICON_THEME[id]}`} aria-hidden="true">
         {ICONS[id]}

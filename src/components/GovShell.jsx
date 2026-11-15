@@ -48,11 +48,7 @@ function SidebarContent({ pathname, onNavigate, pendingFacilityRequests }) {
                 <button
                   type="button"
                   onClick={() => onNavigate(item.path)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition ${
-                    active
-                      ? "bg-sky-600 text-white shadow-md shadow-sky-900/30"
-                      : "text-white/70 hover:bg-white/5 hover:text-white"
-                  }`}
+                  className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition ${ active ? "bg-brand text-white shadow-sky-900/30" : "text-white/70 hover:bg-white/5 hover:text-white" } border border-line`}
                 >
                   {GovNavIcons[item.id]}
                   <span className="flex-1 text-left">{item.label}</span>
@@ -114,7 +110,7 @@ export default function GovShell({ title, subtitle, actions, children }) {
 
   return (
     <>
-      <div className="min-h-dvh bg-slate-50 lg:flex">
+      <div className="min-h-dvh bg-section lg:flex">
         {/* Desktop sidebar */}
         <aside className="hidden w-64 shrink-0 lg:block">
           <div className="sticky top-0 h-dvh">
@@ -146,20 +142,20 @@ export default function GovShell({ title, subtitle, actions, children }) {
         )}
 
         <div className="flex min-h-dvh flex-1 flex-col">
-          <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+          <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-white px-4 py-3 sm:px-6">
             <button
               type="button"
               aria-label="Open menu"
               onClick={() => setMobileOpen(true)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 lg:hidden"
+              className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink hover:bg-section lg:hidden"
             >
               {GovNavIcons.menu}
             </button>
 
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-lg font-bold text-slate-900 sm:text-xl">{title}</h1>
+              <h1 className="truncate text-2xl leading-tight font-semibold text-ink">{title}</h1>
               {subtitle && (
-                <p className="truncate text-xs text-slate-500 sm:text-sm">{subtitle}</p>
+                <p className="text-sm leading-snug text-muted">{subtitle}</p>
               )}
             </div>
 
@@ -168,28 +164,26 @@ export default function GovShell({ title, subtitle, actions, children }) {
             <button
               type="button"
               onClick={() => handleNavigate("/official/notifications")}
-              aria-label="Notifications"
-              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+              aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+              className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink hover:bg-section"
             >
               {GovNavIcons.notifications}
               {unreadCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
-                  {unreadCount}
-                </span>
+                <span data-unread-badge className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-600 ring-2 ring-white" aria-hidden="true" />
               )}
             </button>
 
             <button
               type="button"
               onClick={() => handleNavigate("/official/profile")}
-              className="hidden shrink-0 items-center gap-2 rounded-full border border-slate-200 py-1 pl-1 pr-3 hover:bg-slate-50 sm:flex"
+              className="hidden shrink-0 items-center gap-2 rounded-full border border-line py-1 pl-1 pr-3 hover:bg-section sm:flex"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-section text-xs font-semibold text-ink">
                 {govInitials(profile.name)}
               </span>
               <span className="text-left leading-tight">
-                <span className="block text-xs font-semibold text-slate-800">{profile.name}</span>
-                <span className="block text-[10px] text-slate-500">{profile.district} District</span>
+                <span className="block text-xs font-semibold text-ink">{profile.name}</span>
+                <span className="block text-[10px] text-muted">{profile.district} District</span>
               </span>
             </button>
 
@@ -197,14 +191,14 @@ export default function GovShell({ title, subtitle, actions, children }) {
               type="button"
               onClick={() => setConfirmingLogout(true)}
               aria-label="Logout"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-600 hover:bg-slate-50"
+              className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink hover:bg-section"
             >
               {GovNavIcons.logout}
             </button>
           </header>
 
           {actions && (
-            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 sm:hidden">
+            <div className="flex flex-wrap items-center gap-2 border-b border-line bg-white px-4 py-2 sm:hidden">
               {actions}
             </div>
           )}

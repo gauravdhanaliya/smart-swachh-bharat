@@ -1,6 +1,8 @@
 import StatusBadge from "./StatusBadge";
 import { googleMapsSearchUrl } from "./SimpleMap";
 import { GHOST_RING } from "./buttonStyles";
+import Glyph from "./Glyph";
+import Icon from "./Icon";
 
 // Step 11B section 4 — since a plain iframe can't carry our app's
 // dynamic marker popups, this card shows the same details a marker
@@ -21,7 +23,7 @@ export default function LocationCard({ kind, item, onViewDetails, onRetryLocatio
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-              📍 {manual ? "Location set manually" : approximate ? "Approximate location" : "Your current location"}
+              <Icon name="pin" className="inline h-4 w-4 align-[-2px]" /> {manual ? "Location set manually" : approximate ? "Approximate location" : "Your current location"}
             </p>
             {manual && item.label && (
               <p className="mt-1 text-xs font-medium text-emerald-900/80">{item.label}</p>
@@ -82,11 +84,11 @@ export default function LocationCard({ kind, item, onViewDetails, onRetryLocatio
   const isBuilding = kind === "building";
 
   return (
-    <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 shadow-sm">
+    <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-950">
-            <span>{isBin ? "🗑️" : isBuilding ? item.icon : "🚻"}</span>
+            <Glyph value={isBin ? "🗑️" : isBuilding ? item.icon : "🚻"} />
             <span className="truncate">{item.name}</span>
           </p>
           <p className="text-xs text-emerald-800/60">
@@ -138,7 +140,7 @@ export default function LocationCard({ kind, item, onViewDetails, onRetryLocatio
           <button
             type="button"
             onClick={() => onViewDetails(item.id)}
-            className="flex-1 rounded-full bg-emerald-700 px-3 py-2 text-xs font-semibold text-white"
+            className="flex-1 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-semibold text-white"
           >
             View Details
           </button>

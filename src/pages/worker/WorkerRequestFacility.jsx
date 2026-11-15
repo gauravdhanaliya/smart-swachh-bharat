@@ -19,6 +19,7 @@ import {
   MAX_PHOTO_SIZE_BYTES,
   ALLOWED_PHOTO_TYPES,
 } from "../../data/facilityRequests";
+import Glyph from "../../components/Glyph";
 
 const LOCATION_MODES = [
   { id: "gps", label: "Current GPS Location" },
@@ -174,7 +175,7 @@ export default function WorkerRequestFacility() {
   return (
     <WorkerShell title="Request Facility" showBack onBack={() => navigate(-1)}>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 px-5 py-4">
-        <p className="text-sm text-orange-900/70">
+        <p className="text-sm text-muted">
           Ask for a new dustbin or public toilet to be added at a location that needs one.
           Your request goes to the Government Official for review.
         </p>
@@ -193,13 +194,9 @@ export default function WorkerRequestFacility() {
                     setFacilityType(type);
                     if (errors.facilityType) setErrors((er) => ({ ...er, facilityType: undefined }));
                   }}
-                  className={`flex flex-col items-center gap-2 rounded-2xl border p-4 text-center transition ${
-                    selected
-                      ? "border-transparent bg-orange-600 text-white shadow-md shadow-orange-900/20"
-                      : "border-orange-100 bg-white text-slate-900 hover:border-orange-200"
-                  }`}
+                  className={`flex flex-col items-center gap-2 rounded-2xl border p-4 text-center transition ${ selected ? "border-transparent bg-brand text-white " : "border-line bg-white text-slate-900 hover:border-line" }`}
                 >
-                  <span className="text-2xl">{type.icon}</span>
+                  <Glyph value={type.icon} className="h-6 w-6" />
                   <span className="text-sm font-semibold leading-tight">{type.label}</span>
                 </button>
               );
@@ -222,7 +219,7 @@ export default function WorkerRequestFacility() {
               if (errors.suggestedName) setErrors((er) => ({ ...er, suggestedName: undefined }));
             }}
             placeholder="e.g. Dustbin near bus stop"
-            className="w-full rounded-2xl border border-orange-100 bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none"
+            className="w-full rounded-2xl border border-line bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-line focus:outline-none"
           />
           {errors.suggestedName && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.suggestedName}</p>}
         </div>
@@ -237,11 +234,7 @@ export default function WorkerRequestFacility() {
                 key={mode.id}
                 type="button"
                 onClick={() => setLocationMode(mode.id)}
-                className={`flex-1 rounded-full px-2 py-1.5 text-xs font-semibold transition ${
-                  locationMode === mode.id
-                    ? "bg-orange-600 text-white"
-                    : "bg-orange-50 text-orange-700 hover:bg-orange-100"
-                }`}
+                className={`flex-1 rounded-full px-2 py-1.5 text-xs font-semibold transition ${ locationMode === mode.id ? "bg-brand text-white" : "bg-section text-brand hover:bg-section" }`}
               >
                 {mode.label}
               </button>
@@ -249,7 +242,7 @@ export default function WorkerRequestFacility() {
           </div>
 
           {locationMode === "gps" && (
-            <div className="rounded-2xl border border-orange-100 bg-white p-3.5">
+            <div className="rounded-2xl border border-line bg-white p-3.5">
               {gps.asking ? (
                 <GpsConsentNotice theme="orange" onAllow={gps.allow} onManual={gps.decline} />
               ) : (
@@ -257,7 +250,7 @@ export default function WorkerRequestFacility() {
                   type="button"
                   onClick={gps.request}
                   disabled={gpsStatus === "locating"}
-                  className="w-full rounded-full bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white btn-disabled"
+                  className="w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white btn-disabled"
                 >
                   {gpsStatus === "locating" ? "Locating…" : "Use Current GPS Location"}
                 </button>
@@ -266,10 +259,10 @@ export default function WorkerRequestFacility() {
                 <GpsAlert tone="error" className="mt-2">
                   <p>{gpsError}</p>
                   <div className="mt-1.5 flex gap-4">
-                    <button type="button" onClick={gps.request} className="font-semibold underline">
+                    <button type="button" onClick={gps.request} className="font-semibold">
                       Try again
                     </button>
-                    <button type="button" onClick={() => setLocationMode("manual")} className="font-semibold underline">
+                    <button type="button" onClick={() => setLocationMode("manual")} className="font-semibold">
                       Enter manually
                     </button>
                   </div>
@@ -287,7 +280,7 @@ export default function WorkerRequestFacility() {
           )}
 
           {locationMode === "map" && (
-            <div className="rounded-2xl border border-orange-100 bg-white p-3.5">
+            <div className="rounded-2xl border border-line bg-white p-3.5">
               <IndiaLocationPicker
                 id="worker-facility-location"
                 theme="orange"
@@ -317,7 +310,7 @@ export default function WorkerRequestFacility() {
           )}
 
           {locationMode === "manual" && (
-            <div className="grid grid-cols-2 gap-3 rounded-2xl border border-orange-100 bg-white p-3.5">
+            <div className="grid grid-cols-2 gap-3 rounded-2xl border border-line bg-white p-3.5">
               <div>
                 <label htmlFor="lat" className="mb-1 block text-xs font-semibold text-slate-600">
                   Latitude
@@ -332,7 +325,7 @@ export default function WorkerRequestFacility() {
                     if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                   }}
                   placeholder="26.8467"
-                  className="w-full rounded-xl border border-orange-100 px-3 py-2 text-sm text-slate-900 focus:border-orange-400 focus:outline-none"
+                  className="w-full rounded-xl border border-line px-3 py-2 text-sm text-slate-900 focus:border-line focus:outline-none"
                 />
               </div>
               <div>
@@ -349,7 +342,7 @@ export default function WorkerRequestFacility() {
                     if (errors.location) setErrors((er) => ({ ...er, location: undefined }));
                   }}
                   placeholder="80.9462"
-                  className="w-full rounded-xl border border-orange-100 px-3 py-2 text-sm text-slate-900 focus:border-orange-400 focus:outline-none"
+                  className="w-full rounded-xl border border-line px-3 py-2 text-sm text-slate-900 focus:border-line focus:outline-none"
                 />
               </div>
             </div>
@@ -372,7 +365,7 @@ export default function WorkerRequestFacility() {
               if (errors.address) setErrors((er) => ({ ...er, address: undefined }));
             }}
             placeholder="e.g. Near COER University main gate"
-            className="w-full rounded-2xl border border-orange-100 bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none"
+            className="w-full rounded-2xl border border-line bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-line focus:outline-none"
           />
           {errors.address && <p className="mt-1.5 text-xs font-medium text-red-600">{errors.address}</p>}
         </div>
@@ -386,11 +379,7 @@ export default function WorkerRequestFacility() {
                 key={p}
                 type="button"
                 onClick={() => setPriority(p)}
-                className={`rounded-full px-2 py-2 text-xs font-semibold transition ${
-                  priority === p
-                    ? "bg-orange-600 text-white"
-                    : "bg-orange-50 text-orange-700 hover:bg-orange-100"
-                }`}
+                className={`rounded-full px-2 py-2 text-xs font-semibold transition ${ priority === p ? "bg-brand text-white" : "bg-section text-brand hover:bg-section" }`}
               >
                 {p}
               </button>
@@ -413,7 +402,7 @@ export default function WorkerRequestFacility() {
               if (errors.reason) setErrors((er) => ({ ...er, reason: undefined }));
             }}
             placeholder="Why is this facility needed here?"
-            className="w-full resize-none rounded-2xl border border-orange-100 bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none"
+            className="w-full resize-none rounded-2xl border border-line bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-line focus:outline-none"
           />
           <div className="mt-1 flex items-center justify-between">
             {errors.reason ? (
@@ -430,7 +419,7 @@ export default function WorkerRequestFacility() {
           <label className="mb-1.5 block text-sm font-semibold text-slate-900">Photo (Optional)</label>
           <div className="flex items-center gap-3">
             {photo ? (
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-orange-100">
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line">
                 <img src={photo.dataUrl} alt="Selected facility location" className="h-full w-full object-cover" />
                 <button
                   type="button"
@@ -448,7 +437,7 @@ export default function WorkerRequestFacility() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={photoBusy}
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 btn-disabled-quiet"
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-line text-brand hover:bg-section btn-disabled-quiet"
               aria-label={photoBusy ? "Preparing photo" : "Add photo"}
               aria-busy={photoBusy}
             >
@@ -480,7 +469,7 @@ export default function WorkerRequestFacility() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Any other details that would help review this request…"
-            className="w-full resize-none rounded-2xl border border-orange-100 bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none"
+            className="w-full resize-none rounded-2xl border border-line bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-line focus:outline-none"
           />
           <p className="mt-1 text-right text-xs text-slate-400">{description.length}/{DESCRIPTION_MAX_LENGTH}</p>
         </div>
@@ -490,7 +479,7 @@ export default function WorkerRequestFacility() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-full bg-orange-600 px-4 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-900/20 transition active:scale-[0.98] hover:bg-orange-700 btn-disabled"
+          className="w-full rounded-xl bg-brand px-4 py-3.5 text-sm font-semibold text-white transition active:scale-[0.98] hover:bg-brand-hover btn-disabled"
         >
           {submitting ? "Submitting…" : "Submit Request"}
         </button>

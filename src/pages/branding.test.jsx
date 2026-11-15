@@ -21,7 +21,9 @@ describe("no ministry attribution", () => {
         <App />
       </MemoryRouter>
     );
-    await screen.findAllByText(/smart|swachh/i);
+    // "/" opens the citizen side straight away (signed in silently); the others are static pages.
+    await screen.findAllByRole("heading");
     expect(screen.queryByText(/ministry of housing/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/government of india/i)).not.toBeInTheDocument();
   });
 });

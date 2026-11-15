@@ -9,6 +9,7 @@ import {
   getStatesList,
   searchLocations,
 } from "../data/indiaLocations";
+import Icon from "./Icon";
 
 // One location picker used everywhere the app asks "where?" — citizen
 // Report Issue, worker facility requests, government Add Facility and the
@@ -218,7 +219,7 @@ export default function IndiaLocationPicker({
           type="button"
           onClick={gps.request}
           disabled={gpsStatus === "locating" || gps.asking}
-          className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 text-xs font-semibold btn-disabled-quiet ${t.action}`}
+          className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-xl px-3 text-xs font-semibold btn-disabled-quiet ${t.action}`}
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="3" />
@@ -230,7 +231,7 @@ export default function IndiaLocationPicker({
         {gpsError && (
           <GpsAlert tone="error" className="mt-1">
             <p>{gpsError}</p>
-            <button type="button" onClick={gps.request} className="mt-1.5 font-semibold underline">
+            <button type="button" onClick={gps.request} className="mt-1.5 font-semibold">
               Try again
             </button>
           </GpsAlert>
@@ -243,7 +244,7 @@ export default function IndiaLocationPicker({
     return (
       <div className="flex flex-col gap-2">
         <div className={`flex items-start gap-2.5 rounded-2xl border px-4 py-3 ${t.card}`}>
-          <span aria-hidden="true">📍</span>
+          <Icon name="pin" className="h-4 w-4" />
           <div className="min-w-0 flex-1">
             <p className="break-words text-sm font-semibold leading-snug">{value.address}</p>
             {place?.pinned && <p className={`mt-0.5 text-xs ${t.muted}`}>Exact spot pinned with GPS</p>}
@@ -307,7 +308,7 @@ export default function IndiaLocationPicker({
           className={t.field}
         />
         {query.trim() && (
-          <ul className="mt-1.5 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-md" role="listbox">
+          <ul className="mt-1.5 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1" role="listbox">
             {results.length === 0 ? (
               <li className="px-3 py-2 text-xs text-slate-500">
                 No match. Try the State &rarr; District &rarr; City list below, or use GPS.
@@ -423,7 +424,7 @@ export default function IndiaLocationPicker({
                     longitude: selectedState.longitude,
                   })
                 }
-                className={`mt-1 rounded-full px-3 py-1.5 text-xs font-semibold ${t.chip}`}
+                className={`mt-1 rounded-xl px-3 py-1.5 text-xs font-semibold ${t.chip}`}
               >
                 Use {selectedState.name} (approximate centre)
               </button>
@@ -456,7 +457,7 @@ export default function IndiaLocationPicker({
                   setLocality("");
                   onChange(loc);
                 }}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold ${t.chip}`}
+                className={`rounded-xl px-3 py-1.5 text-xs font-semibold ${t.chip}`}
               >
                 {loc.address}
               </button>

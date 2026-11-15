@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import BrandLogo from "./BrandLogo";
-import CityIllustration from "./CityIllustration";
 
 function BackButton({ onBack }) {
   const navigate = useNavigate();
@@ -38,7 +37,7 @@ export default function ScreenShell({
   footer = "Clean Cities  |  Green Tomorrow",
 }) {
   return (
-    <div className="min-h-dvh bg-emerald-50/40 sm:py-4">
+    <div className="min-h-dvh bg-section sm:py-4">
       <div className="device-frame device-frame--app">
         {/* Whole screen scrolls inside the fixed-size frame on short windows. */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -49,13 +48,8 @@ export default function ScreenShell({
 
         <div className="flex-1 flex flex-col px-6 pb-6 pt-4">{children}</div>
 
-        <div className="mt-auto">
-          <div className="relative h-16 overflow-hidden opacity-70 pointer-events-none">
-            <CityIllustration variant="subtle" className="absolute bottom-0 left-0 w-full" />
-          </div>
-          <p className="pb-6 text-center text-xs font-medium text-emerald-700/70">
-            {footer}
-          </p>
+        <div className="mt-auto border-t border-line px-4 py-3">
+          <p className="text-center text-xs text-muted">{footer}</p>
         </div>
         </div>
       </div>

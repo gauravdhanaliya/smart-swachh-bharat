@@ -35,9 +35,7 @@ function VoteButton({ direction, active, count, onClick }) {
       onClick={onClick}
       aria-pressed={active}
       aria-label={`${up ? "Upvote" : "Downvote"}, ${count}`}
-      className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${
-        active ? activeStyle : "border-emerald-100 bg-white text-emerald-800/70 hover:bg-emerald-50"
-      }`}
+      className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${ active ? activeStyle : "border-emerald-100 bg-white text-emerald-800/70 hover:bg-emerald-50" }`}
     >
       <svg viewBox="0 0 24 24" className={`h-4 w-4 ${up ? "" : "rotate-180"}`} fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M7 11v9H4v-9h3zm0 0l4-8c1.5 0 2.5 1 2.5 2.5V9H19a2 2 0 012 2.3l-1 7A2 2 0 0118 20H7" />
@@ -93,11 +91,7 @@ export default function MyComplaints() {
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-              tab === t.id
-                ? "bg-emerald-700 text-white"
-                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-            }`}
+            className={`rounded-xl px-4 py-1.5 text-sm font-semibold transition ${ tab === t.id ? "bg-emerald-700 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" }`}
           >
             {t.label}
           </button>
@@ -106,12 +100,12 @@ export default function MyComplaints() {
 
       <div className="flex flex-col gap-3 px-5 pb-8">
         {loadStatus.loaded && complaints.length === 0 && (
-          <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-emerald-200 bg-white px-6 py-10 text-center">
+          <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-6 py-10 text-center">
             <p className="text-sm font-medium text-emerald-900">No complaints yet. Report your first issue.</p>
             <button
               type="button"
               onClick={() => navigate("/citizen/report")}
-              className="rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"
+              className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover"
             >
               Report Issue
             </button>
@@ -127,7 +121,7 @@ export default function MyComplaints() {
         {filtered.map((c) => (
           <div
             key={c.id}
-            className="rounded-2xl border border-emerald-100 bg-white shadow-sm"
+            className="rounded-2xl border border-emerald-100 bg-white"
           >
             <button
               type="button"

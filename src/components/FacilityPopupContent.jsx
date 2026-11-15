@@ -28,7 +28,7 @@ export default function FacilityPopupContent({ item, kind, rating, onReport }) {
         <button
           type="button"
           onClick={() => onReport(kind, item)}
-          className="mt-2 min-h-9 w-full cursor-pointer rounded-full bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800"
+          className="mt-2 min-h-9 w-full cursor-pointer rounded-xl bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-brand-hover"
         >
           Report an issue
         </button>

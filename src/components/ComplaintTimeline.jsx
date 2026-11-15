@@ -36,17 +36,13 @@ export default function ComplaintTimeline({ status, timestamps = {} }) {
             <StepDot state={step.state} />
             {i < steps.length - 1 && (
               <span
-                className={`w-0.5 flex-1 min-h-[20px] ${
-                  step.state === "done" ? "bg-emerald-600" : "bg-emerald-100"
-                }`}
+                className={`w-0.5 flex-1 min-h-[20px] ${ step.state === "done" ? "bg-emerald-600" : "bg-emerald-100" }`}
               />
             )}
           </div>
           <div className={`pb-5 ${step.state === "pending" ? "opacity-50" : ""}`}>
             <p
-              className={`text-sm font-semibold ${
-                step.state === "pending" ? "text-emerald-800/60" : "text-emerald-950"
-              }`}
+              className={`text-sm font-semibold ${ step.state === "pending" ? "text-emerald-800/60" : "text-emerald-950" }`}
             >
               {step.label}
             </p>

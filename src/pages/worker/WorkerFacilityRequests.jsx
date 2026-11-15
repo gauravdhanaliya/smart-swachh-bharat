@@ -6,6 +6,7 @@ import PriorityBadge from "../../components/PriorityBadge";
 import { useFacilityRequestsForWorker } from "../../hooks/useFacilityRequests";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
 import { REQUEST_STATUS } from "../../data/facilityRequests";
+import Glyph from "../../components/Glyph";
 
 const TABS = [
   { id: "all", label: "All" },
@@ -49,11 +50,7 @@ export default function WorkerFacilityRequests() {
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-              tab === t.id
-                ? "bg-orange-600 text-white"
-                : "bg-orange-50 text-orange-700 hover:bg-orange-100"
-            }`}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${ tab === t.id ? "bg-brand text-white" : "bg-section text-brand hover:bg-section" }`}
           >
             {t.label}
           </button>
@@ -64,7 +61,7 @@ export default function WorkerFacilityRequests() {
         <button
           type="button"
           onClick={() => navigate("/worker/facility-request")}
-          className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-orange-200 bg-white px-4 py-3 text-sm font-semibold text-orange-700 hover:bg-orange-50"
+          className="flex items-center justify-center gap-2 rounded-2xl border-2 border-line bg-white px-4 py-3 text-sm font-semibold text-brand hover:bg-section"
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 5v14M5 12h14" />
@@ -83,11 +80,11 @@ export default function WorkerFacilityRequests() {
             key={r.id}
             type="button"
             onClick={() => navigate(`/worker/facility-requests/${r.id}`)}
-            className="flex items-start justify-between gap-3 rounded-2xl border border-orange-100 bg-white p-4 text-left shadow-sm"
+            className="flex items-start justify-between gap-3 rounded-2xl border border-line bg-white p-4 text-left"
           >
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900">
-                {r.facilityType === "Public Toilet" ? "🚻" : "🗑️"} {r.suggestedName}
+                <Glyph value={r.facilityType === "Public Toilet" ? "🚻" : "🗑️"} className="inline h-4 w-4 align-[-2px]" /> {r.suggestedName}
               </p>
               <p className="mt-0.5 text-xs text-slate-500">{r.location.address}</p>
               <p className="mt-0.5 text-[11px] text-slate-400">

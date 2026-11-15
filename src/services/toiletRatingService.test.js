@@ -2,7 +2,7 @@
 // validation as the EcoSetu API; the API itself is tested in server/test).
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { startOtpSession, startSession } from "./authSession";
+import { startEmailSession, startSession } from "./authSession";
 import { LEGACY_BINS, TOILETS, seedLocalApi, storedLocalApi } from "../test/fixtures";
 import {
   getLowRatedToilets,
@@ -14,7 +14,7 @@ import {
 } from "./toiletRatingService";
 
 const T = "PT-001";
-const asCitizen = (uid) => startOtpSession({ uid, phone: "9876543210" });
+const asCitizen = (uid) => startEmailSession({ uid, email: "citizen@example.test" });
 
 beforeEach(() => {
   seedLocalApi({ locations: [...LEGACY_BINS, ...TOILETS, { ...TOILETS[0], id: "PT-002", name: "Library Toilet" }] });

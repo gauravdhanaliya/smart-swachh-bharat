@@ -39,7 +39,7 @@ export default function RemoveWorkerDialog({ worker, onCancel, onConfirm }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="remove-worker-title"
-        className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl border border-line bg-white p-5 shadow-2xl"
       >
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
@@ -50,34 +50,30 @@ export default function RemoveWorkerDialog({ worker, onCancel, onConfirm }) {
             </svg>
           </span>
           <div className="min-w-0">
-            <h2 id="remove-worker-title" className="text-base font-bold text-slate-900">
+            <h2 id="remove-worker-title" className="text-base font-bold text-ink">
               Remove {worker.name}?
             </h2>
-            <p className="mt-0.5 text-sm text-slate-500">
+            <p className="mt-0.5 text-sm text-muted">
               They&apos;ll disappear from the Workers directory. You can restore them afterwards.
             </p>
           </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <p className="text-xs font-medium text-slate-400">{worker.displayId}</p>
-          <p className="truncate font-semibold text-slate-900">{worker.name}</p>
-          <p className="mt-0.5 truncate text-xs text-slate-500">
+        <div className="mt-4 rounded-xl border border-line bg-section p-3">
+          <p className="text-xs font-medium text-muted">{worker.displayId}</p>
+          <p className="truncate font-semibold text-ink">{worker.name}</p>
+          <p className="mt-0.5 truncate text-xs text-muted">
             {worker.role} · {worker.area}
           </p>
         </div>
 
         <fieldset className="mt-4">
-          <legend className="text-sm font-semibold text-slate-900">Reason for removal</legend>
+          <legend className="text-sm font-semibold text-ink">Reason for removal</legend>
           <div className="mt-2 flex flex-col gap-1.5">
             {[...REMOVAL_REASONS, OTHER].map((option) => (
               <label
                 key={option}
-                className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition ${
-                  reason === option
-                    ? "border-sky-500 bg-sky-50 text-sky-800"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                }`}
+                className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition ${ reason === option ? "border-line bg-sky-50 text-brand" : "border-line text-slate-600 hover:bg-section" }`}
               >
                 <input
                   type="radio"
@@ -100,7 +96,7 @@ export default function RemoveWorkerDialog({ worker, onCancel, onConfirm }) {
               onChange={(e) => setOtherReason(e.target.value)}
               placeholder="Describe why this worker is being removed"
               aria-label="Other reason"
-              className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+              className="mt-2 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
             />
           )}
         </fieldset>
@@ -109,7 +105,7 @@ export default function RemoveWorkerDialog({ worker, onCancel, onConfirm }) {
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-section"
           >
             Cancel
           </button>
@@ -117,7 +113,7 @@ export default function RemoveWorkerDialog({ worker, onCancel, onConfirm }) {
             type="button"
             disabled={!canConfirm}
             onClick={() => onConfirm(finalReason)}
-            className="flex-1 rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 btn-disabled"
+            className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 btn-disabled"
           >
             Remove
           </button>

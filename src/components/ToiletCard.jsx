@@ -1,15 +1,16 @@
 import StatusBadge from "./StatusBadge";
+import Icon from "./Icon";
 
 export default function ToiletCard({ toilet, onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-2xl border border-emerald-100 bg-white p-4 text-left shadow-sm transition hover:border-emerald-200"
+      className="w-full rounded-2xl border border-emerald-100 bg-white p-4 text-left transition hover:border-emerald-200"
     >
       <span className="flex items-start gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-50 text-lg">
-          🚻
+          <Icon name="toilet" className="h-6 w-6" />
         </span>
         <span className="flex-1 min-w-0">
           <span className="flex items-start justify-between gap-2">

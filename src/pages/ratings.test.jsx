@@ -11,7 +11,7 @@ vi.mock("../components/FacilityMap", () => ({ default: () => <div data-testid="f
 import App from "../App";
 import ToiletDetails from "./ToiletDetails";
 import { AuthProvider } from "../context/AuthContext";
-import { startOtpSession, startSession } from "../services/authSession";
+import { startEmailSession, startSession } from "../services/authSession";
 import { resetRatingCache } from "../services/toiletRatingService";
 import { LEGACY_BINS, LOCAL_API_KEY, TOILETS, seedLocalApi } from "../test/fixtures";
 import { acceptConsentLocally } from "../test/consent";
@@ -48,7 +48,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 const citizen = () => {
-  const user = startOtpSession({ uid: "rater-1", phone: "9876543210" });
+  const user = startEmailSession({ uid: "rater-1", email: "citizen@example.test" });
   acceptConsentLocally(user);
   return user;
 };

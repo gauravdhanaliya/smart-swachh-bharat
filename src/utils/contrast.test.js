@@ -53,11 +53,24 @@ describe("disabled controls", () => {
   });
 });
 
-describe("login backdrop", () => {
-  it("brand text stays AA over every backdrop colour at full strength", () => {
-    const backgrounds = ["backdrop-green", "backdrop-sky", "backdrop-amber"].map(token);
-    for (const text of ["brand-green-700", "brand-green-800"].map(token)) {
-      for (const bg of backgrounds) expect(contrast(text, bg), `${text} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+describe("clean white tokens", () => {
+  it("text, secondary text and the brand green are AA on white and on the section background", () => {
+    for (const bg of [token("surface"), token("section")]) {
+      for (const fg of ["ink", "muted", "brand", "brand-hover"].map(token)) expect(contrast(fg, bg), `${fg} on ${bg}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("white text is AA on the brand green (primary buttons, the active tab)", () => {
+    for (const bg of ["brand", "brand-hover"].map(token)) expect(contrast("#ffffff", bg)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("no mint is left: the old emerald scale is now neutral greys and the one brand green", () => {
+    const brand = token("brand").toLowerCase();
+    for (const step of [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]) {
+      const hex = token(`emerald-${step}`).toLowerCase();
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      const neutral = Math.max(r, g, b) - Math.min(r, g, b) <= 32; // cool greys lean a little blue
+      expect(neutral || hex === brand, `emerald-${step} = ${hex}`).toBe(true);
     }
   });
 });

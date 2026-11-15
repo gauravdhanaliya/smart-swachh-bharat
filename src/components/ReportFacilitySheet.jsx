@@ -62,7 +62,7 @@ export default function ReportFacilitySheet({ facility, open, onClose }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby={`${ids}-title`}
-            className="relative flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl"
+            className="relative flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl"
           >
             <div className="mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-slate-200" aria-hidden="true" />
             <div className="flex items-center justify-between gap-3 px-5 pt-3 pb-2">
@@ -185,7 +185,7 @@ function ReportForm({ facility, onClose, reduced }) {
                 onClose();
                 navigate(`/citizen/complaints/${duplicate.id}`);
               }}
-              className="min-h-12 cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 hover:bg-emerald-800"
+              className="min-h-12 cursor-pointer rounded-xl bg-emerald-700 px-5 text-sm font-semibold text-white hover:bg-brand-hover"
             >
               Open your report
             </button>
@@ -193,7 +193,7 @@ function ReportForm({ facility, onClose, reduced }) {
           <button
             type="button"
             onClick={() => setDuplicate(null)}
-            className="min-h-11 cursor-pointer rounded-full px-5 text-sm font-semibold text-emerald-800 hover:bg-white"
+            className="min-h-11 cursor-pointer rounded-xl px-5 text-sm font-semibold text-emerald-800 hover:bg-white"
           >
             Report something else
           </button>
@@ -214,9 +214,7 @@ function ReportForm({ facility, onClose, reduced }) {
             return (
               <label
                 key={c}
-                className={`inline-flex min-h-11 cursor-pointer items-center rounded-full border px-4 text-sm font-medium transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-emerald-500 active:scale-[0.97] ${
-                  on ? "border-transparent bg-emerald-700 text-white shadow-md shadow-emerald-900/20" : "border-emerald-200 bg-white text-emerald-900 hover:border-emerald-300"
-                }`}
+                className={`inline-flex min-h-11 cursor-pointer items-center rounded-xl border px-4 text-sm font-medium transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-emerald-500 active:scale-[0.97] ${ on ? "border-transparent bg-emerald-700 text-white " : "border-emerald-200 bg-white text-emerald-900 hover:border-emerald-300" }`}
               >
                 <input
                   ref={i === 0 ? firstCategory : undefined}
@@ -260,9 +258,7 @@ function ReportForm({ facility, onClose, reduced }) {
             setErrors((er) => ({ ...er, description: undefined }));
           }}
           placeholder="What did you see?"
-          className={`w-full resize-none rounded-2xl border bg-white p-3.5 text-base text-emerald-950 placeholder:text-emerald-800/40 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none sm:text-sm ${
-            errors.description ? "border-red-400" : "border-emerald-200 focus:border-emerald-500"
-          }`}
+          className={`w-full resize-none rounded-2xl border bg-white p-3.5 text-base text-emerald-950 placeholder:text-emerald-800/40 focus:ring-2 focus:ring-emerald-500/30 focus:outline-none sm:text-sm ${ errors.description ? "border-red-400" : "border-emerald-200 focus:border-emerald-500" }`}
         />
         <div className="mt-1 flex justify-between gap-2 text-xs">
           {errors.description ? (
@@ -299,7 +295,7 @@ function ReportForm({ facility, onClose, reduced }) {
       <button
         type="submit"
         disabled={sending}
-        className="min-h-12 cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:bg-emerald-800 active:scale-[0.98] btn-disabled disabled:cursor-wait"
+        className="min-h-12 cursor-pointer rounded-xl bg-emerald-700 px-5 text-sm font-semibold text-white transition hover:bg-brand-hover active:scale-[0.98] btn-disabled disabled:cursor-wait"
       >
         {sending ? "Sending…" : "Send report"}
       </button>

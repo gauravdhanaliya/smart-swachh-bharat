@@ -53,7 +53,7 @@ export default function WorkerMap() {
         longitude: task.location.longitude,
         name: `#${task.id} · ${task.issueType}`,
         color: STATUS_DOT[task.status] ?? "#0284c7",
-        glyph: "\u{1F9F9}",
+        glyph: "clipboard",
       })),
     [tasks]
   );
@@ -72,13 +72,13 @@ export default function WorkerMap() {
             className="h-56"
           />
 
-          <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-2 text-xs font-medium text-orange-900 shadow-sm">
+          <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-2 text-xs font-medium text-ink border border-line">
             <LegendDot color={STATUS_DOT[STATUS.ASSIGNED]} label="Assigned" />
             <LegendDot color={STATUS_DOT[STATUS.IN_PROGRESS]} label="In Progress" />
           </div>
 
           {selected && (
-            <div className="rounded-2xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
+            <div className="rounded-2xl border border-line bg-white px-4 py-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-900">
@@ -93,14 +93,14 @@ export default function WorkerMap() {
                   href={googleMapsSearchUrl(selected.location.latitude, selected.location.longitude)}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex-1 rounded-full bg-white px-3 py-2 text-center text-xs font-semibold text-orange-700 ring-1 ring-orange-200"
+                  className="flex-1 rounded-xl bg-white px-3 py-2 text-center text-xs font-semibold text-brand ring-1 ring-line"
                 >
                   Open in Google Maps
                 </a>
                 <button
                   type="button"
                   onClick={() => navigate(`/worker/tasks/${selected.id}`)}
-                  className="flex-1 rounded-full bg-orange-600 px-3 py-2 text-xs font-semibold text-white"
+                  className="flex-1 rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white"
                 >
                   Open Task
                 </button>
@@ -111,7 +111,7 @@ export default function WorkerMap() {
           <div>
             <h2 className="mb-2 text-sm font-semibold text-slate-900">Active Task Locations</h2>
             {tasks.length === 0 && (
-              <p className="rounded-2xl bg-white px-4 py-3 text-center text-sm text-orange-900/60 shadow-sm">
+              <p className="rounded-2xl bg-white px-4 py-3 text-center text-sm text-muted border border-line">
                 No active task locations to show right now.
               </p>
             )}
@@ -121,7 +121,7 @@ export default function WorkerMap() {
                   key={task.id}
                   type="button"
                   onClick={() => setSelectedId(task.id)}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-orange-100 bg-white px-3.5 py-3 text-left hover:bg-orange-50"
+                  className="flex w-full items-center gap-3 rounded-2xl border border-line bg-white px-3.5 py-3 text-left hover:bg-section"
                 >
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"

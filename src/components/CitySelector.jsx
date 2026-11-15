@@ -109,7 +109,7 @@ export default function CitySelector({ city, cities, onSelect, onAddLocation, on
           <div
             role="dialog"
             aria-label="Choose your location"
-            className="absolute left-0 top-full z-30 mt-1 flex max-h-[75vh] w-[calc(100vw-2.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-xl shadow-emerald-950/15 animate-fade-in-up"
+            className="absolute left-0 top-full z-30 mt-1 flex max-h-[75vh] w-[calc(100vw-2.5rem)] max-w-sm flex-col overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-xl animate-fade-in-up"
           >
             {/* Search */}
             <div className="shrink-0 border-b border-emerald-50 p-2.5">
@@ -126,7 +126,7 @@ export default function CitySelector({ city, cities, onSelect, onAddLocation, on
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search city, district or state..."
-                  className="w-full rounded-xl border border-emerald-100 bg-emerald-50/40 py-2.5 pl-9 pr-3 text-sm text-emerald-950 placeholder:text-emerald-800/40 focus:border-emerald-400 focus:bg-white focus:outline-none"
+                  className="w-full rounded-xl border border-emerald-100 bg-section py-2.5 pl-9 pr-3 text-sm text-emerald-950 placeholder:text-emerald-800/40 focus:border-emerald-400 focus:bg-white focus:outline-none"
                 />
               </div>
             </div>
@@ -219,9 +219,7 @@ export default function CitySelector({ city, cities, onSelect, onAddLocation, on
                                               type="button"
                                               aria-current={c.id === city.id ? "true" : undefined}
                                               onClick={() => pick(c.id)}
-                                              className={`flex min-h-[36px] w-full items-center justify-between gap-2 py-1 pl-11 pr-4 text-left text-[13px] transition hover:bg-emerald-50 ${
-                                                c.id === city.id ? "font-semibold text-emerald-800" : "text-emerald-950"
-                                              }`}
+                                              className={`flex min-h-[36px] w-full items-center justify-between gap-2 py-1 pl-11 pr-4 text-left text-[13px] transition hover:bg-emerald-50 ${ c.id === city.id ? "font-semibold text-emerald-800" : "text-emerald-950" }`}
                                             >
                                               {c.name}
                                               {c.id === city.id && (
@@ -239,7 +237,7 @@ export default function CitySelector({ city, cities, onSelect, onAddLocation, on
                                             <button
                                               type="button"
                                               onClick={() => addForGap(d.name, s.name)}
-                                              className="font-semibold text-emerald-700 underline underline-offset-2"
+                                              className="font-semibold text-emerald-700"
                                             >
                                               Add it
                                             </button>
@@ -291,9 +289,7 @@ function CityRow({ c, selected, onPick, onRemove }) {
         type="button"
         aria-current={selected ? "true" : undefined}
         onClick={onPick}
-        className={`flex min-h-[44px] flex-1 items-center justify-between gap-2 py-2 pl-4 pr-2 text-left text-sm transition hover:bg-emerald-50 ${
-          selected ? "font-semibold text-emerald-800" : "text-emerald-950"
-        }`}
+        className={`flex min-h-[44px] flex-1 items-center justify-between gap-2 py-2 pl-4 pr-2 text-left text-sm transition hover:bg-emerald-50 ${ selected ? "font-semibold text-emerald-800" : "text-emerald-950" }`}
       >
         <span>
           {c.name}

@@ -24,12 +24,12 @@ function RequestCard({ request, onApprove, onReject, busy }) {
   const isPending = request.status === REQUEST_STATUS.PENDING || request.status === REQUEST_STATUS.UNDER_REVIEW;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-line bg-white p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-xs font-medium text-slate-400">{request.id}</p>
-          <p className="font-semibold text-slate-900">{request.suggestedName}</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs font-medium text-muted">{request.id}</p>
+          <p className="font-semibold text-ink">{request.suggestedName}</p>
+          <p className="text-xs text-muted">
             {request.facilityType} · {request.location.address}
           </p>
         </div>
@@ -40,9 +40,9 @@ function RequestCard({ request, onApprove, onReject, busy }) {
       </div>
 
       <p className="mt-3 text-sm text-slate-700">{request.reason}</p>
-      {request.description && <p className="mt-1 text-xs text-slate-500">{request.description}</p>}
+      {request.description && <p className="mt-1 text-xs text-muted">{request.description}</p>}
 
-      <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+      <div className="mt-3 flex items-center justify-between text-xs text-muted">
         <span>Requested by {request.requestedByWorkerName}</span>
         <span>{formatDateTime(request.createdAt)}</span>
       </div>
@@ -59,7 +59,7 @@ function RequestCard({ request, onApprove, onReject, busy }) {
       )}
 
       {isPending && (
-        <div className="mt-3 border-t border-slate-100 pt-3">
+        <div className="mt-3 border-t border-line pt-3">
           {rejecting ? (
             <div className="flex flex-col gap-2">
               <textarea
@@ -67,7 +67,7 @@ function RequestCard({ request, onApprove, onReject, busy }) {
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Reason for rejection…"
                 rows={2}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none"
+                className="w-full rounded-xl border border-line px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-brand focus:outline-none"
               />
               <div className="flex gap-2">
                 <button
@@ -78,14 +78,14 @@ function RequestCard({ request, onApprove, onReject, busy }) {
                     setRejectionReason("");
                   }}
                   disabled={busy}
-                  className="flex-1 rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 btn-disabled"
+                  className="flex-1 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 btn-disabled"
                 >
                   Confirm Reject
                 </button>
                 <button
                   type="button"
                   onClick={() => setRejecting(false)}
-                  className="flex-1 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  className="flex-1 rounded-xl border border-line px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-section"
                 >
                   Cancel
                 </button>
@@ -97,14 +97,14 @@ function RequestCard({ request, onApprove, onReject, busy }) {
                 type="button"
                 onClick={() => onApprove(request.id)}
                 disabled={busy}
-                className="flex-1 rounded-full bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
               >
                 Approve
               </button>
               <button
                 type="button"
                 onClick={() => setRejecting(true)}
-                className="flex-1 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="flex-1 rounded-xl border border-line px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-section"
               >
                 Reject
               </button>
@@ -157,8 +157,8 @@ export default function GovFacilityRequests() {
 
   return (
     <GovShell title="Facility Requests" subtitle="Review Worker-submitted Dustbin & Public Toilet requests">
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-slate-500">
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted">
           {requests.length} requests · {requests.filter((r) => r.status === REQUEST_STATUS.PENDING).length} pending
         </p>
         <StatusFilterTabs options={FILTERS} value={filter} onChange={setFilter} />
@@ -173,13 +173,13 @@ export default function GovFacilityRequests() {
       {filtered.length === 0 ? (
         // Until the list has loaded, an empty list means "not here yet", not "none".
         (loaded || requests.length > 0) && (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
+          <div className="rounded-2xl border border-line bg-white px-6 py-16 text-center">
             {requests.length === 0 ? (
-              <p className="font-semibold text-slate-900">No facility requests yet.</p>
+              <p className="font-semibold text-ink">No facility requests yet.</p>
             ) : (
               <>
-                <p className="font-semibold text-slate-900">No requests here</p>
-                <p className="mt-1 text-sm text-slate-500">Nothing matches this filter right now.</p>
+                <p className="font-semibold text-ink">No requests here</p>
+                <p className="mt-1 text-sm text-muted">Nothing matches this filter right now.</p>
               </>
             )}
           </div>

@@ -11,7 +11,7 @@ import { STATUS } from "../../data/complaints";
 
 const STATUS_DOT = {
   Available: "bg-emerald-500",
-  "On Duty": "bg-orange-500",
+  "On Duty": "bg-brand",
 };
 
 function initials(name) {
@@ -38,8 +38,8 @@ export default function WorkerProfile() {
   return (
     <WorkerShell title="Profile">
       <div className="flex flex-col gap-4 px-5 py-4">
-        <div className="flex items-center gap-3 rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-orange-100 text-lg font-bold text-orange-700">
+        <div className="flex items-center gap-3 rounded-2xl border border-line bg-white p-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-section text-lg font-bold text-brand">
             {initials(worker.name)}
           </span>
           <div className="min-w-0">
@@ -56,11 +56,11 @@ export default function WorkerProfile() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-orange-100 bg-white p-4 text-center shadow-sm">
+          <div className="rounded-2xl border border-line bg-white p-4 text-center">
             <p className="text-xl font-bold text-slate-900">{assignedTaskCount}</p>
             <p className="text-xs text-slate-500">Assigned Tasks</p>
           </div>
-          <div className="rounded-2xl border border-orange-100 bg-white p-4 text-center shadow-sm">
+          <div className="rounded-2xl border border-line bg-white p-4 text-center">
             <p className="text-xl font-bold text-slate-900">{completedTaskCount}</p>
             <p className="text-xs text-slate-500">Completed Tasks</p>
           </div>
@@ -69,10 +69,10 @@ export default function WorkerProfile() {
         <button
           type="button"
           onClick={() => navigate("/worker/facility-requests")}
-          className="flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-white p-4 text-left shadow-sm"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-white p-4 text-left"
         >
           <span className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-700">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-section text-brand">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
@@ -84,7 +84,7 @@ export default function WorkerProfile() {
           </svg>
         </button>
 
-        <div className="rounded-2xl border border-orange-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-line bg-white p-4">
           <p className="mb-2 text-sm font-bold text-slate-900">Switch Demo Worker</p>
           <p className="mb-2 text-xs text-slate-500">
             For this prototype, pick which sanitation worker you're signed in as.
@@ -92,7 +92,7 @@ export default function WorkerProfile() {
           <select
             value={worker.id}
             onChange={(e) => setWorkerId(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-orange-400 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-line focus:outline-none"
           >
             {WORKERS.map((w) => (
               <option key={w.id} value={w.id}>
@@ -107,7 +107,7 @@ export default function WorkerProfile() {
         <button
           type="button"
           onClick={() => setConfirmingLogout(true)}
-          className="mt-2 flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 shadow-sm"
+          className="mt-2 flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600"
         >
           <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />

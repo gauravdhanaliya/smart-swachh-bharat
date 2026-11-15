@@ -6,7 +6,7 @@ import { COMMENT_MAX_LENGTH, RATING_LABELS, formatAverage, ratingCountLabel } fr
 import { fadeUp } from "../utils/motion";
 
 const STAR_WORDS = { 1: "Very poor", 2: "Poor", 3: "Okay", 4: "Good", 5: "Excellent" };
-const CARD = "rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm";
+const CARD = "rounded-2xl border border-emerald-100 bg-white p-5";
 const shortDate = (iso) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
 /**
@@ -31,7 +31,7 @@ export default function ToiletRatingPanel({ toiletId, canRate }) {
         {!summary && status === "error" && (
           <div role="alert" className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
             <span>{error?.message || "Ratings couldn't be loaded."}</span>
-            <button type="button" onClick={reload} className="min-h-9 rounded-full bg-white px-3 font-semibold shadow-sm">
+            <button type="button" onClick={reload} className="min-h-9 rounded-xl bg-white px-3 font-semibold border border-line">
               Retry
             </button>
           </div>
@@ -192,9 +192,7 @@ function ToiletRatingForm({ mine, onSave }) {
                       return (
                         <label
                           key={n}
-                          className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-xs font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-emerald-500 ${
-                            on ? "bg-emerald-700 text-white" : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                          }`}
+                          className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-xs font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-emerald-500 ${ on ? "bg-emerald-700 text-white" : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100" }`}
                         >
                           <input
                             type="radio"
@@ -220,7 +218,7 @@ function ToiletRatingForm({ mine, onSave }) {
                           touched();
                         }}
                         aria-label={`Clear ${label}`}
-                        className="ml-1 min-h-9 px-1 text-xs text-emerald-800/60 underline"
+                        className="ml-1 min-h-9 px-1 text-xs text-emerald-800/60"
                       >
                         Clear
                       </button>
@@ -292,7 +290,7 @@ function ToiletRatingForm({ mine, onSave }) {
       <button
         type="submit"
         disabled={phase === "saving"}
-        className="min-h-12 cursor-pointer rounded-full bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md shadow-emerald-900/20 transition hover:bg-emerald-800 active:scale-[0.98] btn-disabled disabled:cursor-wait"
+        className="min-h-12 cursor-pointer rounded-xl bg-emerald-700 px-5 text-sm font-semibold text-white transition hover:bg-brand-hover active:scale-[0.98] btn-disabled disabled:cursor-wait"
       >
         {phase === "saving" ? "Saving…" : saved ? "Update rating" : "Submit rating"}
       </button>

@@ -17,7 +17,7 @@ export default function MapFilters({ value, onChange, className = "" }) {
     // that padding so the visible edge lines back up, without losing
     // the track padding itself.
     <div
-      className={`-ml-1 inline-flex items-center gap-1 rounded-full bg-white p-1 shadow-md shadow-emerald-900/10 ${className}`}
+      className={`-ml-1 inline-flex items-center gap-1 rounded-full bg-white p-1 shadow-md ${className}`}
     >
       {OPTIONS.map((option) => (
         <button

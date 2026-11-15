@@ -73,7 +73,7 @@ export default function SearchBar({
       <button
         type="submit"
         disabled={submitting}
-        className="min-h-9 shrink-0 cursor-pointer rounded-full bg-emerald-700 px-4 text-xs font-semibold text-white btn-disabled disabled:cursor-wait"
+        className="min-h-9 shrink-0 cursor-pointer rounded-xl bg-emerald-700 px-4 text-xs font-semibold text-white btn-disabled disabled:cursor-wait"
       >
         {submitting ? "Searching…" : "Search"}
       </button>

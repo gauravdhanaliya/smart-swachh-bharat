@@ -3,7 +3,7 @@
 // same calls through the API run in pages/apiMode.test.jsx).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { startOtpSession, startSession } from "./authSession";
+import { startEmailSession, startSession } from "./authSession";
 import { createFacilityComplaint, getComplaintById, getOpenComplaintCount, updateComplaintStatus } from "./complaintService";
 import { FACILITY_CATEGORIES, PHOTO_NOT_SAVED } from "../../server/src/constants.js";
 
@@ -12,7 +12,7 @@ const BIN = { id: "DB-001", type: "bin", name: "Library Bin", address: "Central 
 const JPEG = `data:image/jpeg;base64,${btoa("jpeg bytes")}`;
 
 beforeEach(() => {
-  startOtpSession({ uid: "reporter-1", phone: "9876543210" });
+  startEmailSession({ uid: "reporter-1", email: "citizen@example.test" });
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -52,7 +52,7 @@ describe("creating a facility complaint", () => {
     await expect(again).rejects.toMatchObject({ status: 409, existingId: first.id });
     // another category, or another citizen, is a new report
     await expect(createFacilityComplaint({ facility: TOILET, category: "No lighting" })).resolves.toBeTruthy();
-    startOtpSession({ uid: "reporter-2", phone: "9876543211" });
+    startEmailSession({ uid: "reporter-2", email: "citizen@example.test" });
     await expect(createFacilityComplaint({ facility: TOILET, category: "Dirty" })).resolves.toBeTruthy();
   });
 

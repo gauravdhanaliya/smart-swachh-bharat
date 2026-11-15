@@ -45,10 +45,10 @@ export default function GovNotifications() {
             key={`${item.id}-${item.time}`}
             type="button"
             onClick={() => navigate(`/official/complaints/${item.id}`)}
-            className="flex items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:bg-slate-50"
+            className="flex items-start justify-between gap-3 rounded-2xl border border-line bg-white p-4 text-left transition hover:bg-section"
           >
             <p className="text-sm text-slate-800">{item.message}</p>
-            <span className="shrink-0 text-xs text-slate-400">{item.time}</span>
+            <span className="shrink-0 text-xs text-muted">{item.time}</span>
           </button>
         ))}
       </div>

@@ -11,6 +11,7 @@ import {
   DESCRIPTION_MAX_LENGTH,
   priorityForIssueType,
 } from "../data/complaints";
+import Glyph from "../components/Glyph";
 
 export default function ReportIssue() {
   const navigate = useNavigate();
@@ -96,7 +97,7 @@ export default function ReportIssue() {
         {prefill.location?.facilityId && (
           <div className="flex items-center gap-2.5 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-xs font-medium text-emerald-800">
             <span className="text-base">
-              {prefill.location.facilityType === "Public Toilet" ? "🚻" : "🗑️"}
+              <Glyph value={prefill.location.facilityType === "Public Toilet" ? "🚻" : "🗑️"} />
             </span>
             Reporting for {prefill.location.facilityType} {prefill.location.facilityId} at{" "}
             {prefill.location.address}
@@ -115,13 +116,9 @@ export default function ReportIssue() {
                     setIssueType(type);
                     if (errors.issueType) setErrors((e) => ({ ...e, issueType: undefined }));
                   }}
-                  className={`flex flex-col items-center gap-2 rounded-2xl border p-4 text-center transition ${
-                    selected
-                      ? "border-transparent bg-emerald-700 text-white shadow-md shadow-emerald-900/20"
-                      : "border-emerald-100 bg-white text-emerald-900 hover:border-emerald-200"
-                  }`}
+                  className={`flex flex-col items-center gap-2 rounded-2xl border p-4 text-center transition ${ selected ? "border-transparent bg-emerald-700 text-white " : "border-emerald-100 bg-white text-emerald-900 hover:border-emerald-200" }`}
                 >
-                  <span className="text-2xl">{type.icon}</span>
+                  <Glyph value={type.icon} className="h-6 w-6" />
                   <span className="text-sm font-semibold leading-tight">{type.label}</span>
                 </button>
               );

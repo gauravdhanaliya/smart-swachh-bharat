@@ -42,14 +42,9 @@ export default function WorkerShell({
 
   return (
     <>
-      <div className="min-h-dvh bg-orange-50/40 sm:py-4">
+      <div className="min-h-dvh bg-section sm:py-4">
         <div className="device-frame device-frame--app">
-          <div className="shrink-0 bg-orange-600 px-5 pb-4 pt-5 text-white">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
-                EcoSetu · Smart Swachh Bharat
-              </p>
-            </div>
+          <div className="shrink-0 border-b border-line bg-white px-4 pt-3 pb-3 text-ink">
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 {showBack && (
@@ -57,21 +52,21 @@ export default function WorkerShell({
                     type="button"
                     onClick={onBack ?? (() => navigate(-1))}
                     aria-label="Go back"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/90 hover:bg-white/10"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink hover:bg-section"
                   >
                     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M15 6l-6 6 6 6" />
                     </svg>
                   </button>
                 )}
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-bold">
+                {/* One block: avatar, name, then role and area (the area wraps, never cut off). */}
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-section text-sm font-semibold text-ink" aria-hidden="true">
                   {initials(worker.name)}
                 </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold leading-tight">{worker.name}</p>
-                  <p className="truncate text-[11px] text-white/70">
-                    Sanitation Worker · {worker.area}
-                  </p>
+                <div className="min-w-0" data-worker-identity>
+                  <p className="truncate text-base leading-tight font-semibold">{worker.name}</p>
+                  <p className="text-xs leading-snug text-muted">Sanitation Worker</p>
+                  <p className="text-xs leading-snug text-muted">{worker.area}</p>
                 </div>
               </div>
 
@@ -79,24 +74,22 @@ export default function WorkerShell({
                 <button
                   type="button"
                   onClick={() => navigate("/worker/notifications")}
-                  aria-label="Notifications"
-                  className="relative flex h-9 w-9 items-center justify-center rounded-full text-white/90 hover:bg-white/10"
+                  aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+                  className="relative flex h-11 w-11 items-center justify-center rounded-xl text-ink hover:bg-section"
                 >
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M6 9a6 6 0 1112 0c0 4 1.5 5.5 2 6.5H4c.5-1 2-2.5 2-6.5z" />
                     <path d="M9.5 18a2.5 2.5 0 005 0" />
                   </svg>
                   {unread > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-orange-700">
-                      {unread > 9 ? "9+" : unread}
-                    </span>
+                    <span data-unread-badge className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-600 ring-2 ring-white" aria-hidden="true" />
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmingLogout(true)}
                   aria-label="Logout"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-white/90 hover:bg-white/10"
+                  className="flex h-11 w-11 items-center justify-center rounded-xl text-ink hover:bg-section"
                 >
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
@@ -106,7 +99,7 @@ export default function WorkerShell({
               </div>
             </div>
 
-            {title && <h1 className="mt-3 text-lg font-bold">{title}</h1>}
+            {title && <h1 className="mt-2 text-2xl font-semibold">{title}</h1>}
             {headerExtra}
           </div>
 

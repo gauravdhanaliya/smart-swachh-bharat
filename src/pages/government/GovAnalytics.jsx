@@ -9,7 +9,7 @@ function Bar({ label, value, max, colorClass }) {
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
         <span className="font-medium text-slate-700">{label}</span>
-        <span className="text-slate-400">{value}</span>
+        <span className="text-muted">{value}</span>
       </div>
       <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
         <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${pct}%` }} />
@@ -48,8 +48,8 @@ export default function GovAnalytics() {
   return (
     <GovShell title="Analytics" subtitle="Simple complaint statistics">
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-4 text-sm font-bold text-slate-900">Complaints by Status</p>
+        <div className="rounded-2xl border border-line bg-white p-5">
+          <p className="mb-4 text-sm font-bold text-ink">Complaints by Status</p>
           <div className="flex flex-col gap-3">
             {byStatus.map((row) => (
               <Bar
@@ -57,17 +57,17 @@ export default function GovAnalytics() {
                 label={STATUS_LABELS[row.status]}
                 value={row.count}
                 max={maxStatus}
-                colorClass="bg-sky-600"
+                colorClass="bg-brand"
               />
             ))}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="mb-4 text-sm font-bold text-slate-900">Complaints by Issue Type</p>
+        <div className="rounded-2xl border border-line bg-white p-5">
+          <p className="mb-4 text-sm font-bold text-ink">Complaints by Issue Type</p>
           <div className="flex flex-col gap-3">
             {byIssueType.length === 0 && (
-              <p className="text-sm text-slate-400">No complaints yet.</p>
+              <p className="text-sm text-muted">No complaints yet.</p>
             )}
             {byIssueType.map((row) => (
               <Bar
@@ -81,10 +81,10 @@ export default function GovAnalytics() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-          <p className="mb-1 text-sm font-bold text-slate-900">Resolution Rate</p>
+        <div className="rounded-2xl border border-line bg-white p-5 lg:col-span-2">
+          <p className="mb-1 text-sm font-bold text-ink">Resolution Rate</p>
           <p className="text-3xl font-bold text-emerald-700">{resolvedPct}%</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted">
             {complaints.filter((c) => c.status === STATUS.RESOLVED).length} of {complaints.length} complaints resolved
           </p>
         </div>

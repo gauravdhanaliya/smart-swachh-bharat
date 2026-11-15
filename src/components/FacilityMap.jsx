@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Circle, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import FacilityPopupContent from "./FacilityPopupContent";
+import { iconForEmoji } from "../utils/emojiIcons";
 
 // FIX — bins/toilets stopped appearing as pins on the map when a
 // previous pass swapped react-leaflet for a plain OpenStreetMap iframe
@@ -79,6 +80,23 @@ function toiletGlyph(color, px) {
   return `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="${color}" aria-hidden="true" style="display:block"><circle cx="7" cy="5" r="2.2"/><rect x="4.4" y="8.6" width="5.2" height="7" rx="1.6"/><rect x="5" y="15.4" width="1.8" height="5.6" rx=".9"/><rect x="7.4" y="15.4" width="1.8" height="5.6" rx=".9"/><circle cx="17" cy="5" r="2.2"/><path d="M17 8.6l3.4 8.2h-6.8z"/><rect x="15.4" y="16" width="1.4" height="5" rx=".7"/><rect x="17.2" y="16" width="1.4" height="5" rx=".7"/></svg>`;
 }
 
+function clipboardGlyph(color, px) {
+  return `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/></svg>`;
+}
+
+function buildingGlyph(color, px) {
+  return `<svg width="${px}" height="${px}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M11 21v-3h2v3"/></svg>`;
+}
+
+function dotGlyph(color, px) {
+  return `<svg width="${px}" height="${px}" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><circle cx="12" cy="12" r="5" fill="${color}"/></svg>`;
+}
+
+// Generic markers name their glyph (an icon name, or an emoji older data
+// still holds); it is always drawn as an SVG, never as the emoji itself.
+const MARKER_GLYPHS = { bin: binGlyph, toilet: toiletGlyph, clipboard: clipboardGlyph, building: buildingGlyph, landmark: buildingGlyph, graduation: buildingGlyph, book: buildingGlyph };
+const markerGlyph = (glyph) => MARKER_GLYPHS[iconForEmoji(glyph)] ?? dotGlyph;
+
 // `glyph` is either a ready-made HTML string (the generic `markers`
 // prop still passes emoji through untouched) or a (color, px) => html
 // function so the icon can scale with the pin.
@@ -123,10 +141,10 @@ function dotIcon({ color, kind }) {
   });
 }
 
-function clusterIcon({ count, severity, compact }) {
+function clusterIcon({ count, severity, compact, color }) {
   const size = compact ? 26 : 38;
   const label = count > 99 ? "99+" : String(count);
-  const html = `<div style="width:${size}px;height:${size}px;border-radius:9999px;background:${CLUSTER_COLORS[severity]};border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${compact ? 11 : 14}px;line-height:1;font-family:var(--font-sans, system-ui, sans-serif);">${label}</div>`;
+  const html = `<div style="width:${size}px;height:${size}px;border-radius:9999px;background:${color ?? CLUSTER_COLORS[severity]};border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35);box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:${compact ? 11 : 14}px;line-height:1;font-family:var(--font-sans, system-ui, sans-serif);">${label}</div>`;
   return L.divIcon({
     html,
     className: "ssb-pin",
@@ -161,6 +179,57 @@ function meIcon() {
  * Location"). Flies smoothly on a genuinely new selection, snaps
  * instantly for everything else (e.g. a status-filter re-render).
  */
+// Leaflet measures its container once. When the container changes size
+// afterwards (the Home's map grows when the "Verify your email" banner is
+// dismissed, a phone rotates), the new area would stay grey with no tiles.
+// This tells Leaflet to measure again whenever the container resizes.
+function FollowContainerSize() {
+  const map = useMap();
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(() => map.invalidateSize({ pan: false }));
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
+// Frames a set of points: fits them in view with `padding` px on every side,
+// so no pin is clipped at the edge. One point: centred at `maxZoom`.
+function FitToPoints({ points, padding, maxZoom }) {
+  const map = useMap();
+  const key = points.map((p) => `${p.latitude.toFixed(5)},${p.longitude.toFixed(5)}`).join("|");
+  useEffect(() => {
+    if (!points.length) return;
+    if (points.length === 1) {
+      map.setView([points[0].latitude, points[0].longitude], maxZoom);
+      return;
+    }
+    map.fitBounds(
+      points.map((p) => [p.latitude, p.longitude]),
+      { padding: [padding, padding], maxZoom, animate: false }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` stands for the points
+  }, [key, padding, maxZoom, map]);
+  return null;
+}
+
+// Writes where the map is actually looking onto its container
+// (data-map-center="lat,lng"), so a layout check can confirm it.
+function ReportCenter() {
+  const map = useMap();
+  useEffect(() => {
+    const write = () => {
+      const c = map.getCenter();
+      map.getContainer().dataset.mapCenter = `${c.lat.toFixed(5)},${c.lng.toFixed(5)}`;
+    };
+    write();
+    map.on("moveend", write);
+    return () => map.off("moveend", write);
+  }, [map]);
+  return null;
+}
+
 function MapViewController({ center, zoom, selectedKey }) {
   const map = useMap();
   const lastSelectedKey = useRef(selectedKey);
@@ -190,6 +259,7 @@ function FacilityPoints({
   bins,
   toilets,
   compact,
+  pinColors,
   cluster,
   interactive,
   selectedKind,
@@ -266,7 +336,7 @@ function FacilityPoints({
         const isSelected = selectedKind === kind && selectedId === item.id;
         const onSelect = kind === "bin" ? onSelectBin : onSelectToilet;
         const icon = compact
-          ? dotIcon({ color, kind })
+          ? dotIcon({ color: pinColors?.[kind] ?? color, kind })
           : pinIcon({
               color,
               glyph: kind === "bin" ? binGlyph : toiletGlyph,
@@ -365,6 +435,14 @@ export default function FacilityMap({
   onSelectMarker,
   interactive = true,
   compact = false,
+  // A colour per kind, { bin, toilet } (the Home preview: green bins, blue
+  // toilets, matching its legend). Without it, pins follow the status.
+  pinColors = null,
+  // Points to fit in view (with `fitPadding` px on every side) instead of
+  // using `center`/`zoom`.
+  fitTo = null,
+  fitPadding = 32,
+  fitMaxZoom = 16,
   cluster = true,
   className = "",
   ratings = null, // Map of toiletId -> rating summary, shown in toilet popups
@@ -384,7 +462,7 @@ export default function FacilityMap({
               position={[marker.latitude, marker.longitude]}
               icon={pinIcon({
                 color: marker.color ?? "#0284c7",
-                glyph: marker.glyph ?? "\u{1F4CD}",
+                glyph: markerGlyph(marker.glyph),
                 selected: isSelected,
               })}
               interactive={interactive}
@@ -441,11 +519,18 @@ export default function FacilityMap({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <MapViewController center={center} zoom={zoom} selectedKey={selectedKey} />
+        <FollowContainerSize />
+        <ReportCenter />
+        {fitTo?.length ? (
+          <FitToPoints points={fitTo} padding={fitPadding} maxZoom={fitMaxZoom} />
+        ) : (
+          <MapViewController center={center} zoom={zoom} selectedKey={selectedKey} />
+        )}
         <FacilityPoints
           bins={bins}
           toilets={toilets}
           compact={compact}
+          pinColors={pinColors}
           cluster={cluster}
           interactive={interactive}
           selectedKind={selectedKind}

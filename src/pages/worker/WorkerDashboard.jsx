@@ -1,19 +1,21 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import WorkerShell from "../../components/WorkerShell";
-import StatTile from "../../components/StatTile";
+import GovKpiCard from "../../components/GovKpiCard";
 import StatusBadge from "../../components/StatusBadge";
 import PriorityBadge from "../../components/PriorityBadge";
 import FacilityMap from "../../components/FacilityMap";
+import Icon from "../../components/Icon";
 import { useComplaints } from "../../hooks/useComplaints";
 import { useWorkerSession } from "../../hooks/useWorkerSession";
 import { computeWorkerStats } from "../../utils/govStats";
+import { workerMapFrame } from "../../utils/workerArea";
 import { STATUS } from "../../data/complaints";
 
-const LUCKNOW = { latitude: 26.8467, longitude: 80.9462 };
-const STATUS_DOT = {
-  [STATUS.ASSIGNED]: "#0284c7",
-  [STATUS.IN_PROGRESS]: "#e07a00",
+// Task pins: blue while assigned, amber once started (status colours).
+const STATUS_PIN = {
+  [STATUS.ASSIGNED]: "#2563eb",
+  [STATUS.IN_PROGRESS]: "#d97706",
 };
 
 function formatDateTime(iso) {
@@ -25,45 +27,19 @@ function formatDateTime(iso) {
   });
 }
 
-const ICONS = {
-  assigned: (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 3h10l4 4v14H7V3z" />
-      <path d="M10 12h6M10 16h6" />
-    </svg>
-  ),
-  new: (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  ),
-  inProgress: (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 3" />
-    </svg>
-  ),
-  completed: (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 6L9 17l-5-5" />
-    </svg>
-  ),
-  high: (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 9v4M12 17h.01M10.3 4.3L2.7 18.7A1 1 0 003.6 20h16.8a1 1 0 00.9-1.3L13.7 4.3a1 1 0 00-1.7 0z" />
-    </svg>
-  ),
-};
-
+/**
+ * The worker's dashboard, clean white like the citizen Home: compact stat
+ * tiles (neutral icons, status only in a small dot), a map of their own area
+ * and tasks with a "See full map" link, requesting a facility, and the
+ * active tasks. One screen: only the task list scrolls.
+ */
 export default function WorkerDashboard() {
   const navigate = useNavigate();
   const complaints = useComplaints();
   const { worker } = useWorkerSession();
-  const stats = computeWorkerStats(complaints, worker.id);
+  const stats = useMemo(() => computeWorkerStats(complaints, worker.id), [complaints, worker.id]);
 
-  const activeTasks = [...stats.active].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
+  const activeTasks = [...stats.active].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   const taskMarkers = useMemo(
     () =>
@@ -72,154 +48,117 @@ export default function WorkerDashboard() {
         latitude: task.location.latitude,
         longitude: task.location.longitude,
         name: `#${task.id} · ${task.issueType}`,
-        color: STATUS_DOT[task.status] ?? "#0284c7",
-        glyph: "\u{1F9F9}",
+        color: STATUS_PIN[task.status] ?? "#2563eb",
+        glyph: "clipboard",
       })),
-    [stats.active]
+    [stats]
   );
+  // Their own tasks (active first; otherwise every task they've had), or their area's city.
+  const frame = useMemo(() => workerMapFrame(worker, stats.active.length ? stats.active : stats.mine), [worker, stats]);
 
   return (
     <WorkerShell title="Dashboard" noScroll>
-      {/* Sized to fit one screen with no scrolling: header stats/map/
-          request-banner are fixed-height and shrink-0; only the active
-          tasks list below gets its own internal scroll, so the header,
-          stats and bottom nav never move even if there are many tasks. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-5 py-3">
-        <p className="shrink-0 text-xs text-orange-900/70">
-          Here's what's on your plate today in <span className="font-semibold">{worker.area}</span>.
-        </p>
-
+      <div className="flex min-h-0 flex-1 flex-col gap-3 bg-white px-4 py-3">
         <div className="grid shrink-0 grid-cols-2 gap-2">
-          <StatTile
-            icon={ICONS.assigned}
-            label="Assigned Tasks"
-            value={stats.assignedCount}
-            color="sky"
-            onClick={() => navigate("/worker/tasks")}
-            compact
-          />
-          <StatTile
-            icon={ICONS.new}
-            label="New Tasks"
-            value={stats.newCount}
-            color="orange"
-            onClick={() => navigate("/worker/tasks?filter=assigned")}
-            compact
-          />
-          <StatTile
-            icon={ICONS.inProgress}
-            label="In Progress"
-            value={stats.inProgressCount}
-            color="orange"
-            onClick={() => navigate("/worker/tasks?filter=in_progress")}
-            compact
-          />
-          <StatTile
-            icon={ICONS.completed}
-            label="Completed"
-            value={stats.completedCount}
-            color="emerald"
-            onClick={() => navigate("/worker/tasks?filter=resolved")}
-            compact
-          />
+          <GovKpiCard icon="reports" label="Assigned" value={stats.assignedCount} tone="new" onClick={() => navigate("/worker/tasks")} dense />
+          <GovKpiCard icon="inbox" label="New" value={stats.newCount} tone="new" onClick={() => navigate("/worker/tasks?filter=assigned")} dense />
+          <GovKpiCard icon="clock" label="In progress" value={stats.inProgressCount} tone="progress" onClick={() => navigate("/worker/tasks?filter=in_progress")} dense />
+          <GovKpiCard icon="check" label="Completed" value={stats.completedCount} tone="done" onClick={() => navigate("/worker/tasks?filter=resolved")} dense />
+          <GovKpiCard icon="alert" label="High priority" value={stats.highPriorityCount} tone="alert" onClick={() => navigate("/worker/tasks")} wide dense />
         </div>
 
-        <StatTile
-          icon={ICONS.high}
-          label="High Priority Tasks"
-          value={stats.highPriorityCount}
-          color="red"
-          onClick={() => navigate("/worker/tasks")}
-          compact
-        />
+        <section aria-labelledby="worker-map-title" className="shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <h2 id="worker-map-title" className="text-lg leading-tight font-semibold text-ink">
+              Your area
+            </h2>
+            <button
+              type="button"
+              onClick={() => navigate("/worker/map")}
+              className="-my-2.5 -mr-1 flex min-h-11 cursor-pointer items-center rounded-lg px-1 text-sm font-semibold text-brand hover:text-brand-hover focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+            >
+              See full map
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/worker/map")}
+            aria-label={`Open the map of your area: ${taskMarkers.length} active ${taskMarkers.length === 1 ? "task" : "tasks"}`}
+            data-worker-map
+            data-area-city={frame.cityName}
+            data-area-center={`${frame.center.latitude},${frame.center.longitude}`}
+            className="mt-1.5 block h-24 w-full cursor-pointer overflow-hidden rounded-2xl border border-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            <FacilityMap
+              markers={taskMarkers}
+              center={frame.center}
+              zoom={13}
+              fitTo={frame.points}
+              fitPadding={28}
+              interactive={false}
+              className="h-full rounded-none border-0"
+            />
+          </button>
+        </section>
 
         <button
           type="button"
-          onClick={() => navigate("/worker/map")}
-          className="relative block w-full shrink-0 overflow-hidden rounded-2xl border border-orange-100 shadow-sm"
-          style={{ height: 88 }}
+          onClick={() => navigate("/worker/facility-request")}
+          className="flex min-h-12 shrink-0 cursor-pointer items-center gap-3 rounded-2xl border border-line bg-white px-3 py-2 text-left hover:bg-section focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
         >
-          <FacilityMap
-            markers={taskMarkers}
-            center={LUCKNOW}
-            zoom={12}
-            interactive={false}
-            className="h-full"
-          />
-          <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-orange-800 shadow">
-            {taskMarkers.length} Active Task{taskMarkers.length === 1 ? "" : "s"} on Map
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-section text-brand" aria-hidden="true">
+            <Icon name="plus" className="h-4 w-4" />
           </span>
-          <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-orange-700 shadow">
-            Open Map →
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">Request a facility</span>
+            <span className="block text-xs text-muted">Ask for a new dustbin or toilet</span>
           </span>
+          <Icon name="chevronRight" className="h-5 w-5 text-muted" />
         </button>
 
-        <div className="flex shrink-0 items-center gap-2.5 rounded-2xl border border-dashed border-orange-300 bg-orange-50/60 p-2.5 shadow-sm">
-          <button
-            type="button"
-            onClick={() => navigate("/worker/facility-request")}
-            className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-700">
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-xs font-bold text-orange-950">Request Facility</span>
-              <span className="block text-[11px] text-orange-900/60">Ask for a new dustbin/toilet</span>
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate("/worker/facility-requests")}
-            className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-orange-700 ring-1 ring-orange-200"
-          >
-            My Requests
-          </button>
-        </div>
-
-        <div className="flex shrink-0 items-center justify-between">
-          <p className="text-xs font-bold text-orange-950">Active Tasks</p>
-          <button
-            type="button"
-            onClick={() => navigate("/worker/tasks")}
-            className="text-[11px] font-semibold text-orange-700"
-          >
-            View All →
-          </button>
-        </div>
-
-        {/* Only this list scrolls internally — everything above and the
-            bottom nav stay fixed no matter how many tasks there are. */}
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-          {activeTasks.length === 0 && (
-            <p className="rounded-2xl border border-dashed border-orange-200 bg-white px-4 py-6 text-center text-xs text-orange-900/50">
-              {stats.mine.length === 0 ? "No tasks assigned yet." : "No active tasks right now. New assignments will show up here."}
-            </p>
-          )}
-
-          {activeTasks.map((c) => (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center justify-between">
+            <h2 className="text-lg leading-tight font-semibold text-ink">Active tasks</h2>
             <button
-              key={c.id}
               type="button"
-              onClick={() => navigate(`/worker/tasks/${c.id}`)}
-              className="flex w-full flex-col gap-1.5 rounded-2xl border border-orange-100 bg-white p-3 text-left shadow-sm"
+              onClick={() => navigate("/worker/tasks")}
+              className="-my-2.5 -mr-1 flex min-h-11 cursor-pointer items-center rounded-lg px-1 text-sm font-semibold text-brand hover:text-brand-hover"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-medium text-slate-500">#{c.id}</p>
-                  <p className="text-sm font-semibold text-slate-900">{c.issueType}</p>
-                </div>
-                <PriorityBadge priority={c.priority} />
-              </div>
-              <p className="text-xs text-slate-600">{c.location.address}</p>
-              <div className="flex items-center justify-between border-t border-orange-50 pt-1.5">
-                <span className="text-[11px] text-slate-500">Updated {formatDateTime(c.updatedAt)}</span>
-                <StatusBadge status={c.status} />
-              </div>
+              View all
             </button>
-          ))}
+          </div>
+
+          {/* Only this list scrolls; everything above and the tab bar stay put. */}
+          <div className="mt-1.5 min-h-0 flex-1 space-y-2 overflow-y-auto">
+            {activeTasks.length === 0 && (
+              <p data-empty-state className="flex items-center gap-2 py-2 text-sm text-muted">
+                <Icon name="checkCircle" className="h-5 w-5" />
+                {stats.mine.length === 0 ? "No tasks assigned yet." : "No active tasks. New assignments show up here."}
+              </p>
+            )}
+
+            {activeTasks.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => navigate(`/worker/tasks/${c.id}`)}
+                className="flex w-full cursor-pointer flex-col gap-2 rounded-2xl border border-line bg-white p-3 text-left hover:bg-section"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted">#{c.id}</p>
+                    <p className="text-sm font-semibold text-ink">{c.issueType}</p>
+                  </div>
+                  <PriorityBadge priority={c.priority} />
+                </div>
+                <p className="text-xs text-muted">{c.location.address}</p>
+                <div className="flex items-center justify-between border-t border-line pt-2">
+                  <span className="text-xs text-muted">Updated {formatDateTime(c.updatedAt)}</span>
+                  <StatusBadge status={c.status} />
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </WorkerShell>

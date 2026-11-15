@@ -1,31 +1,53 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Poppins", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
 
-  --color-brand-green-50: #eefbf3;
-  --color-brand-green-100: #d7f5e0;
-  --color-brand-green-500: #1f9d55;
-  --color-brand-green-600: #178a49;
-  --color-brand-green-700: #0f6e3a;
-  --color-brand-green-800: #0b5c30;
-  --color-brand-green-900: #0a4526;
+  /* ---- "Clean white" design tokens ------------------------------------
+     Surfaces white, page sections #F7F8FA; text #111827, secondary #6B7280;
+     borders #E5E7EB. ONE brand green, only for primary buttons, the active
+     tab, links and map pins. Status colours (red/amber/green badges) are
+     used only for status. */
+  --color-surface: #ffffff;
+  --color-section: #f7f8fa;
+  --color-ink: #111827;
+  --color-muted: #6b7280;
+  --color-line: #e5e7eb;
+  --color-brand: #0b7a4b;
+  --color-brand-hover: #096a40;
+  --color-brand-soft: #e7f3ed;
+
+  /* The app was built on Tailwind's emerald scale; it now maps onto the
+     tokens above, so every screen (login, citizen, worker, government)
+     follows the one palette. */
+  --color-emerald-50: #f7f8fa; /* section background */
+  --color-emerald-100: #e5e7eb; /* borders, dividers */
+  --color-emerald-200: #d1d5db; /* input borders */
+  --color-emerald-300: #d1d5db;
+  --color-emerald-400: #9ca3af;
+  --color-emerald-500: #0b7a4b; /* focus rings */
+  --color-emerald-600: #0b7a4b;
+  --color-emerald-700: #0b7a4b; /* brand: primary, links, active */
+  --color-emerald-800: #374151; /* secondary text (with opacity) */
+  --color-emerald-900: #374151; /* body text */
+  --color-emerald-950: #111827; /* headings, primary text */
+
+  --color-brand-green-50: #e7f3ed;
+  --color-brand-green-100: #e7f3ed;
+  --color-brand-green-500: #0b7a4b;
+  --color-brand-green-600: #0b7a4b;
+  --color-brand-green-700: #0b7a4b;
+  --color-brand-green-800: #6b7280;
+  --color-brand-green-900: #111827;
 
   --color-brand-orange-400: #ffab3d;
   --color-brand-orange-500: #f5920e;
   --color-brand-orange-600: #e07a00;
 
   /* Disabled controls: grey, so they read as "off", but the label still
-     meets WCAG AA (5.6:1 on the surface, 6.8:1 on white). Checked in
-     src/utils/contrast.test.js. */
-  --color-disabled-surface: #e4ebe7;
-  --color-disabled-ink: #4d5f55;
-
-  /* Login page backdrop blobs. Light enough that brand-green-700 text
-     stays AA even where a blob is at full strength. */
-  --color-backdrop-green: #d7f5e0;
-  --color-backdrop-sky: #d9f0fb;
-  --color-backdrop-amber: #ffeccf;
+     meets WCAG AA (6.0:1 on the surface). Checked in src/utils/contrast.test.js. */
+  --color-disabled-surface: #e5e7eb;
+  --color-disabled-ink: #4b5563;
 }
 
 /* A filled button (solid background) while disabled. Also wins over the
@@ -67,6 +89,8 @@ html, body, #root {
 
 body {
   font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-section);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -77,7 +101,7 @@ body {
   min-height: 100dvh;
   margin: 0 auto;
   position: relative;
-  background: linear-gradient(180deg, #eef8f0 0%, #ffffff 55%);
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
 }
@@ -87,8 +111,8 @@ body {
     min-height: 900px;
     margin: 24px auto;
     border-radius: 2.5rem;
-    box-shadow: 0 25px 60px -20px rgba(15, 110, 58, 0.35);
-    border: 10px solid #0b1f14;
+    box-shadow: 0 25px 60px -20px rgba(17, 24, 39, 0.25);
+    border: 10px solid #111827;
     overflow: hidden;
   }
 }
@@ -111,7 +135,7 @@ body {
      never needs to scroll on desktop. */
   .device-frame.device-frame--app {
     margin: 0 auto;
-    /* ONE phone size for every screen in the app (splash, login, OTP,
+    /* ONE phone size for every screen in the app (start screen,
        citizen, worker, official-shell): 430px wide, up to 864px tall
        (~9:19), shrinking in height on short browser windows. Fixed width
        means layouts never get cramped and every screen matches. */
@@ -126,7 +150,7 @@ body {
 .device-frame--app .overflow-y-auto {
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(23, 138, 73, 0.3) transparent;
+  scrollbar-color: rgba(17, 24, 39, 0.2) transparent;
 }
 
 .device-frame--app .overflow-y-auto::-webkit-scrollbar {
@@ -139,16 +163,12 @@ body {
 }
 
 .device-frame--app .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: rgba(23, 138, 73, 0.3);
+  background: rgba(17, 24, 39, 0.2);
   border-radius: 9999px;
 }
 
 .device-frame--app .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: rgba(23, 138, 73, 0.5);
-}
-
-.otp-input {
-  caret-color: #178a49;
+  background: rgba(17, 24, 39, 0.35);
 }
 
 @keyframes fade-in-up {
@@ -176,6 +196,18 @@ body {
 
 .leaflet-container {
   font-family: var(--font-sans);
+}
+
+/* Leaflet places its 256px tiles at fractional pixel positions (a flexible
+   container on a high-DPI screen), which leaves a hairline seam between
+   tile rows. Each tile overlaps the next by half a pixel, so no seam shows.
+   Leaflet's own `mix-blend-mode: plus-lighter` would add the overlapping
+   half-pixels together into a bright line, so tiles blend normally here.
+   npm run test:layout screenshots the map preview. */
+.leaflet-container img.leaflet-tile {
+  width: 256.5px !important;
+  height: 256.5px !important;
+  mix-blend-mode: normal;
 }
 
 @keyframes ssb-pin-pulse {

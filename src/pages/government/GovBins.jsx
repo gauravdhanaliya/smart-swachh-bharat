@@ -39,7 +39,7 @@ export default function GovBins() {
           <button
             type="button"
             onClick={() => navigate("/official/add-facility?type=Dustbin")}
-            className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover"
           >
             + Add Facility
           </button>
@@ -47,19 +47,15 @@ export default function GovBins() {
             type="button"
             onClick={removal.toggleRemoveMode}
             aria-pressed={removal.removeMode}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition ${
-              removal.removeMode
-                ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
-                : "border-red-200 bg-white text-red-600 hover:bg-red-50"
-            }`}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition ${ removal.removeMode ? "border-red-600 bg-red-600 text-white hover:bg-red-700" : "border-red-200 bg-white text-red-600 hover:bg-red-50" }`}
           >
             {removal.removeMode ? "Done" : "\u2212 Remove Facility"}
           </button>
         </>
       }
     >
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-slate-500">
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-line bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted">
           {bins.length} bins tracked &middot; {bins.filter((b) => b.status === BIN_STATUS.OVERFLOW).length} overflowing
         </p>
         <StatusFilterTabs options={FILTERS} value={filter} onChange={setFilter} />
@@ -92,26 +88,24 @@ export default function GovBins() {
         {filtered.map((bin) => (
           <div
             key={bin.id}
-            className={`rounded-2xl border bg-white p-4 shadow-sm transition ${
-              removal.removeMode ? "border-red-200" : "border-slate-200"
-            }`}
+            className={`rounded-2xl border bg-white p-4 transition ${ removal.removeMode ? "border-red-200" : "border-line" }`}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs font-medium text-slate-400">{bin.id}</p>
-                <p className="font-semibold text-slate-900">{bin.name}{bin.isDemo && (
+                <p className="text-xs font-medium text-muted">{bin.id}</p>
+                <p className="font-semibold text-ink">{bin.name}{bin.isDemo && (
                 <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[10px] font-bold text-amber-800">DEMO</span>
               )}</p>
               </div>
               <StatusBadge status={bin.status} />
             </div>
-            <p className="mt-1 text-xs text-slate-500">{bin.address}</p>
+            <p className="mt-1 text-xs text-muted">{bin.address}</p>
             <p className="mt-1 text-xs font-medium text-slate-600">{bin.type}</p>
 
             <button
               type="button"
               onClick={() => navigate(`/official/add-facility?edit=${encodeURIComponent(bin.id)}`)}
-              className="mt-3 w-full rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="mt-3 w-full rounded-xl border border-line px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-section"
             >
               Edit
             </button>
@@ -121,7 +115,7 @@ export default function GovBins() {
                 type="button"
                 onClick={() => removal.requestRemove(bin)}
                 aria-label={`Remove ${bin.name}`}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
               >
                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6 7h12l-1 13a1 1 0 01-1 1H8a1 1 0 01-1-1L6 7z" />
@@ -135,12 +129,12 @@ export default function GovBins() {
       </div>
 
       {loaded && bins.length === 0 && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-300 bg-white p-10 text-center">
           <p className="text-sm font-semibold text-slate-700">No bins added yet.</p>
           <button
             type="button"
             onClick={() => navigate("/official/add-facility?type=Dustbin")}
-            className="rounded-full bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+            className="rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover"
           >
             Add Facility
           </button>
@@ -148,9 +142,9 @@ export default function GovBins() {
       )}
 
       {bins.length > 0 && filtered.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <div className="rounded-2xl border border-slate-300 bg-white p-10 text-center">
           <p className="text-sm font-semibold text-slate-700">No bins to show</p>
-          <p className="mt-1 text-sm text-slate-500">Try a different filter.</p>
+          <p className="mt-1 text-sm text-muted">Try a different filter.</p>
         </div>
       )}
 

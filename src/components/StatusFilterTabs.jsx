@@ -14,7 +14,7 @@ export default function StatusFilterTabs({ options, value, onChange }) {
           >
             {opt.label}
             {typeof opt.count === "number" && (
-              <span className={`ml-1.5 ${active ? "text-white/80" : "text-emerald-700/50"}`}>
+              <span className={`ml-1.5 ${active ? "text-white/80" : "text-muted"}`}>
                 {opt.count}
               </span>
             )}
