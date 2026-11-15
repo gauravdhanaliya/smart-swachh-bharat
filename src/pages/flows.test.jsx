@@ -6,7 +6,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { acceptConsentForAll } from "../test/consent";
+import { acceptConsentForAll, agreeOnThisDevice } from "../test/consent";
 
 vi.mock("../components/FacilityMap", () => ({ default: () => <div data-testid="facility-map" /> }));
 vi.mock("../components/PickLocationMap", () => ({ default: () => <div data-testid="pick-map" /> }));
@@ -18,6 +18,11 @@ vi.mock("react-leaflet", () => ({
   useMap: () => ({ setView: () => {} }),
 }));
 vi.mock("../services/geocode", () => ({ reverseGeocode: vi.fn(async () => "Civil Lines, Roorkee") }));
+// The citizen's Firebase account: the same email account every time they log in.
+vi.mock("../services/authService", () => ({
+  logIn: vi.fn(async () => ({ uid: "flow-citizen", idToken: "t", email: "flow@example.test", emailVerified: true })),
+  signOutUser: vi.fn(async () => {}),
+}));
 
 import App from "../App";
 import { clearSession, startSession } from "../services/authSession";
@@ -26,7 +31,7 @@ import { getFacilityRequests } from "../services/facilityRequestService";
 import { getAllBins } from "../services/facilityService";
 import { refreshFresh } from "../services/locationStore";
 import { rememberGpsAck } from "../utils/gps";
-import { demoLogin } from "../test/loginPage";
+import { demoLogin, logInWith } from "../test/loginPage";
 
 function Probe() {
   return <output data-testid="path">{useLocation().pathname}</output>;
@@ -59,27 +64,41 @@ function fakeGps() {
   });
 }
 
-/** Signs in through the "Try the demo" sheet of the real login page. */
+/**
+ * Signs in the way each person really does: a citizen logs in with email,
+ * staff use the "Try the demo" sheet.
+ */
 async function loginAs(row) {
   clearSession();
+  agreeOnThisDevice(); // the previous person logged out, which forgets the agreement: this one agrees
   const user = userEvent.setup();
+  if (row === CITIZEN) {
+    const app = renderApp("/");
+    await logInWith(user, "flow@example.test");
+    return { ...app, user };
+  }
   const app = renderApp("/login");
   await demoLogin(user, row);
   return { ...app, user };
 }
+const CITIZEN = "citizen";
 
 const onPage = (name) => screen.findByRole("heading", { name });
-const tileValue = async (label) => Number((await screen.findAllByText(label)).find((el) => el.previousElementSibling).previousElementSibling.textContent);
+// The citizen's own open reports, on the Home's "My reports" card ("No reports yet" is none).
+const myOpenReports = async () => {
+  const name = (await screen.findByRole("button", { name: /^My reports:/ })).getAttribute("aria-label");
+  return Number(/(\d+) open/.exec(name)?.[1] ?? 0);
+};
+const GREETING = /^Hello/;
 
 async function citizenReports(description) {
   fakeGps();
-  const { user, unmount } = await loginAs(/^citizen/i);
-  expect(path()).toBe("/citizen");
-  await onPage(/, Citizen!$/);
-  const totalBefore = await tileValue("Total Complaints");
+  const { user, unmount } = await loginAs(CITIZEN);
+  await waitFor(() => expect(path()).toBe("/citizen"));
+  await onPage(GREETING);
+  const totalBefore = await myOpenReports();
 
-  await user.click(screen.getByRole("button", { name: "Quick Actions" }));
-  await user.click(screen.getByRole("button", { name: /Report Issue/ }));
+  await user.click(within(screen.getByRole("navigation", { name: "Main" })).getByRole("button", { name: "Report" }));
   await waitFor(() => expect(path()).toBe("/citizen/report"));
   await onPage("Report an Issue");
   await user.click(screen.getByRole("button", { name: /Overflowing Bin$/ }));
@@ -90,12 +109,12 @@ async function citizenReports(description) {
   await waitFor(() => expect(path()).toMatch(/^\/citizen\/complaints\/SSB/));
   await onPage("Complaint Tracking");
   const created = getComplaints().find((c) => c.description === description);
-  expect(created).toMatchObject({ citizenName: "Demo Citizen", citizenId: "demo-citizen", issueType: "Overflowing Bin", status: "SUBMITTED" });
+  expect(created).toMatchObject({ citizenName: "citizen", citizenId: "flow-citizen", issueType: "Overflowing Bin", status: "SUBMITTED" });
   return { user, unmount, created, totalBefore };
 }
 
 beforeEach(() => {
-  acceptConsentForAll();
+  acceptConsentForAll("flow-citizen");
   vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline"))));
 });
 
@@ -104,18 +123,18 @@ afterEach(() => {
 });
 
 describe("citizen flow", () => {
-  it("a report shows in My Complaints and the Total Complaints count goes up by one", async () => {
+  it("a report shows in My Complaints and the Home's open count of my reports goes up by one", async () => {
     const description = "Bin at the gate is overflowing badly";
     const { user, created, totalBefore } = await citizenReports(description);
 
-    await user.click(within(screen.getByRole("navigation")).getByRole("button", { name: /^Complaints/ }));
+    await user.click(within(screen.getByRole("navigation")).getByRole("button", { name: /^Reports$/ }));
     await waitFor(() => expect(path()).toBe("/citizen/complaints"));
     await onPage("My Complaints");
     expect(screen.getByText(created.id, { exact: false })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^Home/ }));
-    await onPage(/, Citizen!$/);
-    expect(await tileValue("Total Complaints")).toBe(totalBefore + 1);
+    await onPage(GREETING);
+    await waitFor(async () => expect(await myOpenReports()).toBe(totalBefore + 1));
   });
 });
 
@@ -206,8 +225,8 @@ describe("the whole flow across roles", () => {
 
     // Citizen: the complaint shows the worker's update, and a notification is waiting.
     {
-      const { user } = await loginAs(/^citizen/i);
-      await onPage(/, Citizen!$/);
+      const { user } = await loginAs(CITIZEN);
+      await onPage(GREETING);
       expect(screen.getByRole("button", { name: /Notifications, \d+ unread/ })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: /Notifications/ }));
       await onPage("Notifications");

@@ -41,7 +41,7 @@ export default function CitizenNotifications() {
             key={n.key}
             type="button"
             onClick={() => navigate(`/citizen/complaints/${n.complaintId}`)}
-            className="flex items-start justify-between gap-3 rounded-2xl border border-emerald-100 bg-white p-4 text-left shadow-sm transition hover:bg-emerald-50"
+            className="flex items-start justify-between gap-3 rounded-2xl border border-emerald-100 bg-white p-4 text-left transition hover:bg-emerald-50"
           >
             <div className="flex items-start gap-3">
               <span

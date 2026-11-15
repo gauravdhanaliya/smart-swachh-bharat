@@ -1,64 +1,86 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import FacilityMap from "./FacilityMap";
+import Icon from "./Icon";
 
-// FIX — this home-screen preview previously rendered with SimpleMap (a
-// non-interactive OpenStreetMap iframe) and silently ignored the
-// `bins`/`toilets` it was passed, since a plain iframe can't carry
-// custom pins. Now backed by FacilityMap (react-leaflet), it actually
-// plots the real bins/toilets, same data as the full map.
-//
-// USABILITY AUDIT FIX (round 2, issue 3 — cluttered emoji markers): at
-// this size (160px tall, whole-city zoom) full-size pins can only ever
-// pile on top of each other. The preview now asks FacilityMap for its
-// `compact` rendering — small status dots, nearby ones merged into count
-// badges — and a legend chip states the totals in plain text so the
-// picture never has to be counted by eye. The full-size, tappable pins
-// live on the full map, one tap away.
-const DEFAULT_CENTER = { latitude: 26.8467, longitude: 80.9462 };
+// The Home's small map. It fits every bin and toilet in view with padding
+// (no pin clipped at an edge), draws bins green and toilets blue, and puts
+// the legend BELOW the map, so nothing covers a pin. Tapping it opens the
+// full map. When there is nothing it could pin, a counts card replaces it,
+// never a bare map.
+const PIN_COLORS = { bin: "#0b7a4b", toilet: "#2563eb" };
+export const PIN_PADDING = 28; // px kept clear on every side of the map
 
-function LegendShape({ round }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`inline-block h-2.5 w-2.5 bg-emerald-700 ${round ? "rounded-full" : "rounded-[3px]"}`}
-    />
-  );
+function LegendDot({ kind }) {
+  // Same shapes as the pins: round bins, square toilets.
+  return <span aria-hidden="true" className={`inline-block h-2.5 w-2.5 ${kind === "bin" ? "rounded-full bg-brand" : "rounded-[3px] bg-blue-600"}`} />;
 }
 
-// `center` follows the citizen's chosen city (see CitySelector). `fill`
-// makes the preview take its parent's height (the one-screen Home layout)
-// instead of a fixed 160px.
-export default function MapPreview({ bins = [], toilets = [], center = DEFAULT_CENTER, fill = false }) {
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const hasPosition = (p) => Number.isFinite(p?.latitude) && Number.isFinite(p?.longitude);
+
+// `center` is the chosen city's centre (used only when there's nothing to frame).
+// `fill` makes the preview take its parent's height (the one-screen Home).
+export default function MapPreview({ bins = [], toilets = [], center, fill = false }) {
   const navigate = useNavigate();
+  const points = useMemo(() => [...bins, ...toilets].filter(hasPosition), [bins, toilets]);
+  const label = `Open the full map: ${plural(bins.length, "bin", "bins")} and ${plural(toilets.length, "toilet", "toilets")}`;
+  const size = fill ? { height: "100%", minHeight: 96 } : { height: 160 };
+
+  if (!points.length) {
+    return (
+      <button
+        type="button"
+        onClick={() => navigate("/citizen/map")}
+        aria-label={label}
+        data-map-counts
+        className="flex w-full cursor-pointer items-center gap-4 rounded-2xl border border-line bg-section p-4 text-left hover:bg-white focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+        style={size}
+      >
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-brand" aria-hidden="true">
+          <Icon name="map" className="h-6 w-6" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-semibold text-ink">0 bins · 0 toilets</span>
+          <span className="block text-sm text-muted">None mapped here yet. Open the map to look around.</span>
+        </span>
+        <Icon name="chevronRight" className="h-5 w-5 text-muted" />
+      </button>
+    );
+  }
 
   return (
-    <button
-      type="button"
-      onClick={() => navigate("/citizen/map")}
-      aria-label={`Open full map — ${bins.length} bins and ${toilets.length} toilets nearby`}
-      className="relative block w-full overflow-hidden rounded-2xl border border-emerald-100 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
-      style={fill ? { height: "100%", minHeight: 70 } : { height: 160 }}
-    >
-      <FacilityMap
-        bins={bins}
-        toilets={toilets}
-        center={center}
-        zoom={12}
-        interactive={false}
-        compact
-        className="h-full w-full"
-      />
-
-      <span className="pointer-events-none absolute inset-0 bg-emerald-950/0 transition group-hover:bg-emerald-950/5" />
-      <span className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-900 shadow">
-        <LegendShape round />
-        {bins.length} {bins.length === 1 ? "bin" : "bins"}
-        <LegendShape />
-        {toilets.length} {toilets.length === 1 ? "toilet" : "toilets"}
-      </span>
-      <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-700 shadow">
-        Open Map →
-      </span>
-    </button>
+    <div className="flex h-full flex-col" data-map-preview>
+      <button
+        type="button"
+        onClick={() => navigate("/citizen/map")}
+        aria-label={label}
+        className="relative block min-h-0 w-full flex-1 cursor-pointer overflow-hidden rounded-2xl border border-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        style={size}
+      >
+        <FacilityMap
+          bins={bins}
+          toilets={toilets}
+          center={center}
+          fitTo={points}
+          fitPadding={PIN_PADDING}
+          interactive={false}
+          compact
+          cluster={false}
+          pinColors={PIN_COLORS}
+          className="h-full w-full rounded-none border-0"
+        />
+      </button>
+      <p data-map-legend className="mt-2 flex shrink-0 items-center gap-4 text-xs text-muted">
+        <span className="flex items-center gap-1.5">
+          <LegendDot kind="bin" />
+          {plural(bins.length, "bin", "bins")}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <LegendDot kind="toilet" />
+          {plural(toilets.length, "toilet", "toilets")}
+        </span>
+      </p>
+    </div>
   );
 }

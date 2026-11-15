@@ -97,7 +97,7 @@ describe("citizen map and the Home city", () => {
     await user.type(screen.getByPlaceholderText("Search city, district or state..."), "Jaipur");
     const picker = screen.getByRole("dialog", { name: "Choose your location" });
     await user.click(within(picker).getAllByRole("button", { name: /^Jaipur/ })[0]);
-    await user.click(screen.getByRole("button", { name: /Open full map/ }));
+    await user.click(screen.getByRole("button", { name: /^Open the full map/ }));
     await waitFor(() => expect(screen.getByTestId("path").textContent).toBe("/citizen/map"));
     expect(await screen.findByText(/No bins or toilets are mapped in Jaipur yet\./)).toBeInTheDocument();
     expect(map.center).toEqual(JAIPUR);

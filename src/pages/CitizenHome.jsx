@@ -1,78 +1,146 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "motion/react";
 import CitizenShell from "../components/CitizenShell";
-import StatTile from "../components/StatTile";
 import MapPreview from "../components/MapPreview";
 import CitySelector from "../components/CitySelector";
 import AddLocationDialog from "../components/AddLocationDialog";
-import { CARD_BUTTON, CARD_BUTTON_FILLED } from "../components/buttonStyles";
+import BrandLogo from "../components/BrandLogo";
+import Icon from "../components/Icon";
+import { useAuth } from "../context/AuthContext";
 import { useLiveBins } from "../hooks/useLiveBins";
 import { useLiveToilets } from "../hooks/useLiveToilets";
-import { useComplaints } from "../hooks/useComplaints";
+import { useComplaints, useComplaintsStatus } from "../hooks/useComplaints";
 import { useCity } from "../hooks/useCity";
 import { useCitizenNotifications } from "../hooks/useCitizenNotifications";
+import { useMyLocation } from "../hooks/useMyLocation";
+import { useRatingSummaries } from "../hooks/useRatingSummaries";
+import { useSyncStatus } from "../hooks/useSyncStatus";
 import { inCity } from "../data/cities";
-import { BIN_STATUS } from "../data/bins";
 import { STATUS } from "../data/complaints";
+import { DEMO_USERS } from "../services/authSession";
+import { distanceMeters } from "../utils/addressLookup";
+import { displayFacilityName } from "../utils/facilityName";
+import { formatAverage } from "../utils/ratings";
+import { EASE_OUT } from "../utils/motion";
 
-function greetingFor(date) {
-  const h = date.getHours();
-  if (h >= 5 && h < 12) return "Good Morning";
-  if (h >= 12 && h < 17) return "Good Afternoon";
-  if (h >= 17 && h < 21) return "Good Evening";
-  return "Good Night";
-}
+// How many toilets the Home lists (the full list is on the map).
+const TOILETS_SHOWN = 2;
+const OPEN_FIRST = { Open: 0, Maintenance: 1, Closed: 2 };
+// The one card style: white, 1px border, 16px radius.
+const CARD = "rounded-2xl border border-line bg-white";
+const DEFAULT_NAMES = new Set(["citizen", ...Object.values(DEMO_USERS).map((u) => u.name)]);
+// Status dot colours (status only), always with the status in words beside it.
+const STATUS_DOT = { Open: "bg-green-600", Maintenance: "bg-amber-500", Closed: "bg-red-600" };
 
-function useNow() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(id);
-  }, []);
-  return now;
-}
+const formatDistance = (m) => (m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`);
 
+/**
+ * The citizen Home, "clean white": a header (logo, name, bell), the greeting
+ * and city, three quick actions (Report, My reports, Map), the map preview
+ * with real pins (or a counts card), and the city's public toilets. One small
+ * DEMO banner when the facilities shown are demo data. Fits one phone screen:
+ * the map takes whatever height is left. Skeletons while data loads.
+ */
 export default function CitizenHome() {
   const navigate = useNavigate();
-  const now = useNow();
-  const timeLabel = now.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+  const reduced = useReducedMotion();
+  const { user, usesApi } = useAuth();
   const allBins = useLiveBins();
   const allToilets = useLiveToilets();
   const complaints = useComplaints();
+  const complaintsStatus = useComplaintsStatus();
+  const sync = useSyncStatus();
   const { city, cities, selectCity, addLocation, removeLocation } = useCity();
   const [addingLocation, setAddingLocation] = useState(false);
   const [locationPrefill, setLocationPrefill] = useState(null);
   const { unreadCount } = useCitizenNotifications();
+  const here = useMyLocation();
 
-  // Everything on this screen follows the chosen city. Demo data only
-  // exists for Roorkee, so other cities honestly show zero.
+  const name = user?.name && !DEFAULT_NAMES.has(user.name) ? user.name : "";
   const bins = useMemo(() => allBins.filter((b) => inCity(b, city)), [allBins, city]);
   const toilets = useMemo(() => allToilets.filter((t) => inCity(t, city)), [allToilets, city]);
+  const showingDemo = useMemo(() => [...bins, ...toilets].some((f) => displayFacilityName(f).demo), [bins, toilets]);
 
-  const stats = useMemo(() => {
-    const needsCollection = bins.filter((b) => b.status === BIN_STATUS.ALMOST_FULL).length;
-    const overflowing = bins.filter((b) => b.status === BIN_STATUS.OVERFLOW).length;
-    return { total: bins.length, needsCollection, overflowing };
-  }, [bins]);
+  // Without a location: open ones first, by name. With one: nearest first, with distances.
+  const shownToilets = useMemo(() => {
+    const from = here.position;
+    const list = toilets.map((t) => ({
+      ...t,
+      metres: from && Number.isFinite(t.latitude) && Number.isFinite(t.longitude) ? distanceMeters(from.latitude, from.longitude, t.latitude, t.longitude) : null,
+    }));
+    list.sort((a, b) =>
+      from
+        ? (a.metres ?? Infinity) - (b.metres ?? Infinity)
+        : (OPEN_FIRST[a.status] ?? 3) - (OPEN_FIRST[b.status] ?? 3) || displayFacilityName(a).name.localeCompare(displayFacilityName(b).name)
+    );
+    return list.slice(0, TOILETS_SHOWN);
+  }, [toilets, here.position]);
+  const ratings = useRatingSummaries(useMemo(() => shownToilets.map((t) => t.id), [shownToilets]));
 
-  const complaintStats = useMemo(
-    () => ({
-      resolved: complaints.filter((c) => c.status === STATUS.RESOLVED).length,
-      total: complaints.length,
-    }),
-    [complaints]
-  );
+  // Only this citizen's own reports. The API already sends a citizen only
+  // their own; the browser-only build keeps everyone's in one list.
+  const mine = useMemo(() => {
+    const own = usesApi ? complaints : complaints.filter((c) => c.citizenId === user?.id);
+    const resolved = own.filter((c) => c.status === STATUS.RESOLVED).length;
+    return { total: own.length, open: own.length - resolved, resolved };
+  }, [complaints, usesApi, user?.id]);
+
+  const located = here.status === "ready";
+  const placesLoaded = sync.loaded || allToilets.length > 0 || allBins.length > 0;
+  const reportsLoaded = complaintsStatus.loaded !== false;
+  const mapCenter = useMemo(() => ({ latitude: city.latitude, longitude: city.longitude }), [city.latitude, city.longitude]);
+  // Subtle entrance only: the content fades up once (not at all with reduced motion).
+  const enter = reduced ? {} : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0, transition: { duration: 0.24, ease: EASE_OUT } } };
+
+  const actions = [
+    { id: "report", label: "Report", note: "New issue", icon: "plus", to: "/citizen/report", aria: "Report an issue" },
+    {
+      id: "mine",
+      label: "My reports",
+      note: !reportsLoaded ? "Loading…" : mine.total ? `${mine.open} open` : "None yet",
+      icon: "reports",
+      to: "/citizen/complaints",
+      aria: !reportsLoaded ? "My reports: loading" : mine.total ? `My reports: ${mine.open} open, ${mine.resolved} resolved` : "My reports: no reports yet",
+    },
+    { id: "map", label: "Map", note: "Bins, toilets", icon: "map", to: "/citizen/map", aria: "Map of bins and toilets" },
+  ];
 
   return (
-    <CitizenShell noScroll>
-      {/* Everything below is sized to fit inside one screen with no
-          scrolling — noScroll on the shell means there's no safety-net
-          scroll area, so every margin/padding/icon size here was trimmed
-          deliberately. Change a value, then re-check the shortest phone
-          height (~660px) still fits before shipping. */}
-      <div className="flex min-h-0 flex-1 flex-col px-5 pt-3">
-        {/* Top bar */}
+    <CitizenShell>
+      {/* One screen on a phone: the map is the only part that flexes, so it
+          takes what is left and there is never a gap. When the "Verify your
+          email" banner takes room, the page scrolls in its own area (never
+          under the tab bar). 8px spacing grid. npm run test:layout checks both. */}
+      <div className="flex flex-1 flex-col bg-white px-4 pt-2">
+        {/* Header: logo and name, bell */}
         <div className="flex shrink-0 items-center justify-between">
+          <BrandLogo size="sm" nameAs="p" />
+          <button
+            type="button"
+            onClick={() => navigate("/citizen/notifications")}
+            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+            className="relative -mr-2 flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl text-ink hover:bg-section focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+          >
+            <Icon name="bell" className="h-6 w-6" />
+            {unreadCount > 0 && (
+              <span data-unread-badge className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-red-600 ring-2 ring-white" aria-hidden="true" />
+            )}
+          </button>
+        </div>
+
+        {showingDemo && (
+          <p data-demo-banner className="mt-2 flex shrink-0 items-center gap-2 rounded-xl bg-section px-3 py-2 text-xs text-muted">
+            <Icon name="info" className="h-4 w-4" />
+            <span>
+              <span className="font-semibold text-ink">DEMO</span> The bins and toilets shown are sample data.
+            </span>
+          </p>
+        )}
+
+        {/* Greeting and city */}
+        <div className="mt-4 flex shrink-0 items-center justify-between gap-2">
+          <h1 className="min-w-0 truncate text-2xl leading-tight font-semibold text-ink">{name ? `Hello, ${name}` : "Hello"}</h1>
           <CitySelector
             city={city}
             cities={cities}
@@ -83,145 +151,143 @@ export default function CitizenHome() {
             }}
             onRemoveLocation={removeLocation}
           />
+        </div>
 
-          <button
-            type="button"
-            onClick={() => navigate("/citizen/notifications")}
-            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
-            className="relative flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"
-          >
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.7 21a2 2 0 01-3.4 0" />
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
+        <motion.div {...enter} data-home-content className="mt-4 flex flex-1 flex-col">
+          {/* Quick actions */}
+          <div className="grid shrink-0 grid-cols-3 gap-2">
+            {actions.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => navigate(a.to)}
+                aria-label={a.aria}
+                data-quick-action={a.id}
+                className={`flex min-h-24 cursor-pointer flex-col items-start justify-between ${CARD} p-3 text-left transition-colors hover:bg-section focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none`}
+              >
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${a.id === "report" ? "bg-brand text-white" : "bg-section text-brand"}`} aria-hidden="true">
+                  <Icon name={a.icon} className="h-5 w-5" />
+                </span>
+                <span className="mt-2 block w-full">
+                  <span className="block text-sm leading-tight font-semibold text-ink">{a.label}</span>
+                  <span className="block truncate text-xs text-muted" data-my-reports={a.id === "mine" ? "" : undefined}>
+                    {a.note}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* The map: the one part allowed to flex. */}
+          <section aria-labelledby="home-map-title" className="mt-6 flex flex-1 flex-col">
+            <div className="flex shrink-0 items-center justify-between gap-2">
+              <h2 id="home-map-title" className="text-lg leading-tight font-semibold text-ink">
+                Bins and toilets in {city.name}
+              </h2>
+              <button
+                type="button"
+                onClick={() => navigate("/citizen/map")}
+                className="relative z-10 -my-2.5 -mr-1 flex min-h-11 shrink-0 cursor-pointer items-center rounded-lg px-1 text-sm font-semibold text-brand hover:text-brand-hover focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+              >
+                See full map
+              </button>
+            </div>
+            <div className="mt-2 min-h-32 flex-1">
+              {placesLoaded ? (
+                <MapPreview bins={bins} toilets={toilets} center={mapCenter} fill />
+              ) : (
+                <Skeleton className="h-full w-full rounded-2xl" label="Loading the map" />
+              )}
+            </div>
+          </section>
+
+          {/* Public toilets; nearest first once the citizen shares their location */}
+          <section aria-labelledby="home-toilets-title" className="mt-6 shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <h2 id="home-toilets-title" className="text-lg leading-tight font-semibold text-ink">
+                {located ? "Public toilets near you" : "Public toilets"}
+              </h2>
+              {!located && toilets.length > 0 && (
+                <button
+                  type="button"
+                  onClick={here.locate}
+                  disabled={here.status === "locating"}
+                  className="-my-2.5 -mr-1 flex min-h-11 shrink-0 cursor-pointer items-center gap-1 rounded-lg px-1 text-sm font-semibold text-brand hover:text-brand-hover focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none disabled:cursor-wait"
+                >
+                  <Icon name="locate" className="h-4 w-4" />
+                  {here.status === "locating" ? "Finding you…" : "Use my location"}
+                </button>
+              )}
+            </div>
+            <div aria-live="polite">
+              {here.status === "error" && (
+                <p role="alert" className="mt-1 text-sm text-red-700">
+                  {here.message}
+                </p>
+              )}
+            </div>
+            {!placesLoaded ? (
+              <div className={`mt-2 ${CARD}`} aria-busy="true" aria-label="Loading toilets">
+                {[0, 1].map((i) => (
+                  <div key={i} className="flex items-center gap-2 px-4 py-3">
+                    <div className="flex-1">
+                      <Skeleton className="h-4 w-36" />
+                      <Skeleton className="mt-2 h-3 w-24" />
+                    </div>
+                    <Skeleton className="h-4 w-12" />
+                  </div>
+                ))}
+              </div>
+            ) : shownToilets.length === 0 ? (
+              <p className="mt-2 text-sm text-muted">No public toilets are mapped in {city.name} yet. The demo data covers Roorkee.</p>
+            ) : (
+              <ul className={`mt-2 divide-y divide-line ${CARD}`}>
+                {shownToilets.map((t) => {
+                  const { name: label } = displayFacilityName(t);
+                  const rating = ratings.get(t.id);
+                  return (
+                    <li key={t.id}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/citizen/toilet/${encodeURIComponent(t.id)}`)}
+                        className="flex min-h-14 w-full cursor-pointer items-center gap-3 px-4 py-2 text-left first:rounded-t-2xl last:rounded-b-2xl hover:bg-section focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none focus-visible:ring-inset"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-base font-semibold text-ink">{label}</span>
+                          <span className="block truncate text-sm text-muted">
+                            {t.metres != null ? (
+                              <span className="tabular-nums" data-distance>
+                                {formatDistance(t.metres)}
+                              </span>
+                            ) : (
+                              t.address || t.locationLabel || ""
+                            )}
+                          </span>
+                        </span>
+                        <span className="flex shrink-0 flex-col items-end gap-1 text-sm">
+                          <span data-rating className={rating?.count ? "flex items-center gap-1 font-semibold text-ink" : "text-muted"}>
+                            {rating?.count ? (
+                              <>
+                                {formatAverage(rating.average)}
+                                <Icon name="star" className="h-4 w-4 text-amber-500" />
+                              </>
+                            ) : (
+                              "Not rated"
+                            )}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-xs text-muted">
+                            <span className={`h-2 w-2 rounded-full ${STATUS_DOT[t.status] ?? "bg-gray-400"}`} aria-hidden="true" />
+                            {t.status}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-          </button>
-        </div>
-
-        {/* Greeting */}
-        <div className="mt-2 flex shrink-0 items-start justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-bold leading-tight text-emerald-950">{greetingFor(now)}, Citizen!</h1>
-            <p className="text-xs text-emerald-800/70">{timeLabel} · Let&apos;s keep our city clean and green.</p>
-          </div>
-          <span className="text-2xl">🌱</span>
-        </div>
-
-        {/* Total bins nearby */}
-        <button
-          type="button"
-          onClick={() => navigate("/citizen/map")}
-          className={`mt-2 shrink-0 ${CARD_BUTTON} p-2.5`}
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-base">
-            🗑️
-          </span>
-          <span className="flex-1">
-            <span className="block text-[11px] font-medium text-emerald-800/60">Total Bins Nearby</span>
-            <span className="block text-lg font-bold leading-tight text-emerald-950">{stats.total}</span>
-          </span>
-          <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700">
-            View on map
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-          </span>
-        </button>
-
-        {/* Stat grid */}
-        <div className="mt-2 grid shrink-0 grid-cols-2 gap-2">
-          <StatTile
-            color="orange"
-            value={stats.needsCollection}
-            label="Bins Need Collection"
-            icon={<BinGlyph />}
-            onClick={() => navigate("/citizen/map?filter=bins")}
-            compact
-          />
-          <StatTile
-            color="red"
-            value={stats.overflowing}
-            label="Overflowing Bins"
-            icon={<BinGlyph />}
-            onClick={() => navigate("/citizen/map?filter=bins")}
-            compact
-          />
-          <StatTile
-            color="sky"
-            value={complaintStats.resolved}
-            label="Complaints Resolved"
-            icon={<CheckGlyph />}
-            onClick={() => navigate("/citizen/complaints")}
-            compact
-          />
-          <StatTile
-            color="slate"
-            value={complaintStats.total}
-            label="Total Complaints"
-            icon={<FileGlyph />}
-            onClick={() => navigate("/citizen/complaints")}
-            compact
-          />
-        </div>
-
-        {/* Small actions banner */}
-        <button
-          type="button"
-          onClick={() => navigate("/citizen/eco-guide")}
-          className={`mt-2 shrink-0 ${CARD_BUTTON_FILLED} p-2.5`}
-        >
-          <span className="text-base">🌿</span>
-          <span className="flex-1 text-xs font-semibold leading-tight">
-            Small Actions
-            <br />
-            Make a Big Difference
-            <span className="mt-0.5 block text-xs font-normal text-white/80">
-              Open the Eco Guide — learn easy ways to help
-            </span>
-          </span>
-          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 6l6 6-6 6" />
-          </svg>
-        </button>
-
-        {/* Map preview — the one section allowed to flex, so it absorbs
-            whatever room is left instead of pushing the page taller. */}
-        <div className="mt-2 flex min-h-0 flex-1 flex-col pb-2">
-          <div className="mb-1 flex shrink-0 items-center justify-between gap-3">
-            <h2 className="text-xs font-semibold text-emerald-950">Nearby Bins &amp; Toilets</h2>
-            <button
-              type="button"
-              onClick={() => navigate("/citizen/map")}
-              // A full 44px tap target that still takes only ~24px of the
-              // one-screen layout: the 8px above fills the gap under the Eco
-              // Guide card, the 12px below overlaps the map preview (which
-              // opens the same full map), and z-10 keeps taps on this link.
-              className="relative z-10 -mt-2 -mr-3 -mb-3 flex min-h-11 items-center gap-1 px-3 text-xs font-semibold text-emerald-700"
-            >
-              See full map
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
-            </button>
-          </div>
-          <div className="min-h-0 flex-1">
-            <MapPreview
-              bins={bins}
-              toilets={toilets}
-              center={{ latitude: city.latitude, longitude: city.longitude }}
-              fill
-            />
-          </div>
-          {bins.length === 0 && toilets.length === 0 && (
-            <p className="mt-1 shrink-0 text-[11px] text-emerald-800/60">
-              No bins or toilets are mapped in {city.name} yet — the demo data covers Roorkee (COER University area).
-            </p>
-          )}
-        </div>
+          </section>
+        </motion.div>
       </div>
 
       {addingLocation && (
@@ -239,28 +305,6 @@ export default function CitizenHome() {
   );
 }
 
-function BinGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 7h12l-1 13H7L6 7zM9 7V4h6v3M10 11v5M14 11v5" />
-    </svg>
-  );
-}
-
-function CheckGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9 12l2 2 4-4" />
-    </svg>
-  );
-}
-
-function FileGlyph() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 3h7l4 4v14H7V3z" />
-      <path d="M10 12h4M10 16h4" />
-    </svg>
-  );
+function Skeleton({ className = "", label }) {
+  return <div role={label ? "status" : undefined} aria-label={label} className={`animate-pulse rounded-md bg-section motion-reduce:animate-none ${className}`} />;
 }

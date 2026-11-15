@@ -40,7 +40,7 @@ describe("MapPreview", () => {
         <MapPreview />
       </MemoryRouter>
     );
-    expect(screen.getByRole("button", { name: /Open full map/ })).toHaveStyle({ height: "160px" });
+    expect(screen.getByRole("button", { name: /^Open the full map/ })).toHaveStyle({ height: "160px" });
   });
 
   it("with `fill`, takes its parent's height (with a floor)", () => {
@@ -49,9 +49,9 @@ describe("MapPreview", () => {
         <MapPreview fill />
       </MemoryRouter>
     );
-    const button = screen.getByRole("button", { name: /Open full map/ });
+    const button = screen.getByRole("button", { name: /^Open the full map/ });
     expect(button.style.height).toBe("100%");
-    expect(button.style.minHeight).toBe("70px");
+    expect(button.style.minHeight).toBe("96px");
   });
 });
 
@@ -75,14 +75,21 @@ describe("RoleCard", () => {
 });
 
 describe("citizen Home fits one screen", () => {
-  it("has no outer scroll; the map preview fills the space left and the tiles are compact", async () => {
+  it("only its content area can scroll (the tab bar sits outside it); the map preview fills the space left", async () => {
     startSession("citizen", "Asha");
     renderApp("/citizen");
-    const heading = await screen.findByRole("heading", { name: /, Citizen!$/ });
+    const heading = await screen.findByRole("heading", { level: 1, name: /^Hello/ });
     const frame = heading.closest(".device-frame");
-    expect([...frame.querySelectorAll(":scope > div")].some(scrollsOuter)).toBe(false);
-    expect(screen.getByRole("button", { name: /Open full map/ }).style.height).toBe("100%");
-    expect(screen.getByText("Total Complaints").previousElementSibling.className).toContain("text-base");
+    // On a phone it fits one screen (npm run test:layout); with the verify banner the content area scrolls, never the page.
+    const scrollers = [...frame.querySelectorAll(":scope > div")].filter(scrollsOuter);
+    expect(scrollers).toHaveLength(1);
+    expect(scrollers[0]).toHaveAttribute("data-shell-content");
+    expect(scrollers[0].contains(frame.querySelector("[data-bottom-nav]"))).toBe(false);
+    // Places load asynchronously: wait for the preview rather than racing it.
+    expect((await screen.findByRole("button", { name: /^Open the full map/ })).style.height).toBe("100%");
+    expect(screen.getByRole("button", { name: /^report an issue/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^My reports:/ })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /^public toilets$/i })).toBeInTheDocument();
   });
 });
 
@@ -114,10 +121,10 @@ describe("Home's 'See full map' link", () => {
     const cls = link.className.split(/\s+/);
     expect(cls).toContain("min-h-11"); // 44px
     expect(cls).not.toContain("py-1"); // the old ~24px button
-    // 44 - 8 (above) - 12 (below) = 24: the same space the old link took.
-    expect(cls).toEqual(expect.arrayContaining(["-mt-2", "-mb-3", "relative", "z-10"]));
+    // 44 - 10 (above) - 10 (below) = 24: the height of its line of text.
+    expect(cls).toEqual(expect.arrayContaining(["-my-2.5", "relative", "z-10"]));
     // What it overlaps below is the map preview, which opens the same page.
-    const preview = screen.getByRole("button", { name: /Open full map/ });
+    const preview = screen.getByRole("button", { name: /^Open the full map/ });
     expect(link.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

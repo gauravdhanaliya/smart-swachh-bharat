@@ -53,8 +53,8 @@ export const DEMO_LOCATIONS = [
   { address: "COER University — OpenStreetMap centroid", latitude: 29.8905429, longitude: 77.9594553 },
 ];
 
-// Single demo citizen identity (Step 1/2 auth is OTP-only and doesn't
-// collect a name yet), matching the reference-design profile screen.
+// Single demo citizen identity (a citizen's name is optional and often
+// unset), matching the reference-design profile screen.
 export const DEMO_CITIZEN_NAME = "Rahul Sharma";
 
 export const DESCRIPTION_MAX_LENGTH = 500;

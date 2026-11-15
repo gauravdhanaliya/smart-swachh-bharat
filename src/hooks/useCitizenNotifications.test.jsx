@@ -9,10 +9,13 @@ import { useCitizenNotifications } from "./useCitizenNotifications";
 import { getCitizenNotifications } from "../utils/citizenNotifications";
 import { countUnreadWorkerNotifications, getWorkerNotifications } from "../utils/workerNotifications";
 import { STATUS } from "../data/complaints";
+import { startEmailSession } from "../services/authSession";
 
 const { assignComplaint, createComplaint, getComplaints, updateComplaintStatus } = complaintService;
 
+const ME = "asha-1";
 const input = {
+  citizenId: ME,
   citizenName: "Asha",
   issueType: "Overflowing Bin",
   description: "Bin near the gate is overflowing",
@@ -25,6 +28,46 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   remote.reset();
+});
+
+beforeEach(() => {
+  startEmailSession({ uid: ME, email: "asha@example.test" });
+});
+
+describe("the badge counts only this account's notifications", () => {
+  it("a new account has no unread notifications, even with other people's complaints on the device (it showed 4)", () => {
+    for (const who of ["someone-else", "another-one", null]) createComplaint({ ...input, citizenId: who });
+    expect(getComplaints().length).toBeGreaterThanOrEqual(3);
+    const { result } = renderHook(() => useCitizenNotifications());
+    expect(result.current.unreadCount).toBe(0);
+    expect(result.current.notifications).toEqual([]);
+  });
+
+  it("its own complaint does count, and other people's never show in the list", () => {
+    createComplaint({ ...input, citizenId: "someone-else" });
+    const mine = createComplaint(input);
+    const { result } = renderHook(() => useCitizenNotifications());
+    expect(result.current.unreadCount).toBe(1);
+    expect(result.current.notifications.map((n) => n.complaintId)).toEqual([mine.id]);
+  });
+
+  it("'seen' is kept per account: one account marking all read doesn't clear another's", () => {
+    // Both complaints exist BEFORE the first account marks everything read.
+    createComplaint(input);
+    createComplaint({ ...input, citizenId: "other-2" });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 60_000); // "read" clearly after both were filed
+    try {
+      const a = renderHook(() => useCitizenNotifications());
+      act(() => a.result.current.markAllRead());
+      a.unmount();
+      expect(renderHook(() => useCitizenNotifications()).result.current.unreadCount).toBe(0); // the first account: all read
+      startEmailSession({ uid: "other-2", email: "other@example.test" });
+      expect(renderHook(() => useCitizenNotifications()).result.current.unreadCount).toBe(1); // the second: still unread
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("citizen notifications", () => {
