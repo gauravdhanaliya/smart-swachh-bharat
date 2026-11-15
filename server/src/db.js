@@ -47,6 +47,74 @@ function explainConnectionError(err) {
   return `MongoDB connection failed (${err?.name ?? "unknown error"}).`;
 }
 
+// The first error in the chain that carries a server error code
+// (MongoServerError, or one wrapped as `cause` / `reason`).
+function serverErrorIn(err) {
+  const seen = new Set();
+  for (let e = err; e && typeof e === "object" && !seen.has(e); e = e.cause ?? e.reason) {
+    seen.add(e);
+    if (typeof e.code === "number" || e.codeName) return e;
+  }
+  return null;
+}
+
+// Every piece of MONGODB_URI that could identify the account: the whole URI,
+// the username and the password (as written and percent-decoded).
+function uriSecrets(uri) {
+  const out = [];
+  if (!uri) return out;
+  out.push(uri);
+  const m = /^mongodb(?:\+srv)?:\/\/([^@/]*)@/i.exec(uri);
+  if (m) {
+    const [user, pass] = m[1].split(":");
+    for (const part of [user, pass]) {
+      if (!part) continue;
+      out.push(part);
+      try {
+        out.push(decodeURIComponent(part));
+      } catch {
+        /* not percent-encoded */
+      }
+    }
+  }
+  return [...new Set(out)].filter((s) => s.length >= 3).sort((a, b) => b.length - a.length);
+}
+
+/** `text` with the URI, username and password removed. */
+export function redactUri(text, uri) {
+  let out = String(text ?? "");
+  for (const secret of uriSecrets(uri)) out = out.split(secret).join("***");
+  // Any other connection string (e.g. one echoed back by the driver).
+  return out.replace(/mongodb(\+srv)?:\/\/[^\s"']+/gi, "mongodb$1://***");
+}
+
+/**
+ * One line for a failed MongoDB operation, for the admin scripts and server
+ * logs: the error class, the server's code and codeName (8000 AtlasError,
+ * 13 Unauthorized, 18 AuthenticationFailed …), the command that failed and the
+ * server's reason. Never the URI, username or password; a command document
+ * echoed in the message (it can hold session ids and cluster-time signatures)
+ * is cut off.
+ */
+export function describeMongoError(err, { uri, failedCommand } = {}) {
+  const server = serverErrorIn(err);
+  const parts = [err?.name ?? "Error"];
+  if (server) {
+    const codeName = server.codeName ?? server.errorResponse?.codeName;
+    parts.push(`code ${server.code ?? "?"}${codeName ? ` (${codeName})` : ""}`);
+  }
+  // The recorded command only if it failed with this same code (a failure the
+  // code tolerated earlier, e.g. NamespaceExists, must not be blamed).
+  const recorded = failedCommand && server && failedCommand.code === server.code ? failedCommand.name : null;
+  // Authentication runs in the connection handshake, which command monitoring doesn't see.
+  const command = recorded ?? (server?.code === 18 ? "authenticate (connection handshake)" : null);
+  if (command) parts.push(`command: ${command}`);
+  let reason = server?.errmsg ?? server?.errorResponse?.errmsg ?? server?.message ?? err?.message ?? "";
+  reason = reason.replace(/\s*(:\s*)?\{[\s\S]*$/, "").trim(); // drop an echoed command document
+  reason = redactUri(reason, uri).slice(0, 300);
+  return `${parts.join(", ")}${reason ? ` — ${reason}` : ""}`;
+}
+
 /**
  * Opens the shared connection and applies the collection validators and
  * indexes (both idempotent, so concurrent cold starts are harmless). It does
@@ -56,18 +124,37 @@ function explainConnectionError(err) {
  * `maxPoolSize` is small on purpose: on Vercel each warm instance keeps its own
  * pool, and many instances share one Atlas cluster's connection limit.
  */
-export async function connectDatabase({ uri, dbName, maxPoolSize = 10 }) {
+export async function connectDatabase({ uri, dbName, maxPoolSize = 10, trackFailedCommands = false }) {
   let client;
+  // { name, code } of the last command the server rejected, including write
+  // errors inside an "ok" reply (admin scripts only: command monitoring adds an
+  // event per command, which the API doesn't need).
+  let failedCommand = null;
   try {
-    client = new MongoClient(uri, { serverSelectionTimeoutMS: 8000, appName: "ecosetu-api", maxPoolSize });
+    client = new MongoClient(uri, { serverSelectionTimeoutMS: 8000, appName: "ecosetu-api", maxPoolSize, monitorCommands: trackFailedCommands });
+    if (trackFailedCommands) {
+      client.on("commandFailed", (e) => (failedCommand = { name: e.commandName, code: e.failure?.code }));
+      client.on("commandSucceeded", (e) => {
+        const writeError = e.reply?.writeErrors?.[0] ?? e.reply?.writeConcernError;
+        if (writeError) failedCommand = { name: e.commandName, code: writeError.code };
+      });
+    }
     await client.connect();
     const db = client.db(dbName);
     await db.command({ ping: 1 });
     await ensureCollections(db);
-    return { client, db, close: () => client.close() };
+    return {
+      client,
+      db,
+      close: () => client.close(),
+      /** One line for an error thrown while using this connection (no URI or credentials). */
+      describeError: (err) => describeMongoError(err, { uri, failedCommand }),
+    };
   } catch (err) {
     await client?.close().catch(() => {});
-    throw new DatabaseError(explainConnectionError(err));
+    const error = new DatabaseError(explainConnectionError(err));
+    error.details = describeMongoError(err, { uri, failedCommand });
+    throw error;
   }
 }
 

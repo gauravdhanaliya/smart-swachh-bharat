@@ -141,8 +141,9 @@ if (!fs.existsSync(file)) {
 
 const config = loadConfig();
 const sqlite = new DatabaseSync(file, { readOnly: true });
-const conn = await connectDatabase({ uri: config.mongoUri, dbName: config.mongoDbName }).catch((err) => {
+const conn = await connectDatabase({ uri: config.mongoUri, dbName: config.mongoDbName, trackFailedCommands: true }).catch((err) => {
   console.error(err.message);
+  if (err.details) console.error(`  Details: ${err.details}`); // code, codeName, command; never the URI or credentials
   process.exit(1);
 });
 
