@@ -138,8 +138,3 @@ The intended walkthrough: sign in as Citizen and report an overflowing bin, sign
 
 - Gaurav Kumar - Team Lead and Full-Stack Developer ([@gauravdhanaliya](https://github.com/gauravdhanaliya))
 - Ashmit Saini - Team Member ([@Paradox-cy](https://github.com/Paradox-cy))
-- Aaditya Giri - Team Member
-- Bhaswar Ghosh - Team Member
-- Sujal Tomar - Team Member
-
-Faculty guide: Mohd Anas
