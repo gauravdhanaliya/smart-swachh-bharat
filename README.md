@@ -134,8 +134,12 @@ The intended walkthrough: sign in as Citizen and report an overflowing bin, sign
 
 ## Team and contact
 
-[TEAM NAME]
+**Team EcoSetu**, IIMT Engineering College, Meerut (CSE, AI & DS)
 
-- [Member name] - [role/contact]
-- [Member name] - [role/contact]
-- [Member name] - [role/contact]
+- Gaurav Kumar - Team Lead and Full-Stack Developer ([@gauravdhanaliya](https://github.com/gauravdhanaliya))
+- Ashmit Saini - Team Member ([@Paradox-cy](https://github.com/Paradox-cy))
+- Aaditya Giri - Team Member
+- Bhaswar Ghosh - Team Member
+- Sujal Tomar - Team Member
+
+Faculty guide: Mohd Anas
